@@ -16,10 +16,10 @@ docs/                 plan and UI requirements
 packages/protocol/    @glitch/protocol: shared TypeScript types for the bridge
 ui/                   @glitch/ui: Preact + Vite app the engine loads
   glitch/             the Scamp project. Scamp-owned: don't hand-edit
-  src/app/            views, hooks, fader law, placeholders
+  src/app/            views, router, meters, fader law, placeholders
   src/bridge/         engine.ts (JUCE or mock), mockEngine.ts
   src/store/          signals store fed by engine events
-engine/src/           C++ app: Main, MainComponent, bridge/ (WebUi, Protocol.h), audio/ (Engine)
+engine/src/           C++ app: Main, MainComponent, bridge/ (WebUi, Protocol.h), audio/ (Engine, ChainStage), plugins/ (PluginLibrary, PluginWindow), project/ (ProjectStore)
 scripts/              dev.sh (UI dev server), mac.sh (build on the Mac over SSH)
 .github/workflows/    CI: UI, Linux engine, macOS app
 ```
@@ -57,10 +57,12 @@ The Vite dev server listens on the local network (`server.host: true`) so the Ma
 - `ui/glitch/` is the Scamp project. Open it in Scamp from there. Treat it as generated and never hand-edit it, including its config.
 - Scamp components are presentational: props in, callbacks out. They never import from `app/`, `bridge/` or `store/`. If a component needs data, it needs a new prop, added in Scamp.
 - Every state in `docs/ui-requirements.md` should be reachable through props (`muted`, `status`, …).
-- High-rate visuals (meters, CPU, hold progress) read CSS variables from a root element passed through a ref prop (`meterRef`). The app writes `--level` at ~30 Hz without re-rendering.
+- Meters read a CSS variable: bind a string prop to `data-meter` on the meter element (ChainStrip has `inputMeter` and `outputMeter`), and style the fill from `var(--level, <sample>)`, where `--level` runs 0–1. `ui/src/app/meters.ts` writes `--level` (and a latched `data-clip`) into every `[data-meter]` element at ~30 Hz without re-rendering. Keys come from the `meters` event: `in:1`, `out:1`, `chain:<id>:in`, `chain:<id>:out`.
 - Per-chain and per-track colors come in through an `accent` prop, applied as `--accent`.
 - `ui/src/app/` imports Scamp components through the `@scamp` alias (`@scamp/components/TopBar/TopBar`). `@` also points at `ui/glitch`, because Scamp's own files import each other as `@/components/...`. Hand-written code uses `@scamp`.
 - Hand-written CSS uses a `gl-` prefix. Note that Scamp's `design/theme.css` resets `button` and `input` with `all: unset`, so hand-written controls must style themselves.
+- Views take real data through Scamp's own bindings, and their defaults stay the canvas samples. Home's project grid is a repeat over `projects`. Rig's `content` variant is `sample` on the canvas and `live` in the app, where it shows the `chains` repeat and hides the sample song, chains and editor sheet.
+- **Hiding a component instance needs a show binding** (`{showTopBar && (<TopBar … />)}`), not a CSS variant rule. Scamp keeps variant rules on plain elements but deletes rules that target instance classes.
 - Missing components get a temporary placeholder in `ui/src/app/placeholders/`, deleted once the Scamp version exists.
 
 ### Placeholders to replace in Scamp
@@ -68,13 +70,43 @@ The Vite dev server listens on the local network (`server.host: true`) so the Ma
 | Component | Why there's a placeholder | Props the app needs |
 |---|---|---|
 | `Fader` | Scamp's Fader is uncontrolled (`defaultValue`, no callbacks). Its `level` and `muted` props are typed `string` but default to a number and a boolean. | `name`, `position` (0–1), `readout`, `muted`, `accent`, `onPositionChange(position)`, `onMuteChange(muted)` |
-| `Meter` | Doesn't exist yet. | `label`, `meterRef` (root reads `--level` 0–1 and `[data-clip]`; clicking clears clip), `accent`, `muted` |
+| `Meter` | Doesn't exist yet. | `label`, `meterKey` (bound to `data-meter`; reads `--level` 0–1 and `[data-clip]`; clicking clears clip), `accent`, `muted` |
 
-Also used from Scamp: `TopBar` (device, CPU and MIDI status, plus the panic button through its `panic: "off" | "on"` variant and `onPanic` event) and the `Rig` view, shown as a static design on the Rig screen. The app shell owns the live top bar, so it renders `<Rig topbar="hidden" />`; the canvas default (`shown`) still draws Rig's own top bar. The mock badge and the Monitor/Rig switcher sit next to `TopBar`. A prop worth adding to `TopBar` later: `cpuRef` (CPU fill via a CSS variable instead of re-rendering).
+Also used from Scamp:
+- `TopBar`: project name, device, CPU and MIDI status, and the panic button (`panic: "off" | "on"` variant, `onPanic` event). The app shell owns the live top bar, so it passes `showTopBar={false}` to the views; their canvas default still draws one. Its back arrow (`href="/"`) is the way from Rig to Projects.
+- The `Home` view (route `/`) and the `Rig` view (route `/rig`, with the monitor strip under it).
+- `ChainStrip`, inside Rig's live chains. Clicking the input or output chip steps to the next choice: inputs 1…n, then output pairs, then single outputs.
+
+Scamp's own interaction attributes (`data-scamp-click`, `-outside`, `-escape`: the TopBar device menu, ChainStrip's plugin menu, BlockTile's modal) work in the app because `ui/src/main.tsx` installs Scamp's runtime handler from `scampjs/runtime` (pinned to the version the Scamp project uses).
+
+The app routes in-page: `ui/src/app/router.ts` handles Scamp's plain `<a href="/...">` links without a page load. A project card links to `/rig?project=<id>`, which opens that project. The bundled app serves `index.html` for these paths.
+
+A prop worth adding to `TopBar` later: `cpuRef` (the CPU fill via a CSS variable instead of re-rendering).
 
 Vite serves `ui/glitch/public/` as the app's public folder, because Scamp references its images from the URL root (`/assets/*.webp`).
 
 The UI typecheck covers every Scamp file the app imports. Scamp's `React.ReactNode` slot types are mapped to Preact in `ui/src/env.d.ts`.
+
+## Projects and chains
+
+- The app starts blank. **New project** creates a project and opens its empty rig. **+ Add chain** adds a chain (input 1 → outputs 1/2, 0 dB) up to the v1 limit of 8.
+- A chain takes one hardware input, runs it through its plugins in order, applies a smoothed level and mute, and sums into its outputs. Chains are stereo from the input stage on. Amp models (NAM) and IRs come in later milestones.
+- The monitor fader is the master stage after all chains, with mute and PANIC on top. With no chains, the outputs are silent.
+- Projects are saved as JSON in `~/.config/Glitch/projects/<id>/project.json` on Linux and `~/Library/Application Support/Glitch/` on macOS. Changes are written at most once a second, on switching projects and on quit, via a temp file so a crash can't corrupt them. `settings.json` remembers the last open project.
+- Not yet: renaming or deleting projects and chains. Delete a project's folder by hand for now.
+
+### Audio device
+
+Click the audio device pill in the top bar for a list of every device JUCE can see (all types: ALSA/JACK on Linux, CoreAudio on macOS). Picking one switches both directions when the device has them; a device with only inputs or only outputs leaves the other side as it was. The choice is saved in `settings.json` and restored at startup (falling back to the default device if it's gone). Opening the menu rescans, so a device plugged in after startup shows up.
+
+### Plugins
+
+- **Import:** open a chain's **+** menu. **Scan for plugins** searches the standard folders: `~/.vst3`, `/usr/lib/vst3` and `/usr/local/lib/vst3` on Linux, and `~/Library/Audio/Plug-Ins` and `/Library/Audio/Plug-Ins` on macOS. **Add plugin…** opens a file chooser for a plugin or a folder of plugins installed anywhere else. Formats: VST3, plus AU on macOS. The list is saved in `plugins.xml` next to the projects.
+- **Use:** pick a plugin from the **+** menu to add it to the end of that chain. Click a plugin tile for **Open plugin window** (the plugin's own editor, in a native window, or JUCE's generic one when it has none), **Bypass/Enable**, and **Remove from chain**.
+- **Saving:** each plugin's settings are captured every couple of seconds, on switching projects and on quit, and stored in the project (`pluginStates`, base64), outside the chains, so state events stay small.
+- **Missing plugins:** a block whose plugin isn't installed shows Scamp's error state ("Not installed") and is skipped in the audio path, but stays in the project. It loads again once a scan finds the plugin.
+- **Scanning risk:** scans run inside the app. A plugin that crashes during a scan takes Glitch down once; JUCE's crash marker (`plugin-scan-in-progress.txt`) makes the next scan skip it. Plugins are also created synchronously, which a few AUv3 plugins refuse. Both are marked `shortcut:` in `engine/src/plugins/PluginLibrary`.
+- In the browser, the mock engine's scan finds two placeholder plugins, so the flow can be designed without the app. "Add plugin…" and plugin windows only work in the app.
 
 ## Bridge protocol
 
@@ -145,6 +177,7 @@ For live UI on the Mac: run `./scripts/dev.sh` on Linux, then build `dev-remote`
 | JUCE | **8.0.15** | Not 8.0.9: on Linux, 8.0.9 crashes (`std::bad_alloc`) serving any bundled file larger than the WebView IPC pipe buffer. Fixed in 8.0.11. All 8.0.x releases list Xcode 12.4 as the minimum. Still to confirm on the Mac with Xcode 14.2. |
 | preact | **10.29.8** | Not 10.24.3: the Scamp project requires `^10.29.0`. Vite dedupes Preact, so `ui/glitch/node_modules` can't load a second copy. |
 | @preact/signals | 1.3.0 | |
+| scampjs | 0.3.4 | Only its `scampjs/runtime` interactions handler is used. It brings its own Vite 8 as a nested dependency, which the build doesn't use. Keep in step with `ui/glitch/package-lock.json`. |
 | vite | 5.4.10 | build target `safari15` |
 | @preact/preset-vite | 2.9.1 | |
 | typescript | 5.6.3 | |
