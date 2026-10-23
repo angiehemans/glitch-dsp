@@ -34,33 +34,6 @@ body {
   padding: 0 16px;
 }
 
-.gl-screens {
-  display: flex;
-  border: 1px solid var(--color-line, #2e3035);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.gl-screens button {
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-lo, #8a8f98);
-  cursor: pointer;
-}
-
-.gl-screens button[aria-current="page"] {
-  background: var(--color-bg-3, #34363b);
-  color: var(--color-text-hi, #d6d9de);
-}
-
-.gl-screens button:focus-visible {
-  outline: 2px solid var(--color-accent, #5c6ac4);
-  outline-offset: -2px;
-}
-
 .gl-mock-badge {
   padding: 4px 8px;
   border: 1px solid var(--color-warning, #fbbf24);
@@ -107,13 +80,24 @@ body {
   color: var(--color-muted, #8a8f98);
 }
 
+.gl-empty {
+  margin: 48px auto;
+  color: var(--color-muted, #8a8f98);
+}
+
+.gl-empty a {
+  color: var(--color-accent, #5c6ac4);
+}
+
+/* Monitor strip at the bottom of the rig */
 .gl-monitor {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 32px;
-  padding: 32px 16px;
+  padding: 24px 16px;
+  border-top: 1px solid var(--color-line, #2e3035);
+  background: var(--color-bg-1, #1a1b1e);
 }
 
 /* Fader placeholder */
@@ -275,4 +259,37 @@ body {
     var(--color-bg-2, #26282c) 0 4px,
     var(--color-bg-3, #34363b) 4px 8px
   );
+}
+
+/* Block actions, shown in BlockTile's modal */
+.gl-block-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.gl-block-actions button {
+  padding: 10px 14px;
+  border: 1px solid var(--color-line, #2e3035);
+  border-radius: 4px;
+  background: var(--color-bg-2, #26282c);
+  color: var(--color-text-hi, #d6d9de);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.gl-block-actions button:hover {
+  background: var(--color-bg-3, #34363b);
+}
+
+.gl-block-actions button:focus-visible {
+  outline: 2px solid var(--color-accent, #5c6ac4);
+  outline-offset: 2px;
+}
+
+.gl-block-actions .gl-danger {
+  color: var(--color-clip, #ef4444);
 }

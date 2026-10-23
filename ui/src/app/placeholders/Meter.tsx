@@ -1,21 +1,19 @@
-import type { Ref } from "preact";
-
 // Placeholder until Scamp has a Meter. Props to add in Scamp:
-// label, meterRef (root element; reads --level 0..1 and [data-clip]), accent, muted.
+// label, meterKey (bound as data-meter on the track, which reads --level 0..1 and [data-clip]), accent, muted.
 // Delete this file once ui/glitch/components/Meter exists.
 type MeterProps = {
   label: string;
-  meterRef: Ref<HTMLElement>;
+  meterKey: string;
   accent?: string;
   muted?: boolean;
 };
 
-export function Meter({ label, meterRef, accent, muted }: MeterProps) {
+export function Meter({ label, meterKey, accent, muted }: MeterProps) {
   return (
     <div class="gl-meter" data-muted={muted || undefined} style={accent ? { "--accent": accent } : undefined}>
       <div
         class="gl-meter-track"
-        ref={meterRef as Ref<HTMLDivElement>}
+        data-meter={meterKey}
         role="meter"
         aria-label={`${label} level`}
         title="Click to clear clip"
