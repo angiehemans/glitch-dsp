@@ -4,35 +4,46 @@ import Button from '@/components/Button/Button';
 type ProjectCardProps = {
   color?: "orange" | "cyan" | "pink" | "lime" | "violet";
   state?: "default" | "current" | "opening" | "warning";
+  menu?: "closed" | "open";
   name?: string;
+  renameKey?: string;
   href?: string;
   lastOpened?: string;
   chainCount?: string;
   presetCount?: string;
   setlistCount?: string;
   mainOutput?: string;
+  onRename?: () => void;
   className?: string;
 };
 
 export default function ProjectCard({
   color = "orange",
   state = "default",
+  menu = "closed",
   name = "Full Band, IEMs",
+  renameKey = "",
   href = "/rig",
   lastOpened = "Opened 2 hours ago",
   chainCount = "3",
   presetCount = "12",
   setlistCount = "2",
   mainOutput = "Main · Out 1/2",
+  onRename,
   className,
 }: ProjectCardProps) {
   return (
-    <article data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-color={color} data-state={state}>
+    <article data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-color={color} data-state={state} data-menu={menu} data-scamp-outside="menu:open=closed" data-scamp-escape="menu:open=closed">
       <div data-scamp-id="body_2d4f" className={styles.body_2d4f}>
         <div data-scamp-id="head_3e5a" className={styles.head_3e5a}>
-          <a data-scamp-id="name_4f6b" className={styles.name_4f6b} href={href}>{name}</a>
+          <a data-scamp-id="name_4f6b" className={styles.name_4f6b} href={href} data-rename={renameKey}>{name}</a>
           <span data-scamp-id="badge_open_5a7c" className={styles.badge_open_5a7c}>OPEN</span>
-          <Button data-scamp-instance-id="inst_7f0c" variant="icon" ariaLabel="Project options" label="⋯" />
+          <div data-scamp-id="options_wrap_7a2b" className={styles.options_wrap_7a2b} data-scamp-click="menu:closed=open,open=closed">
+            <Button data-scamp-instance-id="inst_7f0c" variant="icon" ariaLabel="Project options" label="⋯" />
+            <div data-scamp-id="options_menu_8b3c" className={styles.options_menu_8b3c} role="menu" aria-label="Project options">
+              <button data-scamp-id="rename_item_9c4d" className={styles.rename_item_9c4d} type="button" role="menuitem" data-scamp-click="menu:open=closed" onClick={onRename}>Rename</button>
+            </div>
+          </div>
         </div>
         <p data-scamp-id="opened_7c9e" className={styles.opened_7c9e}>{lastOpened}</p>
         <div data-scamp-id="stats_8daf" className={styles.stats_8daf}>
@@ -61,4 +72,4 @@ export default function ProjectCard({
   );
 }
 
-export const _scamp = { contract: 2, events: [] } as const;
+export const _scamp = { contract: 2, events: ['onRename'] } as const;

@@ -60,7 +60,6 @@
   color: var(--color-lcd-text);
   box-shadow: var(--bevel-inset);
   min-width: 0;
-  cursor: pointer;
 }
 
 .project_dot_d1a7 {

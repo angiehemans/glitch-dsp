@@ -223,6 +223,52 @@
   bottom: 0px;
 }
 
+.options_wrap_7a2b {
+  display: flex;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.options_menu_8b3c {
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+  padding: var(--space-1);
+  background: var(--color-bg-1);
+  border-radius: var(--radius-md);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line-strong);
+  box-shadow: var(--shadow-panel);
+  position: absolute;
+  top: 100%;
+  right: 0px;
+  margin: var(--space-1) 0px 0px 0px;
+  z-index: 10;
+}
+
+.rename_item_9c4d {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-hi);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rename_item_9c4d:hover {
+  background: var(--color-bg-3);
+}
+
+.rename_item_9c4d:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
 .root[data-color="cyan"] {
   --card-color: var(--chain-cyan);
 }
@@ -257,4 +303,8 @@
 
 .root[data-state="warning"] .warn_badge_4a6b {
   display: block;
+}
+
+.root[data-menu="open"] .options_menu_8b3c {
+  visibility: visible;
 }

@@ -5,6 +5,7 @@ type TopBarProps = {
   panic?: "off" | "on";
   audiomenu?: "closed" | "open";
   projectName?: string;
+  projectRenameKey?: string;
   presetName?: string;
   modified?: boolean;
   songName?: string;
@@ -23,6 +24,7 @@ export default function TopBar({
   panic = "off",
   audiomenu = "closed",
   projectName = "FULL BAND, IEMS",
+  projectRenameKey = "",
   presetName = "CLEAN VERSE",
   modified = true,
   songName = "03. MIDNIGHT CITY",
@@ -44,9 +46,9 @@ export default function TopBar({
         <svg data-scamp-id="back_icon_8f32" className={styles.back_icon_8f32} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l14 0" /><path d="M5 12l6 6" /><path d="M5 12l6 -6" /></svg>
       </a>
       <span data-scamp-id="brand_a3f1" className={styles.brand_a3f1}>GLITCH</span>
-      <button data-scamp-id="lcd_c4e9" className={styles.lcd_c4e9} type="button">
+      <div data-scamp-id="lcd_c4e9" className={styles.lcd_c4e9}>
         <div data-scamp-id="project_dot_d1a7" className={styles.project_dot_d1a7} />
-        <span data-scamp-id="project_name_e2b8" className={styles.project_name_e2b8}>{projectName}</span>
+        <span data-scamp-id="project_name_e2b8" className={styles.project_name_e2b8} data-rename={projectRenameKey}>{projectName}</span>
         <span data-scamp-id="sep_f3c9" className={styles.sep_f3c9}>//</span>
         <span data-scamp-id="preset_label_04da" className={styles.preset_label_04da}>PRESET</span>
         <span data-scamp-id="preset_name_15eb" className={styles.preset_name_15eb}>{presetName}</span>
@@ -56,7 +58,7 @@ export default function TopBar({
         <span data-scamp-id="sep_370d" className={styles.sep_370d}>//</span>
         <span data-scamp-id="song_label_481e" className={styles.song_label_481e}>SONG</span>
         <span data-scamp-id="song_name_592f" className={styles.song_name_592f}>{songName}</span>
-      </button>
+      </div>
       <div data-scamp-id="cpu_6a30" className={styles.cpu_6a30}>
         <span data-scamp-id="cpu_label_7b41" className={styles.cpu_label_7b41}>CPU</span>
         <div data-scamp-id="cpu_track_8c52" className={styles.cpu_track_8c52}>

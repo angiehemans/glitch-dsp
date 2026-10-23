@@ -8,6 +8,7 @@ type ChainStripProps = {
   inmenu?: "closed" | "open";
   outmenu?: "closed" | "open";
   name?: string;
+  renameKey?: string;
   input?: string;
   inputs?: Array<{ id: string; label: string; detail: string; current: boolean }>;
   level?: string;
@@ -38,6 +39,7 @@ export default function ChainStrip({
   inmenu = "closed",
   outmenu = "closed",
   name = "Guitar",
+  renameKey = "",
   input = "Input 1",
   inputs = [
     { id: "1", label: "In 1", detail: "Inst 1", current: true },
@@ -82,7 +84,7 @@ export default function ChainStrip({
         <div data-scamp-id="main_8252" className={styles.main_8252}>
           <div data-scamp-id="title_row_1c2d" className={styles.title_row_1c2d}>
             <div data-scamp-id="icon_9c3d" className={styles.icon_9c3d}>{icon}</div>
-            <h3 data-scamp-id="name_023e" className={styles.name_023e}>{name}</h3>
+            <h3 data-scamp-id="name_023e" className={styles.name_023e} data-rename={renameKey}>{name}</h3>
             <div data-scamp-id="head_spacer_cf60" className={styles.head_spacer_cf60} />
             <Button data-scamp-instance-id="inst_d39a" className={styles.inst_d39a} variant="icon" ariaLabel="Chain options" label="⋯" />
           </div>
