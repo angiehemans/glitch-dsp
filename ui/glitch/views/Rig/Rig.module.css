@@ -7,6 +7,10 @@
   color: var(--color-text);
 }
 
+.inst_1a0b {
+  width: 100%;
+}
+
 .shell_2b1c {
   min-height: 836px;
   display: flex;
@@ -515,3 +519,6 @@
   height: 480px;
 }
 
+.root[data-topbar="hidden"] .inst_1a0b {
+  display: none;
+}

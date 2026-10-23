@@ -4,14 +4,14 @@ type FaderProps = {
   color?: "green" | "blue" | "amber" | "pink";
   name?: string;
   level?: string;
-  muted?: string;
+  muted?: boolean;
   className?: string;
 };
 
 export default function Fader({
   color = "green",
   name = "Backing",
-  level = 75,
+  level = "75",
   muted = false,
   className,
 }: FaderProps) {

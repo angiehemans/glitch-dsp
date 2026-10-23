@@ -9,13 +9,14 @@ import Playlist from '@/components/Playlist/Playlist';
 import TopBar from '@/components/TopBar/TopBar';
 
 type RigProps = {
+  topbar?: "shown" | "hidden";
   className?: string;
 };
 
-export default function Rig({ className }: RigProps) {
+export default function Rig({ topbar = "shown", className }: RigProps) {
   return (
-    <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`}>
-      <TopBar data-scamp-instance-id="inst_1a0b" />
+    <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-topbar={topbar}>
+      <TopBar data-scamp-instance-id="inst_1a0b" className={styles.inst_1a0b} />
       <div data-scamp-id="shell_2b1c" className={styles.shell_2b1c}>
         <main data-scamp-id="main_4d3e" className={styles.main_4d3e}>
           <div data-scamp-id="content_5e4f" className={styles.content_5e4f}>

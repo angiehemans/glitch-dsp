@@ -53,7 +53,7 @@ export default function ChainStrip({
 	
 	<path xmlns="http://www.w3.org/2000/svg" d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>
 </svg>
-            <p data-scamp-id="source_47e8" className={styles.source_47e8} type="button">{input}</p>
+            <p data-scamp-id="source_47e8" className={styles.source_47e8}>{input}</p>
           </div>
           <div data-scamp-id="fader_row_3e4f" className={styles.fader_row_3e4f}>
             <div data-scamp-id="vfader_4f50" className={styles.vfader_4f50}>
