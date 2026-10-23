@@ -1,0 +1,46 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "dev",
+      "displayName": "Dev (UI from local Vite dev server)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "GLITCH_UI_DEV_URL": "http://localhost:5290",
+        "GLITCH_BUILD_UI": "OFF"
+      }
+    },
+    {
+      "name": "dev-remote",
+      "displayName": "Dev remote (UI from the Linux machine's dev server)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "GLITCH_UI_DEV_URL": "http://$env{GLITCH_DEV_HOST}:5290",
+        "GLITCH_BUILD_UI": "OFF"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (UI bundled)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "GLITCH_UI_DEV_URL": "",
+        "GLITCH_BUILD_UI": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "dev-remote", "configurePreset": "dev-remote" },
+    { "name": "release", "configurePreset": "release" }
+  ]
+}
