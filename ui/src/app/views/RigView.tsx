@@ -1,9 +1,10 @@
 import { SILENCE_DB, type Block, type Chain, type GlitchState } from "@glitch/protocol";
 import BlockTile from "@scamp/components/BlockTile/BlockTile";
+import ChainStrip from "@scamp/components/ChainStrip/ChainStrip";
 import Rig from "@scamp/views/Rig/Rig";
 import { send } from "../../store/glitch";
 import { dbToPosition, positionToDb } from "../faderLaw";
-import { renameWhenCreated } from "../rename";
+import { renameByKey, renameWhenCreated } from "../rename";
 import { MonitorView } from "./MonitorView";
 
 type ChainColor = "orange" | "cyan" | "pink" | "lime" | "violet";
@@ -83,11 +84,17 @@ export function RigView({ state }: { state: GlitchState }) {
 
   const inputNames = state.device?.inputs ?? [];
   const outputNames = state.device?.outputs ?? [];
-  const byId = new Map(state.chains.map((c) => [c.id, c]));
-  const withChain = (id: string, fn: (c: Chain) => void) => {
-    const c = byId.get(id);
-    if (c) fn(c);
-  };
+  const plugins = state.plugins.list.map((p) => ({
+    id: p.id,
+    name: p.name,
+    kind: [p.format, p.category.replace(/\|/g, " · ")].filter(Boolean).join(" · "),
+    image: PLUGIN_IMAGE,
+  }));
+  const pluginNote = state.plugins.scanning
+    ? "Scanning for plugins…"
+    : state.plugins.list.length === 0
+      ? "No plugins yet. Scan the standard folders, or add one."
+      : `${state.plugins.list.length} plugin${state.plugins.list.length === 1 ? "" : "s"}`;
 
   return (
     <>
@@ -95,44 +102,44 @@ export function RigView({ state }: { state: GlitchState }) {
         content="live"
         showTopBar={false}
         showPlaylist={false}
-        chains={state.chains.map((c) => ({
-          id: c.id,
-          color: c.color as ChainColor,
-          name: c.name,
-          renameKey: `chain:${c.id}`,
-          input: `In ${c.inputs[0].hwChannel}`,
-          ...ioOptions(c, inputNames, outputNames),
-          level: String(Math.round(dbToPosition(c.outputs[0].level) * 100)),
-          muted: c.muted,
-          inputMeter: `chain:${c.id}:in`,
-          output: outputLabel(c.outputs[0].hwChannels),
-          outputMeter: `chain:${c.id}:out`,
-          blocks: c.blocks.map((b) => <BlockView key={b.id} block={b} snapshotBase={state.snapshotBase} />),
-        }))}
-        plugins={state.plugins.list.map((p) => ({ id: p.id, name: p.name, kind: [p.format, p.category.replace(/\|/g, " · ")].filter(Boolean).join(" · "), image: PLUGIN_IMAGE }))}
-        pluginNote={
-          state.plugins.scanning
-            ? "Scanning for plugins…"
-            : state.plugins.list.length === 0
-              ? "No plugins yet. Scan the standard folders, or add one."
-              : `${state.plugins.list.length} plugin${state.plugins.list.length === 1 ? "" : "s"}`
-        }
-        scanning={state.plugins.scanning}
-        onChainAddPlugin={(chainId, pluginId) => send({ type: "block.add", chainId, block: { type: "plugin", pluginId } })}
-        onScanPlugins={() => send({ type: "plugins.scan" })}
-        onImportPlugin={() => send({ type: "plugins.import" })}
         onAddChain={() => {
           renameWhenCreated("chain");
           send({ type: "chain.create" });
         }}
-        onChainInput={(chainId, optionId) => send({ type: "chain.setInputs", chainId, inputs: [{ hwChannel: Number(optionId) }] })}
-        onChainOutput={(chainId, optionId) =>
-          send({ type: "chain.setOutputs", chainId, outputs: [{ hwChannels: optionId.split("-").map(Number) }] })
-        }
-        onChainLevel={(id, value) =>
-          send({ type: "chain.setLevel", chainId: id, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) })
-        }
-        onChainMute={(id) => withChain(id, (c) => send({ type: "chain.setMute", chainId: id, muted: !c.muted }))}
+        liveChains={state.chains.map((c) => (
+          <ChainStrip
+            key={c.id}
+            color={c.color as ChainColor}
+            name={c.name}
+            renameKey={`chain:${c.id}`}
+            removeLabel={c.blocks.length ? `Remove “${c.name}” and its ${c.blocks.length === 1 ? "plugin" : `${c.blocks.length} plugins`}` : `Remove “${c.name}”`}
+            onRename={() => renameByKey(`chain:${c.id}`)}
+            onRemove={() => send({ type: "chain.remove", chainId: c.id })}
+            input={`In ${c.inputs[0].hwChannel}`}
+            {...ioOptions(c, inputNames, outputNames)}
+            level={String(Math.round(dbToPosition(c.outputs[0].level) * 100))}
+            muted={c.muted}
+            inputMeter={`chain:${c.id}:in`}
+            output={outputLabel(c.outputs[0].hwChannels)}
+            outputMeter={`chain:${c.id}:out`}
+            plugins={plugins}
+            menuNote={pluginNote}
+            scanning={state.plugins.scanning}
+            onSelectInput={(id) => send({ type: "chain.setInputs", chainId: c.id, inputs: [{ hwChannel: Number(id) }] })}
+            onSelectOutput={(id) => send({ type: "chain.setOutputs", chainId: c.id, outputs: [{ hwChannels: id.split("-").map(Number) }] })}
+            onLevelChange={(value) =>
+              send({ type: "chain.setLevel", chainId: c.id, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) })
+            }
+            onMuteToggle={() => send({ type: "chain.setMute", chainId: c.id, muted: !c.muted })}
+            onAddPlugin={(pluginId) => send({ type: "block.add", chainId: c.id, block: { type: "plugin", pluginId } })}
+            onScanPlugins={() => send({ type: "plugins.scan" })}
+            onImportPlugin={() => send({ type: "plugins.import" })}
+          >
+            {c.blocks.map((b) => (
+              <BlockView key={b.id} block={b} snapshotBase={state.snapshotBase} />
+            ))}
+          </ChainStrip>
+        ))}
       />
       <MonitorView state={state} />
     </>

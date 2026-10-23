@@ -1,4 +1,5 @@
 import type { GlitchState } from "@glitch/protocol";
+import ProjectCard from "@scamp/components/ProjectCard/ProjectCard";
 import Home from "@scamp/views/Home/Home";
 import { send } from "../../store/glitch";
 import { renameByKey, renameWhenCreated } from "../rename";
@@ -22,26 +23,30 @@ export function HomeView({ state }: { state: GlitchState }) {
   return (
     <Home
       showTopBar={false}
+      showSamples={false}
       subtitle={count === 0 ? "No projects yet. Create one to start a rig." : `${count} project${count === 1 ? "" : "s"} · most recently opened first`}
-      projects={state.projects.map((p) => ({
-        id: p.id,
-        color: p.color as ProjectColor,
-        state: p.id === state.project?.id ? "current" : "default",
-        name: p.name,
-        renameKey: `project:${p.id}`,
-        href: `/rig?project=${encodeURIComponent(p.id)}`,
-        lastOpened: openedAgo(p.openedAt),
-        chainCount: String(p.chainCount),
-        presetCount: "0",
-        setlistCount: "0",
-        mainOutput: "Main · Out 1/2",
-      }))}
-      onRenameProject={(id) => renameByKey(`project:${id}`)}
       onNewProject={() => {
         // Name it in place on its card; Enter names it and opens its rig.
         renameWhenCreated("project", (id, how) => how === "enter" && navigate(`/rig?project=${encodeURIComponent(id)}`));
         send({ type: "project.create" });
       }}
+      projects={state.projects.map((p) => (
+        <ProjectCard
+          key={p.id}
+          className="gl-project-card"
+          color={p.color as ProjectColor}
+          state={p.id === state.project?.id ? "current" : "default"}
+          name={p.name}
+          renameKey={`project:${p.id}`}
+          href={`/rig?project=${encodeURIComponent(p.id)}`}
+          lastOpened={openedAgo(p.openedAt)}
+          chainCount={String(p.chainCount)}
+          presetCount="0"
+          setlistCount="0"
+          mainOutput="Main · Out 1/2"
+          onRename={() => renameByKey(`project:${p.id}`)}
+        />
+      ))}
     />
   );
 }

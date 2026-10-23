@@ -277,3 +277,8 @@ body {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* Project cards the app renders into Home's projects slot, sized like the canvas samples */
+.gl-project-card {
+  width: 320px;
+}

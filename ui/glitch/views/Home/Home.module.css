@@ -138,3 +138,28 @@
 .inst_b3c4.inst_b3c4 {
   width: 320px;
 }
+
+.inst_c4d5.inst_c4d5 {
+  width: 320px;
+}
+
+.inst_d5e6.inst_d5e6 {
+  width: 320px;
+}
+
+.inst_e6f7.inst_e6f7 {
+  width: 320px;
+}
+
+.inst_f708.inst_f708 {
+  width: 320px;
+}
+
+/* Wrappers that keep their cards in the grid: the canvas samples, and the app's cards (a slot). */
+.samples_4e5f {
+  display: contents;
+}
+
+.cards_5f60 {
+  display: contents;
+}
