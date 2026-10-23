@@ -50,9 +50,16 @@ jobs:
       - run: cmake --preset release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
       - run: cmake --build --preset release -j4
       - run: test -f build/release/engine/Glitch_artefacts/Release/Glitch.app/Contents/Resources/ui/index.html
-      # tar keeps the executable bit, which upload-artifact drops.
-      - run: tar -czf Glitch.app.tar.gz -C build/release/engine/Glitch_artefacts/Release Glitch.app
+      # A disk image keeps the app's permissions (upload-artifact drops them) and opens to the
+      # usual drag-to-Applications window.
+      - name: Make Glitch.dmg
+        run: |
+          mkdir dmg
+          cp -R build/release/engine/Glitch_artefacts/Release/Glitch.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname Glitch -srcfolder dmg -ov -format UDZO Glitch.dmg
       - uses: actions/upload-artifact@v4
         with:
-          name: Glitch.app
-          path: Glitch.app.tar.gz
+          name: Glitch-macOS
+          path: Glitch.dmg
+          compression-level: 0 # already compressed

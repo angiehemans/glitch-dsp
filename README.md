@@ -176,7 +176,7 @@ For live UI on the Mac: run `./scripts/dev.sh` on Linux, then build `dev-remote`
 
 ### CI
 
-`.github/workflows/build.yml` has three jobs: the UI (typecheck and build), Linux (release build) and macOS (universal release build, uploaded as `Glitch.app.tar.gz`). GitHub's macOS runners use a newer Xcode than 14.2, so a green CI run doesn't replace building on the Mac itself. The 12.0 deployment target keeps the artifact runnable on Monterey.
+`.github/workflows/build.yml` has three jobs: the UI (typecheck and build), Linux (release build) and macOS (universal release build, uploaded as `Glitch.dmg` in the run's **Glitch-macOS** artifact (GitHub zips artifacts, so unzip first). The app is unsigned: after dragging it to Applications, right-click it and choose Open the first time, or run `xattr -dr com.apple.quarantine /Applications/Glitch.app`). GitHub's macOS runners use a newer Xcode than 14.2, so a green CI run doesn't replace building on the Mac itself. The 12.0 deployment target keeps the artifact runnable on Monterey.
 
 ## Pinned versions and deviations
 
