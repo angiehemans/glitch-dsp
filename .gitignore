@@ -1,0 +1,6 @@
+node_modules/
+ui/dist/
+build/
+.DS_Store
+library/
+*.nam
