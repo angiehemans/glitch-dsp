@@ -39,6 +39,8 @@ jobs:
 
   macos:
     runs-on: macos-14
+    permissions:
+      contents: write # to publish releases on tags
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,3 +65,14 @@ jobs:
           name: Glitch-macOS
           path: Glitch.dmg
           compression-level: 0 # already compressed
+      # Tags (v*) publish the dmg as a GitHub Release; pre-release while the app is unsigned.
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" Glitch.dmg --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" Glitch.dmg --prerelease --title "Glitch $GITHUB_REF_NAME" --notes-file .github/release-notes.md
+          fi
