@@ -4,18 +4,20 @@ type BlockTileProps = {
   state?: "active" | "bypassed" | "selected" | "loading" | "error";
   expanded?: "closed" | "open";
   modal?: "closed" | "open";
+  art?: "fixed" | "hug";
   typeLabel?: string;
   name?: string;
   detail?: string;
+  onOpen?: () => void;
   children?: React.ReactNode;
   plugin?: React.ReactNode;
   className?: string;
 };
 
-export default function BlockTile({ state = "active", expanded = "closed", modal = "closed", typeLabel = "VST3", name = "Vintage Amp", detail = "Amp · 9% CPU", children, plugin, className }: BlockTileProps) {
+export default function BlockTile({ state = "active", expanded = "closed", modal = "closed", art = "fixed", typeLabel = "VST3", name = "Vintage Amp", detail = "Amp · 9% CPU", onOpen, children, plugin, className }: BlockTileProps) {
   return (
-    <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-state={state} data-expanded={expanded} data-modal={modal} data-scamp-escape="modal:open=closed">
-      <button data-scamp-id="art_btn_d71e" className={styles.art_btn_d71e} type="button" aria-label="Open plugin" data-scamp-click="modal:closed=open">
+    <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-state={state} data-expanded={expanded} data-modal={modal} data-art={art} data-scamp-escape="modal:open=closed">
+      <button data-scamp-id="art_btn_d71e" className={styles.art_btn_d71e} type="button" aria-label="Open plugin" onClick={onOpen}>
         <div data-scamp-id="art_1f20" className={styles.art_1f20}>{children}</div>
       </button>
       <button data-scamp-id="expand_5e8a" className={styles.expand_5e8a} type="button" aria-label="Show details" data-scamp-click="expanded:closed=open,open=closed">
@@ -43,4 +45,4 @@ export default function BlockTile({ state = "active", expanded = "closed", modal
   );
 }
 
-export const _scamp = { contract: 2, events: [] } as const;
+export const _scamp = { contract: 2, events: ['onOpen'] } as const;

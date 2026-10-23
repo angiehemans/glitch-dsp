@@ -299,6 +299,14 @@
   visibility: visible;
 }
 
+.root[data-art="hug"] {
+  height: fit-content;
+}
+
+.root[data-art="hug"] .art_1f20 {
+  height: fit-content;
+}
+
 .root[data-state="loading"][data-expanded="open"] .detail_e506 {
   display: none;
 }

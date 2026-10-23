@@ -322,6 +322,9 @@
   font-size: 14px;
   color: var(--color-text-lo);
   white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .midi_status_4f7a {
   height: 44px;

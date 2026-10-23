@@ -65,7 +65,7 @@ export default function TopBar({
         <span data-scamp-id="cpu_value_ae74" className={styles.cpu_value_ae74}>{cpuLoad}</span>
       </div>
       <div data-scamp-id="audio_wrap_f125" className={styles.audio_wrap_f125}>
-        <button data-scamp-id="audio_status_bf85" className={styles.audio_status_bf85} type="button" aria-haspopup="menu" data-scamp-click="audiomenu:closed=open,open=closed" onClick={onAudioClick}>
+        <button data-scamp-id="audio_status_bf85" className={styles.audio_status_bf85} type="button" aria-haspopup="menu" title={audioDevice} data-scamp-click="audiomenu:closed=open,open=closed" onClick={onAudioClick}>
           <div data-scamp-id="audio_led_c096" className={styles.audio_led_c096} />
           <span data-scamp-id="audio_name_d73a" className={styles.audio_name_d73a}>{audioDevice}</span>
         </button>

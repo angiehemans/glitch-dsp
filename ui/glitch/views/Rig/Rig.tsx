@@ -9,19 +9,20 @@ import Playlist from '@/components/Playlist/Playlist';
 import TopBar from '@/components/TopBar/TopBar';
 
 type ChainColor = "orange" | "cyan" | "pink" | "lime" | "violet";
+type IoOption = { id: string; label: string; detail: string; current: boolean };
 
 type RigProps = {
   content?: "sample" | "live";
   showTopBar?: boolean;
   showPlaylist?: boolean;
-  chains?: Array<{ id: string; color: ChainColor; name: string; input: string; level: string; muted: boolean; inputMeter: string; output: string; outputMeter: string; blocks: React.ReactNode }>;
+  chains?: Array<{ id: string; color: ChainColor; name: string; input: string; inputs: IoOption[]; level: string; muted: boolean; inputMeter: string; output: string; outputs: IoOption[]; outputMeter: string; blocks: React.ReactNode }>;
   plugins?: Array<{ id: string; name: string; kind: string; image: string }>;
   pluginNote?: string;
   scanning?: boolean;
-  onChainInput?: (id: string) => void;
+  onChainInput?: (chainId: string, optionId: string) => void;
   onChainLevel?: (id: string, value: string) => void;
   onChainMute?: (id: string) => void;
-  onChainOutput?: (id: string) => void;
+  onChainOutput?: (chainId: string, optionId: string) => void;
   onChainAddPlugin?: (chainId: string, pluginId: string) => void;
   onScanPlugins?: () => void;
   onImportPlugin?: () => void;
@@ -34,8 +35,8 @@ export default function Rig({
   showTopBar = true,
   showPlaylist = true,
   chains = [
-    { id: "1", color: "orange", name: "Guitar", input: "In 1", level: "75", muted: false, inputMeter: "", output: "Out 1/2", outputMeter: "", blocks: null },
-    { id: "2", color: "cyan", name: "Vocals", input: "In 2", level: "64", muted: true, inputMeter: "", output: "Out 1/2", outputMeter: "", blocks: null },
+    { id: "1", color: "orange", name: "Guitar", input: "In 1", inputs: [{ id: "1", label: "In 1", detail: "Inst 1", current: true }, { id: "2", label: "In 2", detail: "Inst 2", current: false }], level: "75", muted: false, inputMeter: "", output: "Out 1/2", outputs: [{ id: "1-2", label: "Out 1/2", detail: "Main L / Main R", current: true }], outputMeter: "", blocks: null },
+    { id: "2", color: "cyan", name: "Vocals", input: "In 2", inputs: [{ id: "1", label: "In 1", detail: "Inst 1", current: false }, { id: "2", label: "In 2", detail: "Inst 2", current: true }], level: "64", muted: true, inputMeter: "", output: "Out 1/2", outputs: [{ id: "1-2", label: "Out 1/2", detail: "Main L / Main R", current: true }], outputMeter: "", blocks: null },
   ],
   plugins = [
     { id: "compressor", name: "Compressor", kind: "Dynamics", image: "/assets/compression-pedal.webp" },
@@ -126,7 +127,7 @@ export default function Rig({
             </div>
             <div data-scamp-id="live_chains_6a2f" className={styles.live_chains_6a2f}>
               {chains.map((chain) => (
-                <ChainStrip data-scamp-instance-id="inst_7b3e" key={chain.id} color={chain.color} name={chain.name} input={chain.input} level={chain.level} muted={chain.muted} inputMeter={chain.inputMeter} output={chain.output} outputMeter={chain.outputMeter} plugins={plugins} menuNote={pluginNote} scanning={scanning} onInputClick={() => onChainInput?.(chain.id)} onLevelChange={(value) => onChainLevel?.(chain.id, value)} onMuteToggle={() => onChainMute?.(chain.id)} onOutputClick={() => onChainOutput?.(chain.id)} onAddPlugin={(pluginId) => onChainAddPlugin?.(chain.id, pluginId)} onScanPlugins={onScanPlugins} onImportPlugin={onImportPlugin}>{chain.blocks}</ChainStrip>
+                <ChainStrip data-scamp-instance-id="inst_7b3e" key={chain.id} color={chain.color} name={chain.name} input={chain.input} inputs={chain.inputs} level={chain.level} muted={chain.muted} inputMeter={chain.inputMeter} output={chain.output} outputs={chain.outputs} outputMeter={chain.outputMeter} plugins={plugins} menuNote={pluginNote} scanning={scanning} onSelectInput={(optionId) => onChainInput?.(chain.id, optionId)} onLevelChange={(value) => onChainLevel?.(chain.id, value)} onMuteToggle={() => onChainMute?.(chain.id)} onSelectOutput={(optionId) => onChainOutput?.(chain.id, optionId)} onAddPlugin={(pluginId) => onChainAddPlugin?.(chain.id, pluginId)} onScanPlugins={onScanPlugins} onImportPlugin={onImportPlugin}>{chain.blocks}</ChainStrip>
               ))}
             </div>
             <Button data-scamp-instance-id="inst_9c1e" className={styles.inst_9c1e} variant="dashed" label="+ Add chain" onClick={onAddChain} />

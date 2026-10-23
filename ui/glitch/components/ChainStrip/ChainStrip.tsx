@@ -5,20 +5,24 @@ type ChainStripProps = {
   color?: "orange" | "cyan" | "pink" | "lime" | "violet";
   state?: "normal" | "selected" | "bypassed";
   menu?: "closed" | "open";
+  inmenu?: "closed" | "open";
+  outmenu?: "closed" | "open";
   name?: string;
   input?: string;
+  inputs?: Array<{ id: string; label: string; detail: string; current: boolean }>;
   level?: string;
   muted?: boolean;
   inputMeter?: string;
   output?: string;
+  outputs?: Array<{ id: string; label: string; detail: string; current: boolean }>;
   outputMeter?: string;
   plugins?: Array<{ id: string; name: string; kind: string; image: string }>;
   menuNote?: string;
   scanning?: boolean;
-  onInputClick?: () => void;
+  onSelectInput?: (id: string) => void;
   onLevelChange?: (value: string) => void;
   onMuteToggle?: () => void;
-  onOutputClick?: () => void;
+  onSelectOutput?: (id: string) => void;
   onAddPlugin?: (id: string) => void;
   onScanPlugins?: () => void;
   onImportPlugin?: () => void;
@@ -31,12 +35,22 @@ export default function ChainStrip({
   color = "orange",
   state = "normal",
   menu = "closed",
+  inmenu = "closed",
+  outmenu = "closed",
   name = "Guitar",
   input = "Input 1",
+  inputs = [
+    { id: "1", label: "In 1", detail: "Inst 1", current: true },
+    { id: "2", label: "In 2", detail: "Inst 2", current: false },
+  ],
   level = "75",
   muted = false,
   inputMeter = "",
   output = "Out 1/2 · FOH",
+  outputs = [
+    { id: "1-2", label: "Out 1/2", detail: "Main L / Main R", current: true },
+    { id: "3-4", label: "Out 3/4", detail: "Line 3 / Line 4", current: false },
+  ],
   outputMeter = "",
   plugins = [
     { id: "compressor", name: "Compressor", kind: "Dynamics", image: "/assets/compression-pedal.webp" },
@@ -51,10 +65,10 @@ export default function ChainStrip({
   ],
   menuNote = "9 plugins installed",
   scanning = false,
-  onInputClick,
+  onSelectInput,
   onLevelChange,
   onMuteToggle,
-  onOutputClick,
+  onSelectOutput,
   onAddPlugin,
   onScanPlugins,
   onImportPlugin,
@@ -63,7 +77,7 @@ export default function ChainStrip({
   className,
 }: ChainStripProps) {
   return (
-    <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-color={color} data-state={state} data-menu={menu} data-scamp-outside="menu:open=closed" data-scamp-escape="menu:open=closed">
+    <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-color={color} data-state={state} data-menu={menu} data-inmenu={inmenu} data-outmenu={outmenu} data-scamp-outside="menu:open=closed inmenu:open=closed outmenu:open=closed" data-scamp-escape="menu:open=closed inmenu:open=closed outmenu:open=closed">
       <div data-scamp-id="header_7a1b" className={styles.header_7a1b}>
         <div data-scamp-id="main_8252" className={styles.main_8252}>
           <div data-scamp-id="title_row_1c2d" className={styles.title_row_1c2d}>
@@ -77,7 +91,20 @@ export default function ChainStrip({
 	
 	<path xmlns="http://www.w3.org/2000/svg" d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>
 </svg>
-            <button data-scamp-id="source_47e8" className={styles.source_47e8} type="button" onClick={onInputClick}>{input}</button>
+            <button data-scamp-id="source_47e8" className={styles.source_47e8} type="button" aria-haspopup="menu" data-scamp-click="inmenu:closed=open,open=closed menu:open=closed outmenu:open=closed">{input}</button>
+            <div data-scamp-id="in_menu_1a9b" className={styles.in_menu_1a9b} role="menu" aria-label="Input">
+              <p data-scamp-id="in_title_2bac" className={styles.in_title_2bac}>INPUT</p>
+              <ul data-scamp-id="in_list_3cbd" className={styles.in_list_3cbd}>
+                {inputs.map((option) => (
+                  <li data-scamp-id="in_row_4dce" className={styles.in_row_4dce} key={option.id}>
+                    <button data-scamp-id="in_item_5edf" className={styles.in_item_5edf} type="button" role="menuitemradio" aria-checked={option.current} data-scamp-click="inmenu:open=closed" onClick={() => onSelectInput?.(option.id)}>
+                      <span data-scamp-id="in_label_6f01" className={styles.in_label_6f01}>{option.label}</span>
+                      <span data-scamp-id="in_detail_7012" className={styles.in_detail_7012}>{option.detail}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
           <div data-scamp-id="fader_row_3e4f" className={styles.fader_row_3e4f}>
             <div data-scamp-id="vfader_4f50" className={styles.vfader_4f50}>
@@ -103,10 +130,23 @@ export default function ChainStrip({
       </div>
       <div data-scamp-id="body_14b5" className={styles.body_14b5}>
         <div data-scamp-id="lane_58f9" className={styles.lane_58f9}>{children}</div>
-        <button data-scamp-id="add_btn_690a" className={styles.add_btn_690a} type="button" aria-label="Add block" data-scamp-click="menu:closed=open,open=closed">+</button>
+        <button data-scamp-id="add_btn_690a" className={styles.add_btn_690a} type="button" aria-label="Add block" data-scamp-click="menu:closed=open,open=closed inmenu:open=closed outmenu:open=closed">+</button>
       </div>
       <div data-scamp-id="out_panel_b3e7" className={styles.out_panel_b3e7}>
-        <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button" onClick={onOutputClick}>{output}</button>
+        <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button" aria-haspopup="menu" data-scamp-click="outmenu:closed=open,open=closed menu:open=closed inmenu:open=closed">{output}</button>
+        <div data-scamp-id="out_menu_8123" className={styles.out_menu_8123} role="menu" aria-label="Output">
+          <p data-scamp-id="out_title_9234" className={styles.out_title_9234}>OUTPUT</p>
+          <ul data-scamp-id="out_list_a345" className={styles.out_list_a345}>
+            {outputs.map((option) => (
+              <li data-scamp-id="out_row_b456" className={styles.out_row_b456} key={option.id}>
+                <button data-scamp-id="out_item_c567" className={styles.out_item_c567} type="button" role="menuitemradio" aria-checked={option.current} data-scamp-click="outmenu:open=closed" onClick={() => onSelectOutput?.(option.id)}>
+                  <span data-scamp-id="out_label_d678" className={styles.out_label_d678}>{option.label}</span>
+                  <span data-scamp-id="out_detail_e789" className={styles.out_detail_e789}>{option.detail}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
         <div data-scamp-id="meter_out_8b2d" className={styles.meter_out_8b2d} data-meter={outputMeter}>
           <div data-scamp-id="meter_out_fill_9c3e" className={styles.meter_out_fill_9c3e} />
         </div>
@@ -136,4 +176,4 @@ export default function ChainStrip({
   );
 }
 
-export const _scamp = { contract: 2, events: ['onInputClick', 'onLevelChange', 'onMuteToggle', 'onOutputClick', 'onAddPlugin', 'onScanPlugins', 'onImportPlugin'] } as const;
+export const _scamp = { contract: 2, events: ['onSelectInput', 'onLevelChange', 'onMuteToggle', 'onSelectOutput', 'onAddPlugin', 'onScanPlugins', 'onImportPlugin'] } as const;
