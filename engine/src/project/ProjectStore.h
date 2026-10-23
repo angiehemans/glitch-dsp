@@ -24,6 +24,8 @@ public:
 
     void create (const juce::String& name); // and opens it
     bool open (const juce::String& projectId);
+    /** Any project, open or not; one that isn't open is saved straight away. */
+    bool renameProject (const juce::String& projectId, const juce::String& name);
     juce::var addChain (const juce::String& name);
 
     /** Blocks of the open project. */
@@ -50,6 +52,7 @@ public:
 
 private:
     static juce::var normaliseProject (const juce::var&);
+    static bool save (const juce::var& project);
     void saveSettings() const;
 
     juce::Array<juce::var> projects;

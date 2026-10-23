@@ -10,7 +10,9 @@ export type Command =
   // Projects and chains. A new project is opened straight away.
   | { type: "project.create"; name?: string; from?: string }
   | { type: "project.open"; projectId: string }
+  | { type: "project.rename"; projectId: string; name: string }
   | { type: "chain.create"; name?: string }
+  | { type: "chain.rename"; chainId: string; name: string }
   | { type: "chain.setInputs"; chainId: string; inputs: Pick<InputRef, "hwChannel">[] }
   | { type: "chain.setOutputs"; chainId: string; outputs: Pick<OutputRef, "hwChannels">[] }
   | { type: "chain.setLevel"; chainId: string; levelDb: number }

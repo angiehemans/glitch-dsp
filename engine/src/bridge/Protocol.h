@@ -14,6 +14,8 @@ namespace glitch::protocol
         inline constexpr auto panicToggle    = "panic.toggle";
         inline constexpr auto projectCreate  = "project.create";
         inline constexpr auto projectOpen    = "project.open";
+        inline constexpr auto projectRename  = "project.rename";
+        inline constexpr auto chainRename    = "chain.rename";
         inline constexpr auto chainCreate    = "chain.create";
         inline constexpr auto chainSetInputs = "chain.setInputs";
         inline constexpr auto chainSetOutputs = "chain.setOutputs";

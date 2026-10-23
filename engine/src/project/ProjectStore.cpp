@@ -213,22 +213,39 @@ juce::var ProjectStore::addChain (const juce::String& name)
 
 void ProjectStore::saveIfDirty()
 {
-    if (! dirty || ! current.isObject())
-        return;
+    if (dirty && current.isObject() && save (current))
+        dirty = false;
+}
 
-    const auto file = getDataDir().getChildFile ("projects").getChildFile (current["id"].toString()).getChildFile ("project.json");
+bool ProjectStore::save (const juce::var& project)
+{
+    const auto file = getDataDir().getChildFile ("projects").getChildFile (project["id"].toString()).getChildFile ("project.json");
     file.getParentDirectory().createDirectory();
 
     // Write to a temp file and move it over, so a crash mid-write never leaves a broken project.
     juce::TemporaryFile temp (file);
-    if (temp.getFile().replaceWithText (juce::JSON::toString (current)) && temp.overwriteTargetFileWithTemporary())
+    if (temp.getFile().replaceWithText (juce::JSON::toString (project)) && temp.overwriteTargetFileWithTemporary())
+        return true;
+
+    DBG ("Failed to save " << file.getFullPathName());
+    return false;
+}
+
+bool ProjectStore::renameProject (const juce::String& projectId, const juce::String& name)
+{
+    for (const auto& p : projects)
     {
-        dirty = false;
+        if (p["id"].toString() == projectId)
+        {
+            p.getDynamicObject()->setProperty ("name", name);
+            if (p["id"] == current["id"])
+                markDirty();
+            else
+                save (p);
+            return true;
+        }
     }
-    else
-    {
-        DBG ("Failed to save " << file.getFullPathName());
-    }
+    return false;
 }
 
 juce::var ProjectStore::findBlock (const juce::String& blockId) const

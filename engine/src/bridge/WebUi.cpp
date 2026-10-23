@@ -53,6 +53,12 @@ namespace
         return result;
     }
 
+    /** A user-typed name: trimmed, single line, at most 60 characters. Empty means "invalid". */
+    juce::String cleanName (const juce::var& v)
+    {
+        return v.toString().replaceCharacters ("\r\n\t", "   ").trim().substring (0, 60).trim();
+    }
+
     bool isChannel (const juce::var& v)
     {
         return (v.isInt() || v.isInt64()) && (int) v >= 1 && (int) v <= Engine::maxChannels;
@@ -202,6 +208,15 @@ void WebUi::handleCommand (const juce::var& command)
         }
         syncEngine();
     }
+    else if (type == protocol::command::projectRename)
+    {
+        const auto name = cleanName (command["name"]);
+        if (name.isEmpty() || ! store.renameProject (command["projectId"].toString(), name))
+        {
+            sendError (name.isEmpty() ? "A project needs a name" : "Unknown project: " + command["projectId"].toString());
+            return;
+        }
+    }
     else if (type.startsWith ("chain."))
     {
         if (! handleChainCommand (type, command))
@@ -306,6 +321,16 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
         }
         output->setProperty ("hwChannels", hwChannels);
         syncEngine();
+    }
+    else if (type == protocol::command::chainRename)
+    {
+        const auto name = cleanName (command["name"]);
+        if (name.isEmpty())
+        {
+            sendError ("A chain needs a name");
+            return false;
+        }
+        obj->setProperty ("name", name);
     }
     else if (type == protocol::command::chainSetLevel)
     {
