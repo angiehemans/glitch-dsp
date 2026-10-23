@@ -29,12 +29,12 @@ export function App() {
           songName="—"
           cpuLoad={`${cpuPercent.value}%`}
           audioDevice={device ? device.name : "NO AUDIO DEVICE"}
-          devices={(state?.devices ?? []).map((d, i) => ({ id: String(i), name: d.name, kind: d.type, current: d.current }))}
+          devices={(state?.devices ?? []).map((d, i) => ({ id: String(i), name: d.label || d.name, kind: d.type, current: d.current }))}
           midiDevice={state?.midi.device ?? "NO MIDI"}
           onAudioClick={() => send({ type: "device.scan" })}
           onSelectDevice={(id) => {
             const d = state?.devices[Number(id)];
-            if (d && !d.current) send({ type: "device.select", deviceType: d.type, name: d.name });
+            if (d) send({ type: "device.select", deviceType: d.type, name: d.name }); // picking the current one reopens it
           }}
           panic={state?.panic ? "on" : "off"}
           onPanic={() => send({ type: "panic.toggle" })}

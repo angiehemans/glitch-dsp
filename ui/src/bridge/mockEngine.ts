@@ -6,6 +6,7 @@ export function emptyState(): GlitchState {
     device: null,
     devices: [],
     plugins: { scanning: false, list: [] },
+    snapshotBase: "",
     monitor: { gainDb: 0, muted: false },
     panic: false,
     project: null,
@@ -45,8 +46,8 @@ export function createMockEngine(): EngineBridge {
       outputs: ["Output 1", "Output 2"],
     },
     devices: [
-      { type: "Mock", name: "Mock M4", current: true },
-      { type: "Mock", name: "Mock built-in audio", current: false },
+      { type: "Mock", name: "Mock M4", label: "Mock M4", current: true },
+      { type: "Mock", name: "Mock built-in audio", label: "Mock built-in audio", current: false },
     ],
   };
 

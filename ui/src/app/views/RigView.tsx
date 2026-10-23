@@ -16,7 +16,28 @@ function outputChoices(n: number): number[][] {
   return [...pairs, ...singles];
 }
 
+/** Dropdown rows for a chain's input and output chips. Ids are the channel numbers ("2", "1-2"). */
+function ioOptions(chain: Chain, inputNames: string[], outputNames: string[]) {
+  const outputs = outputNames.length ? outputChoices(outputNames.length) : []; // none open: say so, don't invent a pair
+  const current = chain.outputs[0].hwChannels.join("-");
+  return {
+    inputs: (inputNames.length ? inputNames : ["Input 1"]).map((name, i) => ({
+      id: String(i + 1),
+      label: `In ${i + 1}`,
+      detail: name,
+      current: chain.inputs[0].hwChannel === i + 1,
+    })),
+    outputs: outputs.map((channels) => ({
+      id: channels.join("-"),
+      label: outputLabel(channels),
+      detail: channels.map((ch) => outputNames[ch - 1] ?? `Output ${ch}`).join(" / "),
+      current: channels.join("-") === current,
+    })),
+  };
+}
+
 const PLUGIN_IMAGE = "/assets/plugin.svg";
+const MAX_ART_HEIGHT = 400; // a very tall plugin window is scaled down so it can't blow up the chain strip
 
 function blockState(b: Block) {
   if (b.missing) return "error";
@@ -24,38 +45,32 @@ function blockState(b: Block) {
 }
 
 /**
- * A block in a chain. Clicking its artwork opens BlockTile's modal (a Scamp interaction), which holds
- * the block's actions. The plugin's own editor opens as a native window, since it can't render in the WebView.
+ * A block in a chain. Clicking it opens the plugin's own window (native: it can't render in the
+ * WebView), whose header has Bypass and Remove from chain.
  */
-function BlockView({ block }: { block: Block }) {
+function BlockView({ block, snapshotBase }: { block: Block; snapshotBase: string }) {
+  // Engine-captured picture of the plugin's window; the version busts the image cache after each capture.
+  const art = block.snapshotAt && snapshotBase ? `${snapshotBase}${block.id}.png?v=${block.snapshotAt}` : null;
+  // The tile hugs the snapshot at the plugin window's size (older snapshots without a size: the image's own).
+  const w = block.snapshotWidth ?? 0, h = block.snapshotHeight ?? 0;
+  const scale = h > MAX_ART_HEIGHT ? MAX_ART_HEIGHT / h : 1;
+  const size = w && h ? { width: `${Math.round(w * scale)}px`, height: `${Math.round(h * scale)}px` } : { maxHeight: `${MAX_ART_HEIGHT}px` };
+
   return (
     <BlockTile
       state={blockState(block)}
+      art={art ? "hug" : "fixed"}
       typeLabel={block.plugin?.format ?? block.type.toUpperCase()}
       name={block.name}
       detail={block.missing ? "Not installed" : block.plugin?.manufacturer || block.plugin?.category || ""}
-      plugin={
-        <div class="gl-block-actions">
-          {!block.missing && (
-            <button type="button" data-scamp-click="modal:open=closed" onClick={() => send({ type: "block.openEditor", blockId: block.id })}>
-              Open plugin window
-            </button>
-          )}
-          <button type="button" onClick={() => send({ type: "block.toggle", blockId: block.id })}>
-            {block.enabled ? "Bypass" : "Enable"}
-          </button>
-          <button type="button" class="gl-danger" data-scamp-click="modal:open=closed" onClick={() => send({ type: "block.remove", blockId: block.id })}>
-            Remove from chain
-          </button>
-        </div>
-      }
+      onOpen={() => send({ type: "block.openEditor", blockId: block.id })}
     >
-      <img src={PLUGIN_IMAGE} alt="" />
+      {art ? <img class="gl-block-art" src={art} style={size} alt="" /> : <img src={PLUGIN_IMAGE} alt="" />}
     </BlockTile>
   );
 }
 
-/** The rig of the open project, with the monitor strip under it. Clicking an I/O chip steps to the next choice. */
+/** The rig of the open project, with the monitor strip under it. */
 export function RigView({ state }: { state: GlitchState }) {
   if (!state.project) {
     return (
@@ -65,8 +80,8 @@ export function RigView({ state }: { state: GlitchState }) {
     );
   }
 
-  const numInputs = Math.max(1, state.device?.inputs.length ?? 1);
-  const choices = outputChoices(Math.max(1, state.device?.outputs.length ?? 2));
+  const inputNames = state.device?.inputs ?? [];
+  const outputNames = state.device?.outputs ?? [];
   const byId = new Map(state.chains.map((c) => [c.id, c]));
   const withChain = (id: string, fn: (c: Chain) => void) => {
     const c = byId.get(id);
@@ -84,12 +99,13 @@ export function RigView({ state }: { state: GlitchState }) {
           color: c.color as ChainColor,
           name: c.name,
           input: `In ${c.inputs[0].hwChannel}`,
+          ...ioOptions(c, inputNames, outputNames),
           level: String(Math.round(dbToPosition(c.outputs[0].level) * 100)),
           muted: c.muted,
           inputMeter: `chain:${c.id}:in`,
           output: outputLabel(c.outputs[0].hwChannels),
           outputMeter: `chain:${c.id}:out`,
-          blocks: c.blocks.map((b) => <BlockView key={b.id} block={b} />),
+          blocks: c.blocks.map((b) => <BlockView key={b.id} block={b} snapshotBase={state.snapshotBase} />),
         }))}
         plugins={state.plugins.list.map((p) => ({ id: p.id, name: p.name, kind: [p.format, p.category.replace(/\|/g, " · ")].filter(Boolean).join(" · "), image: PLUGIN_IMAGE }))}
         pluginNote={
@@ -104,16 +120,9 @@ export function RigView({ state }: { state: GlitchState }) {
         onScanPlugins={() => send({ type: "plugins.scan" })}
         onImportPlugin={() => send({ type: "plugins.import" })}
         onAddChain={() => send({ type: "chain.create" })}
-        onChainInput={(id) =>
-          withChain(id, (c) =>
-            send({ type: "chain.setInputs", chainId: id, inputs: [{ hwChannel: (c.inputs[0].hwChannel % numInputs) + 1 }] }),
-          )
-        }
-        onChainOutput={(id) =>
-          withChain(id, (c) => {
-            const current = choices.findIndex((ch) => ch.join() === c.outputs[0].hwChannels.join());
-            send({ type: "chain.setOutputs", chainId: id, outputs: [{ hwChannels: choices[(current + 1) % choices.length] }] });
-          })
+        onChainInput={(chainId, optionId) => send({ type: "chain.setInputs", chainId, inputs: [{ hwChannel: Number(optionId) }] })}
+        onChainOutput={(chainId, optionId) =>
+          send({ type: "chain.setOutputs", chainId, outputs: [{ hwChannels: optionId.split("-").map(Number) }] })
         }
         onChainLevel={(id, value) =>
           send({ type: "chain.setLevel", chainId: id, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) })

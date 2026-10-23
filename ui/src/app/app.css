@@ -261,35 +261,8 @@ body {
   );
 }
 
-/* Block actions, shown in BlockTile's modal */
-.gl-block-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-}
-
-.gl-block-actions button {
-  padding: 10px 14px;
-  border: 1px solid var(--color-line, #2e3035);
-  border-radius: 4px;
-  background: var(--color-bg-2, #26282c);
-  color: var(--color-text-hi, #d6d9de);
-  font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-  cursor: pointer;
-}
-
-.gl-block-actions button:hover {
-  background: var(--color-bg-3, #34363b);
-}
-
-.gl-block-actions button:focus-visible {
-  outline: 2px solid var(--color-accent, #5c6ac4);
-  outline-offset: 2px;
-}
-
-.gl-block-actions .gl-danger {
-  color: var(--color-clip, #ef4444);
+/* A plugin-window snapshot as a block tile's artwork, at the size RigView gives it */
+.gl-block-art {
+  display: block;
+  flex-shrink: 0;
 }
