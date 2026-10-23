@@ -61,7 +61,7 @@ export default function TopBar({
       </div>
       <div data-scamp-id="cpu_6a30" className={styles.cpu_6a30}>
         <span data-scamp-id="cpu_label_7b41" className={styles.cpu_label_7b41}>CPU</span>
-        <div data-scamp-id="cpu_track_8c52" className={styles.cpu_track_8c52}>
+        <div data-scamp-id="cpu_track_8c52" className={styles.cpu_track_8c52} data-cpu-meter="">
           <div data-scamp-id="cpu_fill_9d63" className={styles.cpu_fill_9d63} />
         </div>
         <span data-scamp-id="cpu_value_ae74" className={styles.cpu_value_ae74}>{cpuLoad}</span>

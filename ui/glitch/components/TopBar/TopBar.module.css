@@ -176,7 +176,7 @@
 }
 
 .cpu_fill_9d63 {
-  width: 34%;
+  width: calc(var(--level, 0.34) * 100%);
   height: 100%;
   background: var(--color-signal);
   position: absolute;
@@ -188,8 +188,11 @@
   font-family: var(--font-display);
   font-size: 16px;
   color: var(--color-text-hi);
-  width: fit-content;
+  width: 44px;
   height: fit-content;
+  flex-shrink: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .audio_status_bf85 {
