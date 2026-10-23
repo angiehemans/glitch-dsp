@@ -93,7 +93,8 @@ The UI typecheck covers every Scamp file the app imports. Scamp's `React.ReactNo
 - A chain takes one hardware input, runs it through its plugins in order, applies a smoothed level and mute, and sums into its outputs. Chains are stereo from the input stage on. Amp models (NAM) and IRs come in later milestones.
 - The monitor fader is the master stage after all chains, with mute and PANIC on top. With no chains, the outputs are silent.
 - Projects are saved as JSON in `~/.config/Glitch/projects/<id>/project.json` on Linux and `~/Library/Application Support/Glitch/` on macOS. Changes are written at most once a second, on switching projects and on quit, via a temp file so a crash can't corrupt them. `settings.json` remembers the last open project.
-- Not yet: renaming or deleting projects and chains. Delete a project's folder by hand for now.
+- **Renaming:** double-click a project's name (on its card, or in the Rig top bar) or a chain's name to edit it in place; Enter or clicking away saves, Escape cancels. A card's ⋯ menu has Rename too. New projects and chains start in rename mode, and Enter on a new project's name opens its rig. Scamp components opt in by binding `data-rename="project:<id>"` or `"chain:<id>"` on the text (`renameKey` props); `ui/src/app/rename.ts` does the editing with `contenteditable`, so text inside a `<button>` can't be renamed. Names are trimmed, one line, at most 60 characters.
+- Not yet: deleting projects and chains. Delete a project's folder by hand for now.
 
 ### Audio device
 
