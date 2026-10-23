@@ -133,6 +133,14 @@ export function createMockEngine(): EngineBridge {
         case "project.open":
           if (!open(cmd.projectId)) return error(`Unknown project: ${cmd.projectId}`);
           break;
+        case "project.rename": {
+          const p = projects.find((p) => p.id === cmd.projectId);
+          const name = cmd.name.replace(/\s+/g, " ").trim().slice(0, 60).trim();
+          if (!name) return error("A project needs a name");
+          if (!p) return error(`Unknown project: ${cmd.projectId}`);
+          p.name = name;
+          break;
+        }
         case "chain.create": {
           const p = projects.find((p) => p.id === state.project?.id);
           if (!p) return error("Open a project first");
@@ -148,6 +156,14 @@ export function createMockEngine(): EngineBridge {
             bypassed: false,
             muted: false,
           });
+          break;
+        }
+        case "chain.rename": {
+          const c = chain(cmd.chainId);
+          const name = cmd.name.replace(/\s+/g, " ").trim().slice(0, 60).trim();
+          if (!name) return error("A chain needs a name");
+          if (!c) return error(`Unknown chain: ${cmd.chainId}`);
+          c.name = name;
           break;
         }
         case "chain.setInputs":

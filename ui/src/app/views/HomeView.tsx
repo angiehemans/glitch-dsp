@@ -1,6 +1,7 @@
 import type { GlitchState } from "@glitch/protocol";
 import Home from "@scamp/views/Home/Home";
 import { send } from "../../store/glitch";
+import { renameByKey, renameWhenCreated } from "../rename";
 import { navigate } from "../router";
 
 type ProjectColor = "orange" | "cyan" | "pink" | "lime" | "violet";
@@ -27,6 +28,7 @@ export function HomeView({ state }: { state: GlitchState }) {
         color: p.color as ProjectColor,
         state: p.id === state.project?.id ? "current" : "default",
         name: p.name,
+        renameKey: `project:${p.id}`,
         href: `/rig?project=${encodeURIComponent(p.id)}`,
         lastOpened: openedAgo(p.openedAt),
         chainCount: String(p.chainCount),
@@ -34,9 +36,11 @@ export function HomeView({ state }: { state: GlitchState }) {
         setlistCount: "0",
         mainOutput: "Main · Out 1/2",
       }))}
+      onRenameProject={(id) => renameByKey(`project:${id}`)}
       onNewProject={() => {
-        send({ type: "project.create" }); // the engine opens the new project
-        navigate("/rig");
+        // Name it in place on its card; Enter names it and opens its rig.
+        renameWhenCreated("project", (id, how) => how === "enter" && navigate(`/rig?project=${encodeURIComponent(id)}`));
+        send({ type: "project.create" });
       }}
     />
   );

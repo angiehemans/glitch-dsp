@@ -24,6 +24,7 @@ export function App() {
         <TopBar
           variant={path === "/rig" ? "rig" : "home"}
           projectName={state?.project?.name ?? "NO PROJECT"}
+          projectRenameKey={state?.project ? `project:${state.project.id}` : ""}
           presetName="—"
           modified={false}
           songName="—"

@@ -3,6 +3,7 @@ import BlockTile from "@scamp/components/BlockTile/BlockTile";
 import Rig from "@scamp/views/Rig/Rig";
 import { send } from "../../store/glitch";
 import { dbToPosition, positionToDb } from "../faderLaw";
+import { renameWhenCreated } from "../rename";
 import { MonitorView } from "./MonitorView";
 
 type ChainColor = "orange" | "cyan" | "pink" | "lime" | "violet";
@@ -98,6 +99,7 @@ export function RigView({ state }: { state: GlitchState }) {
           id: c.id,
           color: c.color as ChainColor,
           name: c.name,
+          renameKey: `chain:${c.id}`,
           input: `In ${c.inputs[0].hwChannel}`,
           ...ioOptions(c, inputNames, outputNames),
           level: String(Math.round(dbToPosition(c.outputs[0].level) * 100)),
@@ -119,7 +121,10 @@ export function RigView({ state }: { state: GlitchState }) {
         onChainAddPlugin={(chainId, pluginId) => send({ type: "block.add", chainId, block: { type: "plugin", pluginId } })}
         onScanPlugins={() => send({ type: "plugins.scan" })}
         onImportPlugin={() => send({ type: "plugins.import" })}
-        onAddChain={() => send({ type: "chain.create" })}
+        onAddChain={() => {
+          renameWhenCreated("chain");
+          send({ type: "chain.create" });
+        }}
         onChainInput={(chainId, optionId) => send({ type: "chain.setInputs", chainId, inputs: [{ hwChannel: Number(optionId) }] })}
         onChainOutput={(chainId, optionId) =>
           send({ type: "chain.setOutputs", chainId, outputs: [{ hwChannels: optionId.split("-").map(Number) }] })

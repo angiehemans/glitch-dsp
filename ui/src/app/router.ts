@@ -8,6 +8,13 @@ export function navigate(to: string) {
   route.value = to;
 }
 
+let pendingNavigation: ReturnType<typeof setTimeout> | undefined;
+
+/** A double-click on a renameable link cancels the navigation its first click started. */
+export function cancelPendingNavigation() {
+  clearTimeout(pendingNavigation);
+}
+
 export function startRouter() {
   addEventListener("popstate", () => (route.value = location.pathname + location.search));
 
@@ -19,6 +26,13 @@ export function startRouter() {
     const href = link?.getAttribute("href");
     if (!link || !href?.startsWith("/") || link.target) return;
     e.preventDefault();
+    if (link.isContentEditable) return; // clicking inside a name being edited
+    if (link.dataset.rename) {
+      // Wait to see whether this is the first click of a double-click (rename).
+      clearTimeout(pendingNavigation);
+      pendingNavigation = setTimeout(() => navigate(href), 250);
+      return;
+    }
     navigate(href);
   });
 }
