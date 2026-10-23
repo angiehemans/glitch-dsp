@@ -7,19 +7,30 @@ export type Command =
   | { type: "monitor.setGain"; gainDb: number }
   | { type: "monitor.setMute"; muted: boolean }
   | { type: "panic.toggle" }
-  // Stubbed from the plan; not handled until their milestone.
-  | { type: "chain.create"; name: string }
-  | { type: "chain.setInputs"; chainId: string; inputs: InputRef[] }
-  | { type: "chain.setOutputs"; chainId: string; outputs: OutputRef[] }
-  | { type: "block.add"; chainId: string; block: { type: string; [key: string]: unknown }; index?: number }
-  | { type: "block.setParam"; blockId: string; param: string; value: number }
+  // Projects and chains. A new project is opened straight away.
+  | { type: "project.create"; name?: string; from?: string }
+  | { type: "project.open"; projectId: string }
+  | { type: "chain.create"; name?: string }
+  | { type: "chain.setInputs"; chainId: string; inputs: Pick<InputRef, "hwChannel">[] }
+  | { type: "chain.setOutputs"; chainId: string; outputs: Pick<OutputRef, "hwChannels">[] }
+  | { type: "chain.setLevel"; chainId: string; levelDb: number }
+  | { type: "chain.setMute"; chainId: string; muted: boolean }
+  // Audio device
+  | { type: "device.scan" }
+  | { type: "device.select"; deviceType: string; name: string }
+  // Plugins: scan the standard folders, or pick a plugin or folder (opens a native file chooser).
+  | { type: "plugins.scan" }
+  | { type: "plugins.import" }
+  | { type: "block.add"; chainId: string; block: { type: "plugin"; pluginId: string }; index?: number }
+  | { type: "block.remove"; blockId: string }
   | { type: "block.toggle"; blockId: string }
+  | { type: "block.openEditor"; blockId: string }
+  // Stubbed from the plan; not handled until their milestone.
+  | { type: "block.setParam"; blockId: string; param: string; value: number }
   | { type: "chain.splitAt"; chainId: string; index: number; duplicate?: boolean }
   | { type: "aby.setMode"; blockId: string; mode: "Y" | "AB" }
   | { type: "aby.select"; blockId: string; path: "A" | "B" }
   | { type: "aby.moveBlock"; blockId: string; toPath: "A" | "B" | "main"; index: number }
-  | { type: "project.create"; name: string; from?: string }
-  | { type: "project.open"; projectId: string }
   | { type: "project.setMainOutput"; outputs: number[] }
   | { type: "setlist.create"; name: string; projectId?: string }
   | { type: "setlist.addToProject"; setlistId: string; projectId: string }

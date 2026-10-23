@@ -22,11 +22,15 @@ target_sources(Glitch PRIVATE
     src/Main.cpp
     src/MainComponent.cpp
     src/bridge/WebUi.cpp
-    src/audio/Engine.cpp)
+    src/audio/Engine.cpp
+    src/plugins/PluginLibrary.cpp
+    src/project/ProjectStore.cpp)
 
 target_compile_definitions(Glitch PRIVATE
     JUCE_WEB_BROWSER=1
     JUCE_USE_CURL=0
+    JUCE_PLUGINHOST_VST3=1
+    JUCE_PLUGINHOST_AU=$<BOOL:${APPLE}>
     JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Glitch,JUCE_PRODUCT_NAME>"
     JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Glitch,JUCE_VERSION>"
     GLITCH_UI_DEV_URL="${GLITCH_UI_DEV_URL}")

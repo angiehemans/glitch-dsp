@@ -12,6 +12,21 @@ namespace glitch::protocol
         inline constexpr auto monitorSetGain = "monitor.setGain";
         inline constexpr auto monitorSetMute = "monitor.setMute";
         inline constexpr auto panicToggle    = "panic.toggle";
+        inline constexpr auto projectCreate  = "project.create";
+        inline constexpr auto projectOpen    = "project.open";
+        inline constexpr auto chainCreate    = "chain.create";
+        inline constexpr auto chainSetInputs = "chain.setInputs";
+        inline constexpr auto chainSetOutputs = "chain.setOutputs";
+        inline constexpr auto chainSetLevel  = "chain.setLevel";
+        inline constexpr auto chainSetMute   = "chain.setMute";
+        inline constexpr auto deviceScan     = "device.scan";
+        inline constexpr auto deviceSelect   = "device.select";
+        inline constexpr auto pluginsScan    = "plugins.scan";
+        inline constexpr auto pluginsImport  = "plugins.import";
+        inline constexpr auto blockAdd       = "block.add";
+        inline constexpr auto blockRemove    = "block.remove";
+        inline constexpr auto blockToggle    = "block.toggle";
+        inline constexpr auto blockOpenEditor = "block.openEditor";
     }
 
     namespace event

@@ -1,5 +1,6 @@
-// Data model from docs/plan.md. Only device, monitor and panic are live in M0;
-// the rest is stubbed so later milestones fill it in without reshaping the state.
+// Data model from docs/plan.md. Live so far: device, monitor (master level), panic, projects
+// and chains (input -> level/mute -> outputs, no blocks yet). The rest is stubbed so later
+// milestones fill it in without reshaping the state.
 
 /** Anything at or below this is silence (-inf). JSON can't carry -Infinity. */
 export const SILENCE_DB = -100;
@@ -12,6 +13,27 @@ export interface DeviceInfo {
   latencyMs: number;
   inputs: string[];
   outputs: string[];
+}
+
+/** An audio device the engine can switch to. */
+export interface AudioDeviceOption {
+  type: string;
+  name: string;
+  current: boolean;
+}
+
+/** An imported plugin. `id` is JUCE's identifier string for it. */
+export interface PluginInfo {
+  id: string;
+  name: string;
+  manufacturer: string;
+  format: string;
+  category: string;
+}
+
+export interface PluginLibraryState {
+  scanning: boolean;
+  list: PluginInfo[];
 }
 
 export interface MonitorState {
@@ -31,6 +53,9 @@ export interface Block {
   enabled: boolean;
   mix?: number;
   params?: Record<string, number>;
+  /** type "plugin": which plugin, and whether it failed to load (not installed). */
+  plugin?: PluginInfo;
+  missing?: boolean;
 }
 
 export interface AbyPath { blocks: Block[]; level: number; pan: number; mute: boolean }
@@ -56,6 +81,7 @@ export interface Chain {
   blocks: Block[];
   outputs: OutputRef[];
   bypassed: boolean;
+  muted: boolean;
 }
 
 export interface PresetSummary { id: string; name: string }
@@ -90,9 +116,21 @@ export interface Setlist {
 
 export interface TrackMixEntry { outputs: OutputRef[]; level: number; pan: number; mute: boolean }
 
-export interface ProjectSummary { id: string; name: string; color: string }
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  color: string;
+  chainCount: number;
+  /** ms since epoch */
+  openedAt: number;
+}
 
-export interface Project extends ProjectSummary {
+export interface Project {
+  id: string;
+  name: string;
+  color: string;
+  /** ms since epoch */
+  openedAt: number;
   mainOutput: number[];
   setlists: string[];
   songPresets: Record<string, string>;
@@ -111,10 +149,15 @@ export interface TuneModeState {
 
 export interface GlitchState {
   device: DeviceInfo | null;
+  devices: AudioDeviceOption[];
+  plugins: PluginLibraryState;
   monitor: MonitorState;
   panic: boolean;
+  /** The open project. */
   project: Project | null;
+  /** All projects, most recently opened first. */
   projects: ProjectSummary[];
+  /** The open project's chains. */
   chains: Chain[];
   presets: PresetSummary[];
   currentPresetId: string | null;
