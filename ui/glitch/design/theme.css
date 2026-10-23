@@ -1,0 +1,330 @@
+/* scamp: font imports — managed by Project Settings → Fonts */
+
+@import url("https://fonts.googleapis.com/css2?family=Google+Sans:wght@400..700&display=swap");
+
+:root {
+  /* Primitives — brand */
+  --color-brand-50: #dde4ff;
+  --color-brand-100: #ced8ff;
+  --color-brand-200: #b9c6ff;
+  --color-brand-300: #99aaff;
+  --color-brand-400: #7889e2;
+  --color-brand-500: #5c6ac4;
+  --color-brand-600: #4652a0;
+  --color-brand-700: #343d84;
+  --color-brand-800: #242a6b;
+  --color-brand-900: #151752;
+
+  /* Primitives — neutral */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+
+  /* Primitives — error */
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-200: #fecaca;
+  --color-error-300: #fca5a5;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+  --color-error-800: #991b1b;
+  --color-error-900: #7f1d1d;
+
+  /* Primitives — warning */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+
+  /* Primitives — success */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-300: #86efac;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-success-800: #166534;
+  --color-success-900: #14532d;
+
+  /* Primitives — bg */
+  --color-bg-0: #101113;
+  --color-bg-1: #1a1b1e;
+  --color-bg-2: #26282c;
+  --color-bg-3: #34363b;
+
+  /* Semantic */
+  --color-line: #2e3035;
+  --color-line-strong: #4a4d53;
+  --color-text-hi: #d6d9de;
+  --color-text-lo: #8a8f98;
+  --color-text-dim: #5b5f66;
+  --color-accent: var(--color-brand-500);
+  --color-accent-soft: rgba(59, 130, 246, 0.12);
+  --color-lcd-bg: #050506;
+  --color-lcd-text: var(--color-brand-400);
+  --color-lcd-dim: #3a3c40;
+  --color-signal: #4ade80;
+  --color-hot: #fbbf24;
+  --color-clip: #ef4444;
+  --color-clip-soft: rgba(239, 68, 68, 0.15);
+  --color-hot-soft: rgba(251, 191, 36, 0.15);
+  --color-primary: var(--color-accent);
+  --color-secondary: var(--color-text-lo);
+  --color-background: var(--color-bg-0);
+  --color-surface: var(--color-bg-1);
+  --color-text: var(--color-text-hi);
+  --color-muted: var(--color-text-lo);
+  --color-border: var(--color-line);
+  --color-error: var(--color-clip);
+  --color-warning: var(--color-hot);
+  --color-success: var(--color-signal);
+
+  /* Typography */
+  --font-display: var(--font-sans);
+  --font-sans: "Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radius */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-full: 999px;
+
+  /* Shadows */
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 6px 8px -2px rgba(0, 0, 0, 0.8), 0 14px 18px -6px rgba(0, 0, 0, 0.6);
+  --shadow-sheet: 0 -1px 0 var(--divider-dark), inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 -12px 24px rgba(0, 0, 0, 0.5);
+  --color-scrim: rgba(0, 0, 0, 0.7);
+
+  /* Other */
+  --chain-orange: #fb923c;
+  --chain-cyan: #22d3ee;
+  --chain-pink: #f472b6;
+  --chain-lime: #a3e635;
+  --chain-violet: #a78bfa;
+  --card-color: var(--chain-orange);
+  --strip-color: var(--chain-orange);
+  --panel-gradient: linear-gradient(180deg, var(--color-bg-2), var(--color-bg-1));
+  --button-face: linear-gradient(180deg, var(--color-bg-3), #232428);
+  --button-face-hover: linear-gradient(180deg, #3e4046, var(--color-bg-2));
+  --divider-dark: rgba(0, 0, 0, 0.45);
+  --bevel: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 3px 5px rgba(0, 0, 0, 0.6);
+  --bevel-inset: inset 0 2px 3px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
+  --bevel-button: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --glow-accent: 0 0 0 2px var(--color-bg-0), 0 0 0 4px var(--color-accent);
+  --meter-gradient: linear-gradient(0deg, var(--color-signal) 0%, var(--color-signal) 65%, var(--color-hot) 85%, var(--color-clip) 100%);
+  --select-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a8f98' stroke-width='1.5'/%3E%3C/svg%3E") right 8px center / 10px 6px no-repeat;
+  --placeholder-x: linear-gradient(to top right, transparent calc(50% - 0.5px), var(--color-line) 50%, transparent calc(50% + 0.5px)), linear-gradient(to top left, transparent calc(50% - 0.5px), var(--color-line) 50%, transparent calc(50% + 0.5px));
+  --fader-bg: var(--color-bg-0);
+  --fader-panel-top: var(--color-bg-2);
+  --fader-panel-bottom: var(--color-bg-1);
+  --fader-slot: var(--color-lcd-bg);
+  --fader-tick: var(--color-text-dim);
+  --fader-label: var(--color-text-lo);
+  --fader-label-strong: var(--color-text-hi);
+  --fader-cap-hi: var(--color-line-strong);
+  --fader-cap-mid: #2c2e32;
+  --fader-cap-lo: #1b1c1f;
+  --fader-dot-off: var(--color-lcd-dim);
+  --fader-green: #4ade80;
+  --fader-blue: #60a5fa;
+  --fader-amber: #fbbf24;
+  --fader-pink: #f472b6;
+  --fader-divider: var(--divider-dark);
+  --fader-divider-hi: 1px 0 0 rgba(255, 255, 255, 0.04);
+  --fader-slot-shadow: var(--bevel-inset);
+  --fader-grip: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0 1px, rgba(0, 0, 0, 0.35) 1px 3px, transparent 3px 5px) center / 100% 70% no-repeat;
+  --fader-grip-vertical: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.10) 0 1px, rgba(0, 0, 0, 0.35) 1px 3px, transparent 3px 5px) center / 70% 100% no-repeat;
+  --fader-cap-body: linear-gradient(180deg, var(--fader-cap-hi) 0%, var(--fader-cap-mid) 45%, var(--fader-cap-lo) 55%, var(--fader-cap-mid) 100%);
+  --fader-cap-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(0, 0, 0, 0.7), inset 1px 0 0 rgba(255, 255, 255, 0.06), inset -1px 0 0 rgba(0, 0, 0, 0.4), 0 6px 8px -2px rgba(0, 0, 0, 0.8), 0 14px 18px -6px rgba(0, 0, 0, 0.6);
+  --fader-cap-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.32), inset 0 -1px 0 rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 10px -2px rgba(0, 0, 0, 0.85), 0 18px 22px -6px rgba(0, 0, 0, 0.6);
+  --fader-cap-shadow-active: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.7), 0 3px 4px -1px rgba(0, 0, 0, 0.9);
+  --fader-mute-bg: var(--button-face);
+  --fader-mute-shadow: var(--bevel-button);
+  --fader-mute-on-text: #1a0b0b;
+  --fader-mute-on-bg: linear-gradient(180deg, #f87171, #dc2626);
+  --fader-mute-on-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 12px rgba(239, 68, 68, 0.45), 0 1px 2px rgba(0, 0, 0, 0.6);
+  --pedal-panel-top: #1d1f22;
+  --pedal-panel-bottom: #141517;
+  --pedal-face: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 0.3'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='1.5' intercept='-0.25'/%3E%3CfeFuncG type='linear' slope='1.5' intercept='-0.25'/%3E%3CfeFuncB type='linear' slope='1.5' intercept='-0.25'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 180px 180px, linear-gradient(180deg, var(--pedal-panel-top), var(--pedal-panel-bottom));
+  --pedal-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -2px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4), 0 40px 70px -24px rgba(0, 0, 0, 0.85), 0 10px 20px rgba(0, 0, 0, 0.5);
+  --pedal-jack-nut: linear-gradient(180deg, #3a3d42, #8d929a 35%, #5a5e64 60%, #2c2e32);
+  --pedal-jack-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.25), 0 4px 6px rgba(0, 0, 0, 0.6);
+  --pedal-jack-hole: radial-gradient(circle, #000 45%, #222 46% 60%, #000 61%);
+  --pedal-title-shadow: 0 1px 0 rgba(0, 0, 0, 0.8), 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --pedal-a: var(--color-success-400);
+  --pedal-b: var(--color-warning-400);
+  --pedal-led-off: radial-gradient(circle at 35% 30%, #3a3c40, #18191b 70%);
+  --pedal-led-off-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.8), 0 0 0 3px #111214, 0 1px 0 3px rgba(255, 255, 255, 0.05);
+  --pedal-led-a-on: radial-gradient(circle at 35% 30%, #ecfdf3, var(--pedal-a) 45%, var(--color-success-700) 100%);
+  --pedal-led-a-glow: 0 0 0 3px #111214, 0 0 10px 2px color-mix(in srgb, var(--pedal-a) 70%, transparent), 0 0 24px 6px color-mix(in srgb, var(--pedal-a) 30%, transparent);
+  --pedal-led-b-on: radial-gradient(circle at 35% 30%, var(--color-warning-50), var(--pedal-b) 45%, var(--color-warning-700) 100%);
+  --pedal-led-b-glow: 0 0 0 3px #111214, 0 0 10px 2px color-mix(in srgb, var(--pedal-b) 70%, transparent), 0 0 24px 6px color-mix(in srgb, var(--pedal-b) 30%, transparent);
+  --pedal-cap-ring: radial-gradient(circle at 50% 50%, transparent 0 21px, #1a1b1e 21.5px 23px, transparent 23.5px), conic-gradient(from 0deg, #5c6067, #9ea3ab, #50545a, #8c9199, #4a4d53, #a3a8b0, #5c6067);
+  --pedal-cap-dome: radial-gradient(circle at 38% 32%, #f2f4f7 0%, #b7bcc4 30%, #6b7078 70%, #3d4045 100%);
+  --pedal-cap-dome-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.5), 0 2px 3px rgba(0, 0, 0, 0.7);
+  --pedal-cap-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 8px 12px -2px rgba(0, 0, 0, 0.8), 0 18px 24px -8px rgba(0, 0, 0, 0.6);
+  --pedal-cap-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06), 0 10px 14px -2px rgba(0, 0, 0, 0.85), 0 22px 28px -8px rgba(0, 0, 0, 0.6);
+  --pedal-cap-shadow-active: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 3px 5px rgba(0, 0, 0, 0.9);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* scamp: browser reset — keep canvas and preview in sync */
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+ul,
+ol,
+dl,
+dd,
+blockquote,
+figure,
+pre,
+hr,
+fieldset {
+  margin: 0;
+}
+
+img,
+video,
+iframe,
+svg {
+  display: block;
+}
+
+button,
+a,
+select,
+input,
+textarea,
+fieldset,
+legend {
+  all: unset;
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+  display: block;
+}
+
+input,
+textarea,
+select {
+  cursor: text;
+  user-select: text;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+/* scamp: list padding — the browser adds 40px the panel does not show */
+ul,
+ol,
+menu {
+  padding: 0;
+}
+
+/* scamp: a link points — the reset above took the browser's cursor with it */
+a[href] {
+  cursor: pointer;
+}
+
+/* scamp: table reset — the browser styles a table before anyone asks */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+th {
+  font-weight: inherit;
+  text-align: inherit;
+}
+
+caption {
+  text-align: inherit;
+}
+
+th,
+td {
+  padding: 0;
+}
+
+/* Page scrollbar — matches the ChainStrip's thin pill thumb, no track */
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+html::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-lo) 35%, transparent);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--color-text-lo) 60%, transparent);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-text-lo) 50%, transparent) transparent;
+  }
+}

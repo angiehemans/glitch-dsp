@@ -1,0 +1,40 @@
+{
+  "artboardBackground": "#0f0f0f",
+  "canvasWidth": 1440,
+  "canvasOverflowHidden": false,
+  "breakpoints": [
+    {
+      "id": "desktop",
+      "label": "Desktop",
+      "width": 1440
+    },
+    {
+      "id": "tablet",
+      "label": "Tablet",
+      "width": 768
+    },
+    {
+      "id": "mobile",
+      "label": "Mobile",
+      "width": 390
+    }
+  ],
+  "componentCanvas": {
+    "Playlist": {
+      "width": 1000,
+      "height": 320
+    },
+    "TopBar": {
+      "width": 1499,
+      "height": 64
+    },
+    "ChainStrip": {
+      "width": 1000,
+      "height": 320
+    },
+    "BlockTile": {
+      "width": 1000,
+      "height": 320
+    }
+  }
+}

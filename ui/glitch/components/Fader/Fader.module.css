@@ -1,0 +1,377 @@
+.root {
+  width: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  padding: 22px 10px 18px;
+  background: linear-gradient(180deg, var(--fader-panel-top), var(--fader-panel-bottom));
+  color: var(--fader-label);
+  position: relative;
+  box-shadow: var(--fader-divider-hi);
+  --fader-accent: var(--fader-green);
+  border-right: 1px solid var(--fader-divider);
+}
+
+.name_a3f1 {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fader-label-strong);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  height: fit-content;
+}
+
+/* The cap travels from 15px (half its height) to 285px, so mark i sits at 15px + i * 33.75px. */
+.fader_b7c2 {
+  height: 300px;
+  display: flex;
+  gap: 8px;
+  position: relative;
+  left: 0px;
+  top: 0px;
+}
+
+.scale_c4d9 {
+  width: 24px;
+  align-self: stretch;
+  position: relative;
+  left: 0px;
+  top: 0px;
+}
+
+.mark_d1a0 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a1 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 49px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a2 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--fader-label-strong);
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 83px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a3 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 116px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a4 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 150px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a5 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 184px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a6 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 218px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a7 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 251px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.mark_d1a8 {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 9px;
+  line-height: 1;
+  transform: translate(0px, -50%);
+  position: absolute;
+  left: 0px;
+  top: 285px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  right: 0px;
+}
+
+.track_e5b3 {
+  width: 60px;
+  align-self: stretch;
+  position: relative;
+  left: 0px;
+  top: 0px;
+}
+
+/* Brighter unity (0 dB) tick, 2 of 8 steps down */
+.unity_tick_f2a6 {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  top: 82px;
+  height: 1px;
+  background: linear-gradient(var(--fader-label-strong), var(--fader-label-strong)) left / 18px 100% no-repeat, linear-gradient(var(--fader-label-strong), var(--fader-label-strong)) right / 18px 100% no-repeat;
+  pointer-events: none;
+}
+
+/* Vertical range input, min at the bottom; 52px wide = cap width so the cap can't sit off-centre */
+.range_a8e4 {
+  width: 52px;
+  height: 100%;
+  transform: translate(-50%, 0px);
+  position: absolute;
+  left: 50%;
+  top: 0px;
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  cursor: grab;
+  z-index: 1;
+}
+
+.range_a8e4:active {
+  cursor: grabbing;
+}
+
+.range_a8e4:focus {
+  outline: none;
+}
+
+.mute_b9d5 {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  position: relative;
+  left: 0px;
+  top: 0px;
+}
+
+.mute_input_c6f7 {
+  opacity: 0;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  inset: 0;
+  cursor: pointer;
+}
+
+.mute_text_d3c8 {
+  width: 60px;
+  height: fit-content;
+  flex-shrink: 0;
+  padding: 7px 0px;
+  background: var(--fader-mute-bg);
+  border-radius: 5px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--fader-label);
+  text-align: center;
+  letter-spacing: 0.14em;
+  box-shadow: var(--fader-mute-shadow);
+}
+
+.name_a3f1::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fader-accent);
+  box-shadow: 0 0 8px var(--fader-accent);
+}
+
+/* Slot the cap rides in */
+.track_e5b3::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  bottom: 10px;
+  width: 8px;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: var(--fader-slot);
+  box-shadow: var(--fader-slot-shadow);
+}
+
+/* Ticks on both sides of the slot, at the same positions as the labels */
+.track_e5b3::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 14.5px;
+  height: 271px;
+  background: repeating-linear-gradient(180deg, var(--fader-tick) 0 1px, transparent 1px 33.75px) left top / 18px 100% no-repeat, repeating-linear-gradient(180deg, var(--fader-tick) 0 1px, transparent 1px 33.75px) right top / 18px 100% no-repeat;
+  pointer-events: none;
+}
+
+.range_a8e4::-webkit-slider-runnable-track {
+  background: transparent;
+  border: 0;
+  width: 100%;
+}
+
+.range_a8e4::-moz-range-track {
+  background: transparent;
+  border: 0;
+}
+
+.range_a8e4::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 52px;
+  height: 30px;
+  border: 0;
+  border-radius: 4px;
+  background: linear-gradient(var(--fader-accent), var(--fader-accent)) center / 100% 2px no-repeat, var(--fader-grip), var(--fader-cap-body);
+  box-shadow: var(--fader-cap-shadow);
+  transition: box-shadow 120ms ease, transform 120ms ease;
+}
+
+.range_a8e4::-moz-range-thumb {
+  width: 52px;
+  height: 30px;
+  border: 0;
+  border-radius: 4px;
+  background: linear-gradient(var(--fader-accent), var(--fader-accent)) center / 100% 2px no-repeat, var(--fader-grip), var(--fader-cap-body);
+  box-shadow: var(--fader-cap-shadow);
+}
+
+.range_a8e4:hover::-webkit-slider-thumb {
+  box-shadow: var(--fader-cap-shadow-hover);
+}
+
+.range_a8e4:active::-webkit-slider-thumb {
+  transform: scale(0.98);
+  box-shadow: var(--fader-cap-shadow-active);
+}
+
+.range_a8e4:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--fader-cap-shadow), 0 0 0 2px var(--fader-bg), 0 0 0 4px var(--fader-accent);
+}
+
+.range_a8e4:focus-visible::-moz-range-thumb {
+  box-shadow: var(--fader-cap-shadow), 0 0 0 2px var(--fader-bg), 0 0 0 4px var(--fader-accent);
+}
+
+.mute_input_c6f7:checked + .mute_text_d3c8 {
+  color: var(--fader-mute-on-text);
+  background: var(--fader-mute-on-bg);
+  box-shadow: var(--fader-mute-on-shadow);
+}
+
+.mute_input_c6f7:focus-visible + .mute_text_d3c8 {
+  outline: 2px solid var(--fader-accent);
+  outline-offset: 2px;
+}
+
+.root:has(.mute_input_c6f7:checked) .range_a8e4 {
+  filter: saturate(0) brightness(0.75);
+}
+
+.root:has(.mute_input_c6f7:checked) .name_a3f1::before {
+  background: var(--fader-dot-off);
+  box-shadow: none;
+}
+
+.root[data-color="blue"] {
+  --fader-accent: var(--fader-blue);
+}
+
+.root[data-color="amber"] {
+  --fader-accent: var(--fader-amber);
+}
+
+.root[data-color="pink"] {
+  --fader-accent: var(--fader-pink);
+}
