@@ -158,6 +158,13 @@ export function createMockEngine(): EngineBridge {
           });
           break;
         }
+        case "chain.remove": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          const i = p?.chains.findIndex((c) => c.id === cmd.chainId) ?? -1;
+          if (!p || i < 0) return error(`Unknown chain: ${cmd.chainId}`);
+          p.chains.splice(i, 1);
+          break;
+        }
         case "chain.rename": {
           const c = chain(cmd.chainId);
           const name = cmd.name.replace(/\s+/g, " ").trim().slice(0, 60).trim();

@@ -13,6 +13,7 @@ export type Command =
   | { type: "project.rename"; projectId: string; name: string }
   | { type: "chain.create"; name?: string }
   | { type: "chain.rename"; chainId: string; name: string }
+  | { type: "chain.remove"; chainId: string }
   | { type: "chain.setInputs"; chainId: string; inputs: Pick<InputRef, "hwChannel">[] }
   | { type: "chain.setOutputs"; chainId: string; outputs: Pick<OutputRef, "hwChannels">[] }
   | { type: "chain.setLevel"; chainId: string; levelDb: number }

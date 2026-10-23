@@ -27,6 +27,8 @@ public:
     /** Any project, open or not; one that isn't open is saved straight away. */
     bool renameProject (const juce::String& projectId, const juce::String& name);
     juce::var addChain (const juce::String& name);
+    /** Removes a chain of the open project, with its blocks' saved states and snapshots. */
+    void removeChain (const juce::String& chainId);
 
     /** Blocks of the open project. */
     juce::var findBlock (const juce::String& blockId) const;

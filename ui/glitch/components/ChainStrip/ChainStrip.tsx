@@ -7,8 +7,10 @@ type ChainStripProps = {
   menu?: "closed" | "open";
   inmenu?: "closed" | "open";
   outmenu?: "closed" | "open";
+  options?: "closed" | "open" | "confirm";
   name?: string;
   renameKey?: string;
+  removeLabel?: string;
   input?: string;
   inputs?: Array<{ id: string; label: string; detail: string; current: boolean }>;
   level?: string;
@@ -20,6 +22,8 @@ type ChainStripProps = {
   plugins?: Array<{ id: string; name: string; kind: string; image: string }>;
   menuNote?: string;
   scanning?: boolean;
+  onRename?: () => void;
+  onRemove?: () => void;
   onSelectInput?: (id: string) => void;
   onLevelChange?: (value: string) => void;
   onMuteToggle?: () => void;
@@ -38,8 +42,10 @@ export default function ChainStrip({
   menu = "closed",
   inmenu = "closed",
   outmenu = "closed",
+  options = "closed",
   name = "Guitar",
   renameKey = "",
+  removeLabel = "Remove “Guitar” and its plugins",
   input = "Input 1",
   inputs = [
     { id: "1", label: "In 1", detail: "Inst 1", current: true },
@@ -67,6 +73,8 @@ export default function ChainStrip({
   ],
   menuNote = "9 plugins installed",
   scanning = false,
+  onRename,
+  onRemove,
   onSelectInput,
   onLevelChange,
   onMuteToggle,
@@ -79,21 +87,28 @@ export default function ChainStrip({
   className,
 }: ChainStripProps) {
   return (
-    <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-color={color} data-state={state} data-menu={menu} data-inmenu={inmenu} data-outmenu={outmenu} data-scamp-outside="menu:open=closed inmenu:open=closed outmenu:open=closed" data-scamp-escape="menu:open=closed inmenu:open=closed outmenu:open=closed">
+    <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-color={color} data-state={state} data-menu={menu} data-inmenu={inmenu} data-outmenu={outmenu} data-options={options} data-scamp-outside="menu:open=closed inmenu:open=closed outmenu:open=closed options:open=closed,confirm=closed" data-scamp-escape="menu:open=closed inmenu:open=closed outmenu:open=closed options:open=closed,confirm=closed">
       <div data-scamp-id="header_7a1b" className={styles.header_7a1b}>
         <div data-scamp-id="main_8252" className={styles.main_8252}>
           <div data-scamp-id="title_row_1c2d" className={styles.title_row_1c2d}>
             <div data-scamp-id="icon_9c3d" className={styles.icon_9c3d}>{icon}</div>
             <h3 data-scamp-id="name_023e" className={styles.name_023e} data-rename={renameKey}>{name}</h3>
             <div data-scamp-id="head_spacer_cf60" className={styles.head_spacer_cf60} />
-            <Button data-scamp-instance-id="inst_d39a" className={styles.inst_d39a} variant="icon" ariaLabel="Chain options" label="⋯" />
+            <div data-scamp-id="chain_opts_f12a" className={styles.chain_opts_f12a} data-scamp-click="options:closed=open,open=closed,confirm=closed menu:open=closed inmenu:open=closed outmenu:open=closed">
+              <Button data-scamp-instance-id="inst_d39a" className={styles.inst_d39a} variant="icon" ariaLabel="Chain options" label="⋯" />
+              <div data-scamp-id="chain_menu_0b3c" className={styles.chain_menu_0b3c} role="menu" aria-label="Chain options">
+                <button data-scamp-id="rename_1c4d" className={styles.rename_1c4d} type="button" role="menuitem" data-scamp-click="options:open=closed" onClick={onRename}>Rename</button>
+                <button data-scamp-id="remove_2d5e" className={styles.remove_2d5e} type="button" role="menuitem" data-scamp-click="options:open=confirm">Remove chain…</button>
+                <button data-scamp-id="confirm_3e6f" className={styles.confirm_3e6f} type="button" role="menuitem" data-scamp-click="options:confirm=closed" onClick={onRemove}>{removeLabel}</button>
+              </div>
+            </div>
           </div>
           <div data-scamp-id="rect_42f0" className={styles.rect_42f0}>
             <svg data-scamp-id="mono_svg_b592" className={styles.mono_svg_b592} viewBox="0 0 24 24">
 	
 	<path xmlns="http://www.w3.org/2000/svg" d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>
 </svg>
-            <button data-scamp-id="source_47e8" className={styles.source_47e8} type="button" aria-haspopup="menu" data-scamp-click="inmenu:closed=open,open=closed menu:open=closed outmenu:open=closed">{input}</button>
+            <button data-scamp-id="source_47e8" className={styles.source_47e8} type="button" aria-haspopup="menu" data-scamp-click="inmenu:closed=open,open=closed menu:open=closed outmenu:open=closed options:open=closed,confirm=closed">{input}</button>
             <div data-scamp-id="in_menu_1a9b" className={styles.in_menu_1a9b} role="menu" aria-label="Input">
               <p data-scamp-id="in_title_2bac" className={styles.in_title_2bac}>INPUT</p>
               <ul data-scamp-id="in_list_3cbd" className={styles.in_list_3cbd}>
@@ -132,10 +147,10 @@ export default function ChainStrip({
       </div>
       <div data-scamp-id="body_14b5" className={styles.body_14b5}>
         <div data-scamp-id="lane_58f9" className={styles.lane_58f9}>{children}</div>
-        <button data-scamp-id="add_btn_690a" className={styles.add_btn_690a} type="button" aria-label="Add block" data-scamp-click="menu:closed=open,open=closed inmenu:open=closed outmenu:open=closed">+</button>
+        <button data-scamp-id="add_btn_690a" className={styles.add_btn_690a} type="button" aria-label="Add block" data-scamp-click="menu:closed=open,open=closed inmenu:open=closed outmenu:open=closed options:open=closed,confirm=closed">+</button>
       </div>
       <div data-scamp-id="out_panel_b3e7" className={styles.out_panel_b3e7}>
-        <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button" aria-haspopup="menu" data-scamp-click="outmenu:closed=open,open=closed menu:open=closed inmenu:open=closed">{output}</button>
+        <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button" aria-haspopup="menu" data-scamp-click="outmenu:closed=open,open=closed menu:open=closed inmenu:open=closed options:open=closed,confirm=closed">{output}</button>
         <div data-scamp-id="out_menu_8123" className={styles.out_menu_8123} role="menu" aria-label="Output">
           <p data-scamp-id="out_title_9234" className={styles.out_title_9234}>OUTPUT</p>
           <ul data-scamp-id="out_list_a345" className={styles.out_list_a345}>
@@ -178,4 +193,4 @@ export default function ChainStrip({
   );
 }
 
-export const _scamp = { contract: 2, events: ['onSelectInput', 'onLevelChange', 'onMuteToggle', 'onSelectOutput', 'onAddPlugin', 'onScanPlugins', 'onImportPlugin'] } as const;
+export const _scamp = { contract: 2, events: ['onRename', 'onRemove', 'onSelectInput', 'onLevelChange', 'onMuteToggle', 'onSelectOutput', 'onAddPlugin', 'onScanPlugins', 'onImportPlugin'] } as const;

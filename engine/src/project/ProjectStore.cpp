@@ -248,6 +248,27 @@ bool ProjectStore::renameProject (const juce::String& projectId, const juce::Str
     return false;
 }
 
+void ProjectStore::removeChain (const juce::String& chainId)
+{
+    auto* chains = getCurrentChains();
+    if (chains == nullptr)
+        return;
+
+    for (int i = chains->size(); --i >= 0;)
+    {
+        const auto chain = (*chains)[i];
+        if (chain["id"].toString() != chainId)
+            continue;
+
+        if (auto* blocks = chain["blocks"].getArray())
+            for (const auto& b : juce::Array<juce::var> (*blocks)) // a copy: removeBlock edits the original
+                removeBlock (b["id"].toString());
+
+        chains->remove (i);
+    }
+    markDirty();
+}
+
 juce::var ProjectStore::findBlock (const juce::String& blockId) const
 {
     if (auto* chains = getCurrentChains())

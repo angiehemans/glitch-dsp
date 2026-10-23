@@ -322,6 +322,11 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
         output->setProperty ("hwChannels", hwChannels);
         syncEngine();
     }
+    else if (type == protocol::command::chainRemove)
+    {
+        store.removeChain (chain["id"].toString());
+        syncEngine(); // closes its plugin windows and unloads its plugins
+    }
     else if (type == protocol::command::chainRename)
     {
         const auto name = cleanName (command["name"]);
