@@ -7,9 +7,21 @@ type ChainStripProps = {
   menu?: "closed" | "open";
   name?: string;
   input?: string;
+  level?: string;
+  muted?: boolean;
+  inputMeter?: string;
   output?: string;
+  outputMeter?: string;
   plugins?: Array<{ id: string; name: string; kind: string; image: string }>;
+  menuNote?: string;
+  scanning?: boolean;
+  onInputClick?: () => void;
+  onLevelChange?: (value: string) => void;
+  onMuteToggle?: () => void;
+  onOutputClick?: () => void;
   onAddPlugin?: (id: string) => void;
+  onScanPlugins?: () => void;
+  onImportPlugin?: () => void;
   icon?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
@@ -21,7 +33,11 @@ export default function ChainStrip({
   menu = "closed",
   name = "Guitar",
   input = "Input 1",
+  level = "75",
+  muted = false,
+  inputMeter = "",
   output = "Out 1/2 · FOH",
+  outputMeter = "",
   plugins = [
     { id: "compressor", name: "Compressor", kind: "Dynamics", image: "/assets/compression-pedal.webp" },
     { id: "fuzz", name: "The Big Fuzz", kind: "Drive", image: "/assets/fuzz-pedal.webp" },
@@ -33,7 +49,15 @@ export default function ChainStrip({
     { id: "delay", name: "Delay", kind: "Time", image: "/assets/delay-pedal.webp" },
     { id: "reverb", name: "Reverb", kind: "Space", image: "/assets/reverb-pedal.webp" },
   ],
+  menuNote = "9 plugins installed",
+  scanning = false,
+  onInputClick,
+  onLevelChange,
+  onMuteToggle,
+  onOutputClick,
   onAddPlugin,
+  onScanPlugins,
+  onImportPlugin,
   icon,
   children,
   className,
@@ -53,15 +77,15 @@ export default function ChainStrip({
 	
 	<path xmlns="http://www.w3.org/2000/svg" d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>
 </svg>
-            <p data-scamp-id="source_47e8" className={styles.source_47e8}>{input}</p>
+            <button data-scamp-id="source_47e8" className={styles.source_47e8} type="button" onClick={onInputClick}>{input}</button>
           </div>
           <div data-scamp-id="fader_row_3e4f" className={styles.fader_row_3e4f}>
             <div data-scamp-id="vfader_4f50" className={styles.vfader_4f50}>
               <div data-scamp-id="track_5061" className={styles.track_5061}>
-                <input data-scamp-id="range_7283" className={styles.range_7283} type="range" min="0" max="100" defaultValue="75" aria-label={name} />
+                <input data-scamp-id="range_7283" className={styles.range_7283} type="range" min="0" max="100" value={level} aria-label={name} onInput={(e) => onLevelChange?.(e.currentTarget.value)} />
               </div>
               <label data-scamp-id="mute_8394" className={styles.mute_8394}>
-                <input data-scamp-id="mute_input_94a5" className={styles.mute_input_94a5} type="checkbox" />
+                <input data-scamp-id="mute_input_94a5" className={styles.mute_input_94a5} type="checkbox" checked={muted} onChange={onMuteToggle} />
                 <span data-scamp-id="mute_text_a5b6" className={styles.mute_text_a5b6}>M</span>
               </label>
               <label data-scamp-id="solo_fac9" className={styles.solo_fac9}>
@@ -72,7 +96,7 @@ export default function ChainStrip({
           </div>
         </div>
         <div data-scamp-id="meter_container_cd1c" className={styles.meter_container_cd1c}>
-          <div data-scamp-id="meter_in_274e" className={styles.meter_in_274e}>
+          <div data-scamp-id="meter_in_274e" className={styles.meter_in_274e} data-meter={inputMeter}>
             <div data-scamp-id="meter_in_fill_8e60" className={styles.meter_in_fill_8e60} />
           </div>
         </div>
@@ -82,8 +106,8 @@ export default function ChainStrip({
         <button data-scamp-id="add_btn_690a" className={styles.add_btn_690a} type="button" aria-label="Add block" data-scamp-click="menu:closed=open,open=closed">+</button>
       </div>
       <div data-scamp-id="out_panel_b3e7" className={styles.out_panel_b3e7}>
-        <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button">{output}</button>
-        <div data-scamp-id="meter_out_8b2d" className={styles.meter_out_8b2d}>
+        <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button" onClick={onOutputClick}>{output}</button>
+        <div data-scamp-id="meter_out_8b2d" className={styles.meter_out_8b2d} data-meter={outputMeter}>
           <div data-scamp-id="meter_out_fill_9c3e" className={styles.meter_out_fill_9c3e} />
         </div>
         <div data-scamp-id="menu_5d1a" className={styles.menu_5d1a} role="menu" aria-label="Installed plugins">
@@ -101,10 +125,15 @@ export default function ChainStrip({
               </li>
             ))}
           </ul>
+          <p data-scamp-id="menu_note_b7e1" className={styles.menu_note_b7e1}>{menuNote}</p>
+          <div data-scamp-id="menu_actions_c8f2" className={styles.menu_actions_c8f2}>
+            <button data-scamp-id="menu_scan_d903" className={styles.menu_scan_d903} type="button" disabled={scanning} onClick={onScanPlugins}>Scan for plugins</button>
+            <button data-scamp-id="menu_import_e014" className={styles.menu_import_e014} type="button" disabled={scanning} data-scamp-click="menu:open=closed" onClick={onImportPlugin}>Add plugin…</button>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-export const _scamp = { contract: 2, events: ['onAddPlugin'] } as const;
+export const _scamp = { contract: 2, events: ['onInputClick', 'onLevelChange', 'onMuteToggle', 'onOutputClick', 'onAddPlugin', 'onScanPlugins', 'onImportPlugin'] } as const;

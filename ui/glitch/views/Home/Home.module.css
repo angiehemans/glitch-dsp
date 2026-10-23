@@ -6,6 +6,9 @@
   background: var(--color-background);
   color: var(--color-text);
 }
+.inst_a7b1.inst_a7b1 {
+  width: 100%;
+}
 
 .shell_b2c3 {
   min-height: 836px;
@@ -133,17 +136,5 @@
   height: fit-content;
 }
 .inst_b3c4.inst_b3c4 {
-  width: 320px;
-}
-.inst_c4d5.inst_c4d5 {
-  width: 320px;
-}
-.inst_d5e6.inst_d5e6 {
-  width: 320px;
-}
-.inst_e6f7.inst_e6f7 {
-  width: 320px;
-}
-.inst_f708.inst_f708 {
   width: 320px;
 }

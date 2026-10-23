@@ -204,6 +204,108 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--color-line);
+  cursor: pointer;
+}
+
+.audio_status_bf85:hover {
+  border-color: var(--color-line-strong);
+}
+
+.audio_status_bf85:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.audio_wrap_f125 {
+  display: flex;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.audio_menu_0236 {
+  width: 320px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  visibility: hidden;
+  padding: var(--space-2);
+  background: var(--color-bg-1);
+  border-radius: var(--radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line-strong);
+  box-shadow: var(--shadow-panel);
+  position: absolute;
+  top: 100%;
+  right: 0px;
+  margin: var(--space-2) 0px 0px 0px;
+  z-index: 30;
+}
+
+.audio_menu_title_1347 {
+  width: fit-content;
+  height: fit-content;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-text-dim);
+}
+
+.audio_list_2458 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.audio_row_3569 {
+  display: flex;
+}
+
+.audio_item_467a {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.audio_item_467a:hover {
+  background: var(--color-bg-3);
+}
+
+.audio_item_467a[aria-checked="true"] {
+  background: var(--color-accent-soft);
+}
+
+.audio_item_name_578b {
+  width: fit-content;
+  height: fit-content;
+  max-width: 100%;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audio_item_type_689c {
+  width: fit-content;
+  height: fit-content;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-text-dim);
 }
 
 .audio_led_c096 {
@@ -306,4 +408,8 @@
   background: var(--color-clip);
   color: var(--color-bg-0);
   box-shadow: 0px 0px 12px var(--color-clip);
+}
+
+.root[data-audiomenu="open"] .audio_menu_0236 {
+  visibility: visible;
 }

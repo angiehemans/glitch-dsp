@@ -8,19 +8,62 @@ import Knob from '@/components/Knob/Knob';
 import Playlist from '@/components/Playlist/Playlist';
 import TopBar from '@/components/TopBar/TopBar';
 
+type ChainColor = "orange" | "cyan" | "pink" | "lime" | "violet";
+
 type RigProps = {
-  topbar?: "shown" | "hidden";
+  content?: "sample" | "live";
+  showTopBar?: boolean;
+  showPlaylist?: boolean;
+  chains?: Array<{ id: string; color: ChainColor; name: string; input: string; level: string; muted: boolean; inputMeter: string; output: string; outputMeter: string; blocks: React.ReactNode }>;
+  plugins?: Array<{ id: string; name: string; kind: string; image: string }>;
+  pluginNote?: string;
+  scanning?: boolean;
+  onChainInput?: (id: string) => void;
+  onChainLevel?: (id: string, value: string) => void;
+  onChainMute?: (id: string) => void;
+  onChainOutput?: (id: string) => void;
+  onChainAddPlugin?: (chainId: string, pluginId: string) => void;
+  onScanPlugins?: () => void;
+  onImportPlugin?: () => void;
+  onAddChain?: () => void;
   className?: string;
 };
 
-export default function Rig({ topbar = "shown", className }: RigProps) {
+export default function Rig({
+  content = "sample",
+  showTopBar = true,
+  showPlaylist = true,
+  chains = [
+    { id: "1", color: "orange", name: "Guitar", input: "In 1", level: "75", muted: false, inputMeter: "", output: "Out 1/2", outputMeter: "", blocks: null },
+    { id: "2", color: "cyan", name: "Vocals", input: "In 2", level: "64", muted: true, inputMeter: "", output: "Out 1/2", outputMeter: "", blocks: null },
+  ],
+  plugins = [
+    { id: "compressor", name: "Compressor", kind: "Dynamics", image: "/assets/compression-pedal.webp" },
+    { id: "reverb", name: "Reverb", kind: "Space", image: "/assets/reverb-pedal.webp" },
+  ],
+  pluginNote = "2 plugins installed",
+  scanning = false,
+  onChainInput,
+  onChainLevel,
+  onChainMute,
+  onChainOutput,
+  onChainAddPlugin,
+  onScanPlugins,
+  onImportPlugin,
+  onAddChain,
+  className,
+}: RigProps) {
   return (
-    <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-topbar={topbar}>
-      <TopBar data-scamp-instance-id="inst_1a0b" className={styles.inst_1a0b} />
+    <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-content={content}>
+      {showTopBar && (
+        <TopBar data-scamp-instance-id="inst_1a0b" className={styles.inst_1a0b} />
+      )}
       <div data-scamp-id="shell_2b1c" className={styles.shell_2b1c}>
         <main data-scamp-id="main_4d3e" className={styles.main_4d3e}>
           <div data-scamp-id="content_5e4f" className={styles.content_5e4f}>
-            <Playlist data-scamp-instance-id="inst_7d2c" />
+            {showPlaylist && (
+              <Playlist data-scamp-instance-id="inst_7d2c" />
+            )}
             <div data-scamp-id="chains_b4a5" className={styles.chains_b4a5}>
               <ChainStrip data-scamp-instance-id="inst_c5b6" color="orange" name="Guitar" icon={<svg data-scamp-id="icon_guitar_b8c1" className={styles.icon_guitar_b8c1} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18.5c2 -2.5 4 -6.5 4 -10.5c0 -2.946 -2.084 -4.157 -4.204 -4.654c-.864 -.23 -2.13 -.346 -3.796 -.346c-1.667 0 -2.932 .115 -3.796 .346c-2.12 .497 -4.204 1.708 -4.204 4.654c0 3.312 2 8 4 10.5c.297 .37 .618 .731 .963 1.081l.354 .347a3.9 3.9 0 0 0 5.364 0a14.05 14.05 0 0 0 1.319 -1.428z" /></svg>}>
                 <BlockTile data-scamp-instance-id="inst_d6c7" name="Compressor" detail="4:1 · 3% CPU" plugin={<img data-scamp-id="pedal_comp_91e3" className={styles.pedal_comp_91e3} src="/assets/compression-pedal.webp" alt="compression-pedal.webp" />}>
@@ -81,7 +124,12 @@ export default function Rig({ topbar = "shown", className }: RigProps) {
                 </BlockTile>
               </ChainStrip>
             </div>
-            <Button data-scamp-instance-id="inst_9c1e" className={styles.inst_9c1e} variant="dashed" label="+ Add chain" />
+            <div data-scamp-id="live_chains_6a2f" className={styles.live_chains_6a2f}>
+              {chains.map((chain) => (
+                <ChainStrip data-scamp-instance-id="inst_7b3e" key={chain.id} color={chain.color} name={chain.name} input={chain.input} level={chain.level} muted={chain.muted} inputMeter={chain.inputMeter} output={chain.output} outputMeter={chain.outputMeter} plugins={plugins} menuNote={pluginNote} scanning={scanning} onInputClick={() => onChainInput?.(chain.id)} onLevelChange={(value) => onChainLevel?.(chain.id, value)} onMuteToggle={() => onChainMute?.(chain.id)} onOutputClick={() => onChainOutput?.(chain.id)} onAddPlugin={(pluginId) => onChainAddPlugin?.(chain.id, pluginId)} onScanPlugins={onScanPlugins} onImportPlugin={onImportPlugin}>{chain.blocks}</ChainStrip>
+              ))}
+            </div>
+            <Button data-scamp-instance-id="inst_9c1e" className={styles.inst_9c1e} variant="dashed" label="+ Add chain" onClick={onAddChain} />
           </div>
           <aside data-scamp-id="sheet_4d40" className={styles.sheet_4d40}>
             <div data-scamp-id="sheet_head_5e51" className={styles.sheet_head_5e51}>
@@ -133,4 +181,4 @@ export default function Rig({ topbar = "shown", className }: RigProps) {
   );
 }
 
-export const _scamp = { contract: 2, events: [] } as const;
+export const _scamp = { contract: 2, events: ['onChainInput', 'onChainLevel', 'onChainMute', 'onChainOutput', 'onChainAddPlugin', 'onScanPlugins', 'onImportPlugin', 'onAddChain'] } as const;
