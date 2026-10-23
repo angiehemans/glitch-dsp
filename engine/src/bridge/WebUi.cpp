@@ -58,9 +58,48 @@ namespace
         return (v.isInt() || v.isInt64()) && (int) v >= 1 && (int) v <= Engine::maxChannels;
     }
 
+    /** Ids are 8 hex chars plus dashes (see newId); anything else never names a file. */
+    bool isId (const juce::String& s)
+    {
+        return s.isNotEmpty() && s.length() <= 36 && s.containsOnly ("0123456789abcdef-");
+    }
+
+    /** A capture that came back one flat colour (nothing painted yet, or capture unsupported). */
+    bool isBlank (const juce::Image& image)
+    {
+        const auto first = image.getPixelAt (0, 0);
+        for (int y = 0; y < 8; ++y)
+            for (int x = 0; x < 8; ++x)
+                if (image.getPixelAt (x * (image.getWidth() - 1) / 7, y * (image.getHeight() - 1) / 7) != first)
+                    return false;
+        return true;
+    }
+
     juce::String newId()
     {
         return juce::Uuid().toDashedString().substring (0, 8);
+    }
+
+    /**
+        JUCE's ALSA type lists every ALSA PCM: per card a direct hardware device plus mixing, snooping,
+        surround and S/PDIF variants. Keep the default, PipeWire and each direct hardware device, named by
+        their card ("M4, USB Audio"). Returns an empty label for entries to hide.
+    */
+    juce::String deviceLabel (const juce::String& type, const juce::String& name)
+    {
+        if (type != "ALSA")
+            return name;
+
+        if (name.startsWith ("Default ALSA") || name.containsIgnoreCase ("PipeWire"))
+            return name;
+
+        if (! name.contains ("Direct hardware device"))
+            return {};
+
+        // "sof-hda-dsp, HDMI 1; Direct hardware device without any conversions (2)" -> "sof-hda-dsp, HDMI 1 (2)"
+        const auto card = name.upToFirstOccurrenceOf (";", false, false).trim().trimCharactersAtEnd (", ");
+        const auto suffix = name.endsWithChar (')') ? " " + name.fromLastOccurrenceOf ("(", true, false) : juce::String();
+        return card + suffix;
     }
 
     juce::var pluginInfo (const juce::PluginDescription& d)
@@ -89,6 +128,7 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l)
     addAndMakeVisible (browser);
     syncEngine();
     engine.getDeviceManager().addChangeListener (this);
+    engine.onDeviceListChanged = [this] { sendState(); };
 
     if (devUrl.isNotEmpty())
     {
@@ -112,6 +152,7 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l)
 
 WebUi::~WebUi()
 {
+    engine.onDeviceListChanged = nullptr;
     engine.getDeviceManager().removeChangeListener (this);
     editors.clear(); // before the plugins they show
     captureStates();
@@ -132,6 +173,7 @@ void WebUi::handleCommand (const juce::var& command)
     {
         if (engine.getDeviceError().isNotEmpty())
             sendError ("Audio device: " + engine.getDeviceError());
+        checkDevice();
     }
     else if (type == protocol::command::monitorSetGain)
     {
@@ -323,26 +365,11 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
     }
 
     if (type == protocol::command::blockRemove)
-    {
-        closeEditor (blockId);
-        store.removeBlock (blockId);
-        syncEngine();
-    }
+        removeBlock (blockId);
     else if (type == protocol::command::blockToggle)
-    {
-        block.getDynamicObject()->setProperty ("enabled", ! (bool) block["enabled"]);
-        engine.setBlockEnabled (blockId, (bool) block["enabled"]);
-        store.markDirty();
-    }
+        toggleBlock (blockId);
     else if (type == protocol::command::blockOpenEditor)
-    {
-        if (engine.getBlockProcessor (blockId) == nullptr)
-        {
-            sendError (block["name"].toString() + " isn't loaded (is it installed?)");
-            return false;
-        }
         openEditor (blockId);
-    }
     else
     {
         sendError ("Unknown command: " + type);
@@ -451,17 +478,109 @@ void WebUi::openEditor (const juce::String& blockId)
         return;
     }
 
-    if (auto* processor = engine.getBlockProcessor (blockId))
+    const auto block = store.findBlock (blockId);
+    auto* processor = engine.getBlockProcessor (blockId); // null when the plugin isn't installed
+    const auto safe = juce::Component::SafePointer<WebUi> (this);
+
+    // Window callbacks run inside the window, so anything that deletes it is deferred.
+    const auto later = [safe] (std::function<void (WebUi&)> fn)
     {
-        editors[blockId] = std::make_unique<PluginWindow> (*processor, [safe = juce::Component::SafePointer<WebUi> (this), blockId]
+        return [safe, fn]
         {
-            juce::MessageManager::callAsync ([safe, blockId]
+            juce::MessageManager::callAsync ([safe, fn]
             {
                 if (safe != nullptr)
-                    safe->closeEditor (blockId);
+                    fn (*safe);
             });
+        };
+    };
+
+    PluginWindow::Callbacks callbacks;
+    callbacks.onClose = later ([blockId] (WebUi& ui)
+    {
+        ui.captureSnapshot (blockId); // the settings it was left at
+        ui.closeEditor (blockId);
+    });
+    callbacks.onBypass = later ([blockId] (WebUi& ui) { ui.toggleBlock (blockId); ui.sendState(); });
+    callbacks.onRemove = later ([blockId] (WebUi& ui) { ui.removeBlock (blockId); ui.sendState(); });
+
+    editors[blockId] = std::make_unique<PluginWindow> (block["name"].toString(), processor, ! (bool) block["enabled"], callbacks);
+
+    if (processor != nullptr)
+    {
+        // Give the plugin time to paint before the first snapshot.
+        juce::Timer::callAfterDelay (800, [safe, blockId]
+        {
+            if (safe != nullptr)
+                safe->captureSnapshot (blockId);
         });
     }
+}
+
+void WebUi::toggleBlock (const juce::String& blockId)
+{
+    const auto block = store.findBlock (blockId);
+    if (auto* obj = block.getDynamicObject())
+    {
+        const auto enabled = ! (bool) block["enabled"];
+        obj->setProperty ("enabled", enabled);
+        engine.setBlockEnabled (blockId, enabled);
+        if (const auto it = editors.find (blockId); it != editors.end())
+            it->second->setBypassed (! enabled);
+        store.markDirty();
+    }
+}
+
+void WebUi::removeBlock (const juce::String& blockId)
+{
+    closeEditor (blockId);
+    store.removeBlock (blockId);
+    syncEngine();
+}
+
+void WebUi::captureSnapshot (const juce::String& blockId)
+{
+    const auto it = editors.find (blockId);
+    auto* peer = it != editors.end() ? it->second->getPeer() : nullptr;
+    const auto block = store.findBlock (blockId);
+    if (peer == nullptr || ! block.isObject() || engine.getBlockProcessor (blockId) == nullptr)
+        return;
+
+    auto image = juce::createSnapshotOfNativeWindow (peer->getNativeHandle());
+    if (! image.isValid())
+        return;
+
+    // Keep just the plugin: crop off Glitch's header. The capture may be at a different scale than the window.
+    auto& window = *it->second;
+    const auto area = window.getPluginArea();
+    const auto sx = image.getWidth() / (double) window.getWidth(), sy = image.getHeight() / (double) window.getHeight();
+    image = image.getClippedImage (juce::Rectangle<double> (area.getX() * sx, area.getY() * sy, area.getWidth() * sx, area.getHeight() * sy)
+                                       .toNearestInt()
+                                       .getIntersection (image.getBounds()));
+    if (! image.isValid() || isBlank (image))
+        return;
+
+    // The tile shows it at the window's on-screen size; keep up to 2x pixels so it stays sharp on Retina.
+    if (image.getHeight() > area.getHeight() * 2)
+        image = image.rescaled (area.getWidth() * 2, area.getHeight() * 2, juce::Graphics::highResamplingQuality);
+
+    const auto file = ProjectStore::getSnapshotFile (store.getCurrent()["id"].toString(), blockId);
+    file.getParentDirectory().createDirectory();
+
+    juce::TemporaryFile temp (file);
+    {
+        juce::FileOutputStream out (temp.getFile());
+        if (! out.openedOk() || ! juce::PNGImageFormat().writeImageToStream (image, out))
+            return;
+    }
+    if (! temp.overwriteTargetFileWithTemporary())
+        return;
+
+    block.getDynamicObject()->setProperty ("snapshotAt", juce::Time::currentTimeMillis());
+    block.getDynamicObject()->setProperty ("snapshotWidth", area.getWidth());
+    block.getDynamicObject()->setProperty ("snapshotHeight", area.getHeight());
+    store.markDirty();
+    sendState();
 }
 
 void WebUi::closeEditor (const juce::String& blockId)
@@ -501,11 +620,19 @@ void WebUi::sendState()
 
         const auto isCurrentType = type->getTypeName() == deviceManager.getCurrentAudioDeviceType();
         for (const auto& name : names)
+        {
+            const auto current = isCurrentType && (setup.outputDeviceName == name || setup.inputDeviceName == name);
+            auto label = deviceLabel (type->getTypeName(), name);
+            if (label.isEmpty() && ! current)
+                continue;
+
             devices.add (object ({
                 { "type", type->getTypeName() },
                 { "name", name },
-                { "current", isCurrentType && (setup.outputDeviceName == name || setup.inputDeviceName == name) },
+                { "label", label.isNotEmpty() ? label : name },
+                { "current", current },
             }));
+        }
     }
 
     juce::Array<juce::var> plugins;
@@ -525,6 +652,8 @@ void WebUi::sendState()
         { "device", device },
         { "devices", devices },
         { "plugins", object ({ { "scanning", library.isScanning() }, { "list", plugins } }) },
+        { "snapshotBase", project.isObject() ? juce::WebBrowserComponent::getResourceProviderRoot() + "snapshots/" + project["id"].toString() + "/"
+                                             : juce::String() },
         { "monitor", object ({ { "gainDb", engine.getGainDb() }, { "muted", engine.isMuted() } }) },
         { "panic", engine.isPanic() },
         { "project", project },
@@ -563,6 +692,31 @@ void WebUi::changeListenerCallback (juce::ChangeBroadcaster*)
         store.setDeviceState (*xml);
 
     sendState();
+    checkDevice();
+}
+
+void WebUi::checkDevice()
+{
+    auto& deviceManager = engine.getDeviceManager();
+    auto* device = deviceManager.getCurrentAudioDevice();
+    if (device == nullptr)
+        return;
+
+    const auto setup = deviceManager.getAudioDeviceSetup();
+    const auto label = deviceLabel (device->getTypeName(), device->getName()).upToFirstOccurrenceOf (",", false, false);
+    const auto noOutputs = setup.outputDeviceName.isNotEmpty() && device->getActiveOutputChannels().isZero();
+    const auto noInputs = setup.inputDeviceName.isNotEmpty() && device->getActiveInputChannels().isZero();
+    if (! noOutputs && ! noInputs)
+        return;
+
+    auto message = "Couldn't open the " + juce::String (noOutputs && noInputs ? "inputs or outputs" : noOutputs ? "outputs" : "inputs")
+                 + " of " + (label.isNotEmpty() ? label : device->getName()) + ". Another app is probably using "
+                 + (noOutputs && noInputs ? "them" : "it") + ".";
+   #if JUCE_LINUX
+    message << " On Linux that's usually the desktop's sound system: set this device's profile to Off in Settings > Sound,"
+               " then pick it again here. Or choose PipeWire Sound Server to share it.";
+   #endif
+    sendError (message);
 }
 
 void WebUi::timerCallback()
@@ -571,6 +725,16 @@ void WebUi::timerCallback()
     {
         captureStates();
         store.saveIfDirty();
+
+       #if JUCE_LINUX
+        // ALSA doesn't announce hotplug; the kernel's card list is cheap to read, so rescan when it changes.
+        const auto cards = juce::File ("/proc/asound/cards").loadFileAsString();
+        if (cards != std::exchange (soundCards, cards) && ticks > 60)
+        {
+            engine.rescanDevices();
+            sendState();
+        }
+       #endif
     }
 
     const auto levels = object ({
@@ -602,6 +766,21 @@ std::optional<juce::WebBrowserComponent::Resource> WebUi::getResource (const juc
                           "<p>Start it with <code>./scripts/dev.sh</code>. Retrying&hellip;</p></div>";
         const auto utf8 = html.toStdString();
         return makeResource (utf8.data(), utf8.size(), "text/html");
+    }
+
+    // Plugin snapshots: snapshots/<projectId>/<blockId>.png, from the app data folder.
+    if (path.startsWith ("snapshots/"))
+    {
+        const auto projectId = path.fromFirstOccurrenceOf ("snapshots/", false, false).upToFirstOccurrenceOf ("/", false, false);
+        const auto name = path.fromLastOccurrenceOf ("/", false, false);
+        const auto blockId = name.upToLastOccurrenceOf (".png", false, false);
+        juce::MemoryBlock data;
+
+        if (! isId (projectId) || ! isId (blockId) || name != blockId + ".png"
+            || ! ProjectStore::getSnapshotFile (projectId, blockId).loadFileAsData (data))
+            return std::nullopt;
+
+        return makeResource (data.getData(), data.getSize(), "image/png");
     }
 
     auto file = uiRoot.getChildFile (path.isEmpty() ? "index.html" : path);

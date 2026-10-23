@@ -262,7 +262,13 @@ void ProjectStore::removeBlock (const juce::String& blockId)
 
     if (auto* states = current["pluginStates"].getDynamicObject())
         states->removeProperty (blockId);
+    getSnapshotFile (current["id"].toString(), blockId).deleteFile();
     markDirty();
+}
+
+juce::File ProjectStore::getSnapshotFile (const juce::String& projectId, const juce::String& blockId)
+{
+    return getDataDir().getChildFile ("projects").getChildFile (projectId).getChildFile ("snapshots").getChildFile (blockId + ".png");
 }
 
 juce::String ProjectStore::getPluginState (const juce::String& blockId) const

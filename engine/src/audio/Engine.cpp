@@ -3,6 +3,10 @@
 
 #include <set>
 
+#if JUCE_LINUX
+ #include <alsa/asoundlib.h>
+#endif
+
 namespace glitch
 {
 
@@ -18,10 +22,16 @@ Engine::Engine (const juce::XmlElement* savedDeviceState)
     deviceError = deviceManager.initialise (maxChannels, maxChannels, savedDeviceState, true);
     deviceManager.addAudioCallback (this);
     rescanDevices();
+
+    for (auto* type : deviceManager.getAvailableDeviceTypes())
+        type->addListener (this);
 }
 
 Engine::~Engine()
 {
+    for (auto* type : deviceManager.getAvailableDeviceTypes())
+        type->removeListener (this);
+
     deviceManager.removeAudioCallback (this);
     player.setProcessor (nullptr);
 }
@@ -207,6 +217,12 @@ int Engine::getBlockSize() const
 //==============================================================================
 void Engine::rescanDevices()
 {
+   #if JUCE_LINUX
+    // alsa-lib loads each card's config once per process, so cards plugged in later stay invisible.
+    // Dropping the global config makes the next scan reload it; open devices hold their own reference.
+    snd_config_update_free_global();
+   #endif
+
     for (auto* type : deviceManager.getAvailableDeviceTypes())
         type->scanForDevices();
 }
@@ -259,6 +275,13 @@ void Engine::audioDeviceStopped()
 void Engine::audioDeviceError (const juce::String& message)
 {
     player.audioDeviceError (message);
+}
+
+void Engine::audioDeviceListChanged()
+{
+    rescanDevices();
+    if (onDeviceListChanged)
+        onDeviceListChanged();
 }
 
 void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int numInputs,

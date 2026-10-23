@@ -19,7 +19,8 @@ class ChainStage;
 // scales every output, in this class's own device callback around the graph.
 // Structural changes go through juce::AudioProcessorGraph, which rebuilds off the audio thread.
 // Parameters are atomics. Message thread for everything public.
-class Engine : private juce::AudioIODeviceCallback
+class Engine : private juce::AudioIODeviceCallback,
+               private juce::AudioIODeviceType::Listener
 {
 public:
     static constexpr int maxChains = 8;   // plan's v1 soft limit
@@ -69,6 +70,9 @@ public:
     juce::AudioDeviceManager& getDeviceManager() { return deviceManager; }
     juce::String getDeviceError() const { return deviceError; }
     void rescanDevices();
+    /** Called (message thread) when a device is plugged in or out, after rescanning. Types that
+        announce it: CoreAudio, JACK, Windows. ALSA doesn't; the owner polls for that. */
+    std::function<void()> onDeviceListChanged;
     /** Switches device; a name the type only has for one direction keeps the other side as it is. */
     juce::String selectDevice (const juce::String& type, const juce::String& name);
 
@@ -82,6 +86,7 @@ private:
     void audioDeviceAboutToStart (juce::AudioIODevice*) override;
     void audioDeviceStopped() override;
     void audioDeviceError (const juce::String&) override;
+    void audioDeviceListChanged() override;
 
     ChainStage* getStage (const std::map<juce::String, NodeID>&, const juce::String& chainId) const;
     void connect (NodeID from, NodeID to);

@@ -49,9 +49,15 @@ private:
     /** Copies plugin states into the project, so they save. */
     void captureStates();
     void openEditor (const juce::String& blockId);
+    void toggleBlock (const juce::String& blockId);
+    void removeBlock (const juce::String& blockId);
+    /** Saves a PNG of the block's open plugin window, shown as its tile artwork. */
+    void captureSnapshot (const juce::String& blockId);
     void closeEditor (const juce::String& blockId);
 
     void sendState();
+    /** Errors for a device that opened without the inputs or outputs it was asked for (e.g. busy). */
+    void checkDevice();
     void sendError (const juce::String& message);
     void emit (const juce::var& event);
     void timerCallback() override; // meters ~30 Hz, saves ~every 2 s
@@ -64,7 +70,7 @@ private:
     PluginLibrary& library;
     juce::StringArray chainIds; // of the open project, for meter keys
     std::map<juce::String, std::unique_ptr<PluginWindow>> editors;
-    juce::String lastDeviceName;
+    juce::String soundCards; // Linux: /proc/asound/cards, polled for hotplug
     int ticks = 0;
 
     const juce::String devUrl { GLITCH_UI_DEV_URL };

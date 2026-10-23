@@ -18,7 +18,10 @@ export interface DeviceInfo {
 /** An audio device the engine can switch to. */
 export interface AudioDeviceOption {
   type: string;
+  /** The device's name to the engine (send it back to select it). */
   name: string;
+  /** A shorter name to show. */
+  label: string;
   current: boolean;
 }
 
@@ -56,6 +59,11 @@ export interface Block {
   /** type "plugin": which plugin, and whether it failed to load (not installed). */
   plugin?: PluginInfo;
   missing?: boolean;
+  /** When the plugin window was last snapshotted (ms since epoch); the image is snapshotBase + id + ".png". */
+  snapshotAt?: number;
+  /** The snapshot's on-screen size in CSS pixels (the image itself may be up to 2x for Retina). */
+  snapshotWidth?: number;
+  snapshotHeight?: number;
 }
 
 export interface AbyPath { blocks: Block[]; level: number; pan: number; mute: boolean }
@@ -151,6 +159,8 @@ export interface GlitchState {
   device: DeviceInfo | null;
   devices: AudioDeviceOption[];
   plugins: PluginLibraryState;
+  /** URL prefix for the open project's block snapshots, or "" when there are none to serve. */
+  snapshotBase: string;
   monitor: MonitorState;
   panic: boolean;
   /** The open project. */

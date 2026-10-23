@@ -33,6 +33,8 @@ public:
     /** Plugin state blobs (base64), kept out of the chains so state events stay small. */
     juce::String getPluginState (const juce::String& blockId) const;
     void setPluginState (const juce::String& blockId, const juce::String& base64);
+    /** Where a block's plugin-window snapshot is kept: projects/<id>/snapshots/<blockId>.png. */
+    static juce::File getSnapshotFile (const juce::String& projectId, const juce::String& blockId);
 
     /** The audio device setup (AudioDeviceManager XML), kept in settings.json. */
     std::unique_ptr<juce::XmlElement> getDeviceState() const;
