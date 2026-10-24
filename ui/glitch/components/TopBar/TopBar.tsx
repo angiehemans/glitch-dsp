@@ -12,9 +12,14 @@ type TopBarProps = {
   cpuLoad?: string;
   audioDevice?: string;
   devices?: Array<{ id: string; name: string; kind: string; current: boolean }>;
+  rates?: Array<{ id: string; label: string; current: boolean }>;
+  buffers?: Array<{ id: string; label: string; current: boolean }>;
+  latency?: string;
   midiDevice?: string;
   onAudioClick?: () => void;
   onSelectDevice?: (id: string) => void;
+  onSelectRate?: (id: string) => void;
+  onSelectBuffer?: (id: string) => void;
   onPanic?: () => void;
   className?: string;
 };
@@ -34,9 +39,23 @@ export default function TopBar({
     { id: "1", name: "Scarlett 4i4", kind: "CoreAudio", current: true },
     { id: "2", name: "MacBook Pro Speakers", kind: "CoreAudio", current: false },
   ],
+  rates = [
+    { id: "44100", label: "44.1k", current: false },
+    { id: "48000", label: "48k", current: true },
+    { id: "96000", label: "96k", current: false },
+  ],
+  buffers = [
+    { id: "64", label: "64", current: false },
+    { id: "128", label: "128", current: true },
+    { id: "256", label: "256", current: false },
+    { id: "512", label: "512", current: false },
+  ],
+  latency = "Reported latency 5.8 ms (in + out)",
   midiDevice = "FC-4",
   onAudioClick,
   onSelectDevice,
+  onSelectRate,
+  onSelectBuffer,
   onPanic,
   className,
 }: TopBarProps) {
@@ -83,6 +102,19 @@ export default function TopBar({
               </li>
             ))}
           </ul>
+          <p data-scamp-id="rate_title_7a8b" className={styles.rate_title_7a8b}>SAMPLE RATE</p>
+          <div data-scamp-id="rates_8b9c" className={styles.rates_8b9c} role="group" aria-label="Sample rate">
+            {rates.map((rate) => (
+              <button data-scamp-id="rate_9cad" className={styles.rate_9cad} type="button" role="menuitemradio" aria-checked={rate.current} key={rate.id} onClick={() => onSelectRate?.(rate.id)}>{rate.label}</button>
+            ))}
+          </div>
+          <p data-scamp-id="buffer_title_adbe" className={styles.buffer_title_adbe}>BUFFER SIZE</p>
+          <div data-scamp-id="buffers_becf" className={styles.buffers_becf} role="group" aria-label="Buffer size">
+            {buffers.map((buffer) => (
+              <button data-scamp-id="buffer_cfd0" className={styles.buffer_cfd0} type="button" role="menuitemradio" aria-checked={buffer.current} key={buffer.id} onClick={() => onSelectBuffer?.(buffer.id)}>{buffer.label}</button>
+            ))}
+          </div>
+          <p data-scamp-id="latency_d0e1" className={styles.latency_d0e1}>{latency}</p>
         </div>
       </div>
       <div data-scamp-id="midi_status_4f7a" className={styles.midi_status_4f7a}>
@@ -96,4 +128,4 @@ export default function TopBar({
   );
 }
 
-export const _scamp = { contract: 2, events: ['onAudioClick', 'onSelectDevice', 'onPanic'] } as const;
+export const _scamp = { contract: 2, events: ['onAudioClick', 'onSelectDevice', 'onSelectRate', 'onSelectBuffer', 'onPanic'] } as const;

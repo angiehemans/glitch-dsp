@@ -310,6 +310,113 @@
   color: var(--color-text-dim);
 }
 
+.rate_title_7a8b {
+  width: fit-content;
+  height: fit-content;
+  padding: var(--space-2) var(--space-2) 0px var(--space-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-text-dim);
+}
+
+.rates_8b9c {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 0px var(--space-2);
+}
+
+.rate_9cad {
+  min-width: 44px;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-2);
+  border-radius: var(--radius-sm);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-hi);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.rate_9cad:hover {
+  border-color: var(--color-line-strong);
+}
+
+.rate_9cad[aria-checked="true"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.rate_9cad:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.buffer_title_adbe {
+  width: fit-content;
+  height: fit-content;
+  padding: var(--space-2) var(--space-2) 0px var(--space-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-text-dim);
+}
+
+.buffers_becf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 0px var(--space-2);
+}
+
+.buffer_cfd0 {
+  min-width: 44px;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-2);
+  border-radius: var(--radius-sm);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-hi);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.buffer_cfd0:hover {
+  border-color: var(--color-line-strong);
+}
+
+.buffer_cfd0[aria-checked="true"] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.buffer_cfd0:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.latency_d0e1 {
+  width: fit-content;
+  height: fit-content;
+  padding: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-text-lo);
+}
+
 .audio_led_c096 {
   width: 8px;
   height: 8px;
