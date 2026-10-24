@@ -259,6 +259,31 @@ juce::String Engine::selectDevice (const juce::String& typeName, const juce::Str
     return deviceManager.setAudioDeviceSetup (setup, true);
 }
 
+juce::String Engine::setFormat (double sampleRate, int bufferSize)
+{
+    auto* device = deviceManager.getCurrentAudioDevice();
+    if (device == nullptr)
+        return "No audio device is open";
+
+    auto setup = deviceManager.getAudioDeviceSetup();
+
+    if (sampleRate > 0)
+    {
+        if (! device->getAvailableSampleRates().contains (sampleRate))
+            return device->getName() + " can't run at " + juce::String (sampleRate / 1000.0, 1) + " kHz";
+        setup.sampleRate = sampleRate;
+    }
+
+    if (bufferSize > 0)
+    {
+        if (! device->getAvailableBufferSizes().contains (bufferSize))
+            return device->getName() + " doesn't offer a " + juce::String (bufferSize) + "-sample buffer";
+        setup.bufferSize = bufferSize;
+    }
+
+    return deviceManager.setAudioDeviceSetup (setup, true);
+}
+
 //==============================================================================
 void Engine::audioDeviceAboutToStart (juce::AudioIODevice* device)
 {

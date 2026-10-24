@@ -75,6 +75,8 @@ public:
     std::function<void()> onDeviceListChanged;
     /** Switches device; a name the type only has for one direction keeps the other side as it is. */
     juce::String selectDevice (const juce::String& type, const juce::String& name);
+    /** Restarts the device at this sample rate and/or buffer size (0 = keep). Returns an error, or {}. */
+    juce::String setFormat (double sampleRate, int bufferSize);
 
 private:
     using NodeID = juce::AudioProcessorGraph::NodeID;

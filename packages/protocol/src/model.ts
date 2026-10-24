@@ -10,7 +10,11 @@ export interface DeviceInfo {
   type: string;
   sampleRate: number;
   bufferSize: number;
+  /** What the driver reports for input + output; the true round trip can be longer. */
   latencyMs: number;
+  /** What this device can run at (buffer sizes: powers of two only). */
+  sampleRates: number[];
+  bufferSizes: number[];
   inputs: string[];
   outputs: string[];
 }

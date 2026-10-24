@@ -24,6 +24,7 @@ namespace glitch::protocol
         inline constexpr auto chainSetMute   = "chain.setMute";
         inline constexpr auto deviceScan     = "device.scan";
         inline constexpr auto deviceSelect   = "device.select";
+        inline constexpr auto deviceSetFormat = "device.setFormat";
         inline constexpr auto pluginsScan    = "plugins.scan";
         inline constexpr auto libraryImport  = "library.import";
         inline constexpr auto blockAdd       = "block.add";
