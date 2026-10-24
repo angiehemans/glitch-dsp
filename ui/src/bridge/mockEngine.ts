@@ -45,6 +45,8 @@ export function createMockEngine(): EngineBridge {
       latencyMs: 5.3,
       inputs: ["Input 1", "Input 2"],
       outputs: ["Output 1", "Output 2"],
+      sampleRates: [44100, 48000, 96000],
+      bufferSizes: [32, 64, 128, 256, 512, 1024],
     },
     devices: [
       { type: "Mock", name: "Mock M4", label: "Mock M4", current: true },
@@ -188,6 +190,15 @@ export function createMockEngine(): EngineBridge {
         }
         case "device.scan":
           break;
+        case "device.setFormat": {
+          const d = state.device!;
+          if (cmd.sampleRate && !d.sampleRates.includes(cmd.sampleRate)) return error(`Audio device: ${d.name} can't run at ${cmd.sampleRate / 1000} kHz`);
+          if (cmd.bufferSize && !d.bufferSizes.includes(cmd.bufferSize)) return error(`Audio device: ${d.name} doesn't offer a ${cmd.bufferSize}-sample buffer`);
+          d.sampleRate = cmd.sampleRate || d.sampleRate;
+          d.bufferSize = cmd.bufferSize || d.bufferSize;
+          d.latencyMs = (2000 * d.bufferSize) / d.sampleRate + 1.5; // in + out, plus converters
+          break;
+        }
         case "device.select": {
           const d = state.devices.find((d) => d.type === cmd.deviceType && d.name === cmd.name);
           if (!d) return error(`Audio device: Device not found: ${cmd.name}`);

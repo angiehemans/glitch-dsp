@@ -61,6 +61,26 @@ namespace
         return v.toString().replaceCharacters ("\r\n\t", "   ").trim().substring (0, 60).trim();
     }
 
+    /** 44.1 kHz and up (devices also offer 8–32 kHz, which no guitar rig wants), plus the current rate. */
+    juce::var sampleRates (juce::AudioIODevice* d)
+    {
+        juce::Array<juce::var> result;
+        for (const auto rate : d->getAvailableSampleRates())
+            if (rate >= 44100.0 || juce::approximatelyEqual (rate, d->getCurrentSampleRate()))
+                result.addIfNotAlreadyThere (rate);
+        return result;
+    }
+
+    /** Powers of two only: ALSA can offer dozens of sizes, and nobody picks 391. */
+    juce::var bufferSizes (juce::AudioIODevice* d)
+    {
+        juce::Array<juce::var> result;
+        for (const auto size : d->getAvailableBufferSizes())
+            if (juce::isPowerOfTwo (size) || size == d->getCurrentBufferSizeSamples())
+                result.addIfNotAlreadyThere (size);
+        return result;
+    }
+
     bool isChannel (const juce::var& v)
     {
         return (v.isInt() || v.isInt64()) && (int) v >= 1 && (int) v <= Engine::maxChannels;
@@ -241,6 +261,14 @@ void WebUi::handleCommand (const juce::var& command)
     else if (type == protocol::command::deviceScan)
     {
         engine.rescanDevices();
+    }
+    else if (type == protocol::command::deviceSetFormat)
+    {
+        const auto error = engine.setFormat (command["sampleRate"].isVoid() ? 0.0 : (double) command["sampleRate"],
+                                             command["bufferSize"].isVoid() ? 0 : (int) command["bufferSize"]);
+        if (error.isNotEmpty())
+            sendError ("Audio device: " + error);
+        // On success the device restarts; its change callback re-prepares the graph and saves the setup.
     }
     else if (type == protocol::command::deviceSelect)
     {
@@ -739,6 +767,8 @@ void WebUi::sendState()
             { "latencyMs", sampleRate > 0 ? 1000.0 * latencySamples / sampleRate : 0.0 },
             { "inputs", activeChannelNames (d->getInputChannelNames(), d->getActiveInputChannels()) },
             { "outputs", activeChannelNames (d->getOutputChannelNames(), d->getActiveOutputChannels()) },
+            { "sampleRates", sampleRates (d) },
+            { "bufferSizes", bufferSizes (d) },
         });
     }
 

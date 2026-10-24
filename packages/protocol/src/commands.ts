@@ -21,6 +21,7 @@ export type Command =
   // Audio device
   | { type: "device.scan" }
   | { type: "device.select"; deviceType: string; name: string }
+  | { type: "device.setFormat"; sampleRate?: number; bufferSize?: number }
   // Plugins and the library: scan the standard plugin folders (and re-read the library), or pick
   // plugins, folders, .nam models or IRs in a native file chooser (models and IRs are copied in).
   | { type: "plugins.scan" }
