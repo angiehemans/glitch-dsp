@@ -157,6 +157,9 @@
 
 /* Wrappers that keep their cards in the grid: the canvas samples, and the app's cards (a slot). */
 .samples_4e5f {
+  position: relative;
+  left: 0px;
+  top: 0px;
   display: contents;
 }
 
