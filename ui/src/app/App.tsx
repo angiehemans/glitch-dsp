@@ -32,6 +32,19 @@ export function App() {
           audioDevice={device ? device.name : "NO AUDIO DEVICE"}
           devices={(state?.devices ?? []).map((d, i) => ({ id: String(i), name: d.label || d.name, kind: d.type, current: d.current }))}
           midiDevice={state?.midi.device ?? "NO MIDI"}
+          rates={(device?.sampleRates ?? []).map((r) => ({
+            id: String(r),
+            label: `${Number((r / 1000).toFixed(1))}k`,
+            current: r === device?.sampleRate,
+          }))}
+          buffers={(device?.bufferSizes ?? []).map((b) => ({ id: String(b), label: String(b), current: b === device?.bufferSize }))}
+          latency={
+            device
+              ? `${device.bufferSize} samples is ${((1000 * device.bufferSize) / device.sampleRate).toFixed(1)} ms · reported latency ${device.latencyMs.toFixed(1)} ms`
+              : ""
+          }
+          onSelectRate={(id) => send({ type: "device.setFormat", sampleRate: Number(id) })}
+          onSelectBuffer={(id) => send({ type: "device.setFormat", bufferSize: Number(id) })}
           onAudioClick={() => send({ type: "device.scan" })}
           onSelectDevice={(id) => {
             const d = state?.devices[Number(id)];
