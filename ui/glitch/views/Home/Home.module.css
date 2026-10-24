@@ -1,0 +1,165 @@
+.root {
+  width: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+.inst_a7b1.inst_a7b1 {
+  width: 100%;
+}
+
+.shell_b2c3 {
+  min-height: 836px;
+  display: flex;
+  flex-grow: 1;
+}
+
+.main_d4e5 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  flex-grow: 1;
+  min-width: 0;
+  padding: var(--space-8);
+}
+
+.head_e5f6 {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.titles_f607 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title_0718 {
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text-hi);
+  width: fit-content;
+  height: fit-content;
+}
+
+.sub_1829 {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-text-lo);
+  width: fit-content;
+  height: fit-content;
+}
+
+.head_spacer_293a {
+  flex-grow: 1;
+}
+
+.search_3a4b {
+  width: 280px;
+  height: 44px;
+  padding: 0px var(--space-4);
+  background: var(--color-bg-1);
+  border-radius: var(--radius-md);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line-strong);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-text-hi);
+  box-shadow: var(--bevel-inset);
+}
+
+.search_3a4b:focus {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-accent);
+}
+
+.grid_6d7e {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.new_card_7e8f {
+  width: 320px;
+  min-height: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  border-width: 2px;
+  border-style: dashed;
+  border-color: var(--color-line-strong);
+  color: var(--color-text-lo);
+  transition: border-color 120ms ease, background 120ms ease;
+  cursor: pointer;
+}
+
+.new_card_7e8f:hover {
+  background: var(--color-accent-soft);
+  border-width: 2px;
+  border-style: dashed;
+  border-color: var(--color-accent);
+  color: var(--color-text-hi);
+}
+
+.new_plus_8f90 {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1;
+  color: var(--color-accent);
+  width: fit-content;
+  height: fit-content;
+}
+
+.new_title_90a1 {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 600;
+  width: fit-content;
+  height: fit-content;
+}
+
+.new_sub_a1b2 {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-text-dim);
+  width: fit-content;
+  height: fit-content;
+}
+.inst_b3c4.inst_b3c4 {
+  width: 320px;
+}
+
+.inst_c4d5.inst_c4d5 {
+  width: 320px;
+}
+
+.inst_d5e6.inst_d5e6 {
+  width: 320px;
+}
+
+.inst_e6f7.inst_e6f7 {
+  width: 320px;
+}
+
+.inst_f708.inst_f708 {
+  width: 320px;
+}
+
+/* Wrappers that keep their cards in the grid: the canvas samples, and the app's cards (a slot). */
+.samples_4e5f {
+  display: contents;
+}
+
+.cards_5f60 {
+  display: contents;
+}

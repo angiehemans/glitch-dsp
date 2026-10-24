@@ -1,0 +1,13 @@
+node_modules
+dist
+.vite
+.dev.vars
+.scamp/*
+!.scamp/agent-history/
+
+# Scamp MCP server registration (machine-local — do not commit)
+.mcp.json
+
+# Scamp MCP server registration (machine-local — do not commit)
+.gemini/settings.json
+.kiro/settings/mcp.json

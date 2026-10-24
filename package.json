@@ -1,0 +1,10 @@
+{
+  "name": "glitch",
+  "private": true,
+  "workspaces": ["ui", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev -w ui",
+    "build:ui": "npm run build -w ui",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

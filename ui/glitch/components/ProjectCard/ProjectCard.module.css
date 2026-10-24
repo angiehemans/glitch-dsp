@@ -1,0 +1,310 @@
+.root {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-1);
+  border-radius: var(--radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line);
+  transition: border-color 120ms ease, background 120ms ease;
+  position: relative;
+  box-shadow: var(--bevel);
+  --card-color: var(--chain-orange);
+  overflow: hidden;
+}
+
+.root:hover {
+  background: var(--color-bg-2);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line-strong);
+}
+
+.body_2d4f {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.head_3e5a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.name_4f6b {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-hi);
+  flex-grow: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.badge_open_5a7c {
+  display: none;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--color-lcd-text);
+  width: fit-content;
+  height: fit-content;
+  padding: 2px var(--space-2);
+  background: var(--color-lcd-bg);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--bevel-inset);
+}
+
+.opened_7c9e {
+  width: fit-content;
+  height: fit-content;
+  margin: -12px 0px 0px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-text-dim);
+}
+
+.stats_8daf {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.stat_9eb0 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-grow: 1;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-lcd-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--bevel-inset);
+}
+
+.stat_value_a0c1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--color-lcd-text);
+  width: fit-content;
+  height: fit-content;
+}
+
+.stat_label_b1d2 {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--color-text-dim);
+  width: fit-content;
+  height: fit-content;
+}
+
+.stat_c2e3 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-grow: 1;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-lcd-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--bevel-inset);
+}
+
+.stat_value_d3f4 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--color-lcd-text);
+  width: fit-content;
+  height: fit-content;
+}
+
+.stat_label_e405 {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--color-text-dim);
+  width: fit-content;
+  height: fit-content;
+}
+
+.stat_f516 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-grow: 1;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-lcd-bg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--bevel-inset);
+}
+
+.stat_value_0627 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--color-lcd-text);
+  width: fit-content;
+  height: fit-content;
+}
+
+.stat_label_1738 {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--color-text-dim);
+  width: fit-content;
+  height: fit-content;
+}
+
+.footer_2849 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+}
+
+.output_chip_395a {
+  width: fit-content;
+  height: fit-content;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line-strong);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-text-lo);
+}
+
+.warn_badge_4a6b {
+  display: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-hot);
+  width: fit-content;
+  height: fit-content;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-hot-soft);
+  border-radius: var(--radius-full);
+}
+
+.progress_5b7c {
+  height: 6px;
+  display: none;
+  flex-grow: 1;
+  background: var(--color-lcd-bg);
+  border-radius: var(--radius-full);
+  position: relative;
+  left: 0px;
+  top: 0px;
+  overflow: hidden;
+}
+
+.progress_fill_6c8d {
+  width: 60%;
+  height: 100%;
+  background: var(--card-color);
+  position: absolute;
+  left: 0px;
+  top: 0px;
+}
+
+/* Stretches the name link over the whole card; the options Button is positioned and later in the DOM, so it stays clickable above it */
+.name_4f6b::after {
+  content: "";
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  right: 0px;
+  bottom: 0px;
+}
+
+.options_wrap_7a2b {
+  display: flex;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.options_menu_8b3c {
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+  padding: var(--space-1);
+  background: var(--color-bg-1);
+  border-radius: var(--radius-md);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line-strong);
+  box-shadow: var(--shadow-panel);
+  position: absolute;
+  top: 100%;
+  right: 0px;
+  margin: var(--space-1) 0px 0px 0px;
+  z-index: 10;
+}
+
+.rename_item_9c4d {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-hi);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rename_item_9c4d:hover {
+  background: var(--color-bg-3);
+}
+
+.rename_item_9c4d:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.root[data-color="cyan"] {
+  --card-color: var(--chain-cyan);
+}
+
+.root[data-color="pink"] {
+  --card-color: var(--chain-pink);
+}
+
+.root[data-color="lime"] {
+  --card-color: var(--chain-lime);
+}
+
+.root[data-color="violet"] {
+  --card-color: var(--chain-violet);
+}
+
+.root[data-state="current"] {
+  background: var(--color-bg-2);
+}
+
+.root[data-state="current"] .badge_open_5a7c {
+  display: block;
+}
+
+.root[data-state="opening"] .progress_5b7c {
+  display: block;
+}
+
+.root[data-state="opening"] .output_chip_395a {
+  display: none;
+}
+
+.root[data-state="warning"] .warn_badge_4a6b {
+  display: block;
+}
+
+.root[data-menu="open"] .options_menu_8b3c {
+  visibility: visible;
+}

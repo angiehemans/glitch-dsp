@@ -1,0 +1,284 @@
+/* Hand-written styles. Everything is gl- prefixed so it never collides with Scamp's classes. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-background, #101113);
+  color: var(--color-text, #d6d9de);
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+.gl-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Matches Scamp's TopBar surface so the extras read as part of the header. */
+.gl-topbar {
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-1, #1a1b1e);
+  border-bottom: 1px solid var(--color-line, #2e3035);
+}
+
+.gl-topbar > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.gl-topbar-extras {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.gl-mock-badge {
+  padding: 4px 8px;
+  border: 1px solid var(--color-warning, #fbbf24);
+  border-radius: 4px;
+  color: var(--color-warning, #fbbf24);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.gl-banner {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+
+.gl-banner button {
+  font: inherit;
+  padding: 4px 12px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.gl-banner-panic {
+  background: var(--color-clip, #ef4444);
+  color: #fff;
+}
+
+.gl-banner-error {
+  background: var(--color-clip-soft, rgba(239, 68, 68, 0.15));
+  color: var(--color-clip, #ef4444);
+}
+
+.gl-loading {
+  margin: auto;
+  color: var(--color-muted, #8a8f98);
+}
+
+.gl-empty {
+  margin: 48px auto;
+  color: var(--color-muted, #8a8f98);
+}
+
+.gl-empty a {
+  color: var(--color-accent, #5c6ac4);
+}
+
+/* Monitor strip at the bottom of the rig */
+.gl-monitor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 24px 16px;
+  border-top: 1px solid var(--color-line, #2e3035);
+  background: var(--color-bg-1, #1a1b1e);
+}
+
+/* Fader placeholder */
+.gl-fader {
+  --accent: var(--color-signal, #4ade80);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.gl-fader[data-muted] {
+  opacity: 0.5;
+}
+
+.gl-fader-name,
+.gl-meter-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.gl-fader-body {
+  display: flex;
+  gap: 8px;
+  height: 300px;
+}
+
+.gl-fader-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 9px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted, #8a8f98);
+}
+
+/* A horizontal range rotated to vertical: works in Safari 15 without slider-vertical. */
+.gl-fader-range {
+  width: 300px;
+  height: 40px;
+  margin: 130px -130px;
+  transform: rotate(-90deg);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+/* Scamp's theme unsets inputs, so the track, thumb and checkbox are drawn here. */
+.gl-fader-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-bg-3, #34363b);
+}
+
+.gl-fader-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 36px;
+  margin-top: -15px;
+  border-radius: 3px;
+  background: var(--color-text-hi, #d6d9de);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.gl-fader-range::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-bg-3, #34363b);
+}
+
+.gl-fader-range::-moz-range-thumb {
+  width: 22px;
+  height: 36px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--color-text-hi, #d6d9de);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.gl-fader-range:focus-visible,
+.gl-fader-mute input:focus-visible {
+  outline: 2px solid var(--color-accent, #5c6ac4);
+  outline-offset: 2px;
+}
+
+.gl-fader-readout {
+  min-width: 6ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.gl-fader-mute {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gl-fader-mute input {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--color-line-strong, #4a4d53);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.gl-fader-mute input:checked {
+  background: var(--color-clip, #ef4444);
+  border-color: var(--color-clip, #ef4444);
+}
+
+/* Meter placeholder: --level (0..1) is written by useMeter */
+.gl-meter {
+  --accent: var(--color-signal, #4ade80);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.gl-meter-track {
+  --level: 0;
+  position: relative;
+  width: 14px;
+  height: 300px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--color-bg-2, #26282c);
+  cursor: pointer;
+}
+
+.gl-meter-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    var(--accent) 0%,
+    var(--accent) 82%,
+    var(--color-hot, #fbbf24) 82%,
+    var(--color-hot, #fbbf24) 91%,
+    var(--color-clip, #ef4444) 91%
+  );
+  clip-path: inset(calc((1 - var(--level)) * 100%) 0 0 0);
+}
+
+.gl-meter-track[data-clip] {
+  box-shadow: 0 -4px 0 var(--color-clip, #ef4444);
+}
+
+.gl-meter[data-muted] .gl-meter-track {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-bg-2, #26282c) 0 4px,
+    var(--color-bg-3, #34363b) 4px 8px
+  );
+}
+
+/* A plugin-window snapshot as a block tile's artwork, at the size RigView gives it */
+.gl-block-art {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* A project or chain name being renamed in place (app/rename.ts) */
+[data-rename][contenteditable="plaintext-only"],
+[data-rename][contenteditable="true"] {
+  outline: 2px solid var(--color-accent, #5c6ac4);
+  outline-offset: 2px;
+  border-radius: 2px;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Project cards the app renders into Home's projects slot, sized like the canvas samples */
+.gl-project-card {
+  width: 320px;
+}

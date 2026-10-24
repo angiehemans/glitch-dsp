@@ -1,0 +1,14 @@
+{
+  "name": "glitch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "scamp dev",
+    "build": "scamp build",
+    "preview": "scamp preview"
+  },
+  "dependencies": {
+    "preact": "^10.29.0",
+    "scampjs": "^0.3.2"
+  }
+}

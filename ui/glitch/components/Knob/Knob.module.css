@@ -1,0 +1,67 @@
+.root {
+  width: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  position: relative;
+}
+
+.dial_1b2c {
+  width: 60px;
+  height: 60px;
+  background: var(--color-bg-1);
+  border-radius: var(--radius-full);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--color-line-strong);
+  box-shadow: 0px 0px 0px 4px var(--color-bg-1), 0px 0px 0px 5px var(--color-line), 0px 0px 0px 5px var(--color-line);
+  position: relative;
+  left: 0px;
+  top: 0px;
+  cursor: ns-resize;
+}
+
+.pointer_2c3d {
+  width: 3px;
+  height: 18px;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  box-shadow: 0px 0px 6px var(--color-accent);
+  transform: rotate(0deg);
+  transform-origin: 1.5px 24px;
+  position: absolute;
+  left: 28px;
+  top: 5px;
+}
+
+.value_3d4e {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--color-lcd-text);
+  white-space: nowrap;
+  width: fit-content;
+  height: fit-content;
+  padding: 2px var(--space-2);
+  background: var(--color-lcd-bg);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--bevel-inset);
+}
+
+.label_4e5f {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--color-text-lo);
+  width: fit-content;
+  height: fit-content;
+}
+
+.root[data-position="low"] .pointer_2c3d {
+  transform: rotate(-110deg);
+}
+
+.root[data-position="high"] .pointer_2c3d {
+  transform: rotate(100deg);
+}
