@@ -36,6 +36,9 @@ export interface PluginInfo {
 
 export interface PluginLibraryState {
   scanning: boolean;
+  /** While scanning: 0..1, and the plugin being scanned. */
+  progress: number;
+  current: string;
   list: PluginInfo[];
 }
 

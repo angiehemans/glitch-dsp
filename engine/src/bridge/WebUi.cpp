@@ -240,7 +240,13 @@ void WebUi::handleCommand (const juce::var& command)
     }
     else if (type == protocol::command::pluginsScan || type == protocol::command::pluginsImport)
     {
-        auto onDone = [safe = juce::Component::SafePointer<WebUi> (this)]
+        const auto safe = juce::Component::SafePointer<WebUi> (this);
+        auto onProgress = [safe]
+        {
+            if (safe != nullptr)
+                safe->sendState(); // the menu shows how far the scan has got
+        };
+        auto onDone = [safe]
         {
             if (safe != nullptr)
             {
@@ -248,10 +254,16 @@ void WebUi::handleCommand (const juce::var& command)
                 safe->sendState();
             }
         };
+
         if (type == protocol::command::pluginsScan)
-            library.scan (onDone);
-        else
-            library.import (onDone);
+        {
+            library.scan (onProgress, onDone);
+        }
+        else if (! library.import (onProgress, onDone))
+        {
+            sendError ("A plugin scan is still running. Wait for it to finish, then add the plugin.");
+            return;
+        }
     }
     else
     {
@@ -681,7 +693,8 @@ void WebUi::sendState()
     const auto state = object ({
         { "device", device },
         { "devices", devices },
-        { "plugins", object ({ { "scanning", library.isScanning() }, { "list", plugins } }) },
+        { "plugins", object ({ { "scanning", library.isScanning() }, { "progress", library.getScanProgress() },
+                               { "current", library.getScanningName() }, { "list", plugins } }) },
         { "snapshotBase", project.isObject() ? juce::WebBrowserComponent::getResourceProviderRoot() + "snapshots/" + project["id"].toString() + "/"
                                              : juce::String() },
         { "monitor", object ({ { "gainDb", engine.getGainDb() }, { "muted", engine.isMuted() } }) },
