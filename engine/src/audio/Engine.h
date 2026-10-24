@@ -52,7 +52,7 @@ public:
     void setChains (const std::vector<ChainSpec>&);
     void setChainParams (const juce::String& chainId, float levelDb, bool isMuted);
 
-    bool addBlock (const juce::String& blockId, std::unique_ptr<juce::AudioPluginInstance>);
+    bool addBlock (const juce::String& blockId, std::unique_ptr<juce::AudioProcessor>);
     void removeBlock (const juce::String& blockId);
     bool hasBlock (const juce::String& blockId) const { return blocks.count (blockId) > 0; }
     juce::StringArray getBlockIds() const;

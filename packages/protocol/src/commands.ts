@@ -21,10 +21,16 @@ export type Command =
   // Audio device
   | { type: "device.scan" }
   | { type: "device.select"; deviceType: string; name: string }
-  // Plugins: scan the standard folders, or pick a plugin or folder (opens a native file chooser).
+  // Plugins and the library: scan the standard plugin folders (and re-read the library), or pick
+  // plugins, folders, .nam models or IRs in a native file chooser (models and IRs are copied in).
   | { type: "plugins.scan" }
-  | { type: "plugins.import" }
-  | { type: "block.add"; chainId: string; block: { type: "plugin"; pluginId: string }; index?: number }
+  | { type: "library.import" }
+  | {
+      type: "block.add";
+      chainId: string;
+      block: { type: "plugin"; pluginId: string } | { type: "nam" | "ir"; file: string };
+      index?: number;
+    }
   | { type: "block.remove"; blockId: string }
   | { type: "block.toggle"; blockId: string }
   | { type: "block.openEditor"; blockId: string }

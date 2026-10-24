@@ -133,7 +133,7 @@ void Engine::setChainParams (const juce::String& chainId, float levelDb, bool is
 }
 
 //==============================================================================
-bool Engine::addBlock (const juce::String& blockId, std::unique_ptr<juce::AudioPluginInstance> plugin)
+bool Engine::addBlock (const juce::String& blockId, std::unique_ptr<juce::AudioProcessor> plugin)
 {
     if (plugin == nullptr || hasBlock (blockId))
         return false;

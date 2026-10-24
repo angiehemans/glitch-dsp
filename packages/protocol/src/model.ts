@@ -34,6 +34,12 @@ export interface PluginInfo {
   category: string;
 }
 
+/** A NAM model or IR in the library. `id` is its path inside the library, e.g. "nam/Plexi.nam". */
+export interface LibraryFile {
+  id: string;
+  name: string;
+}
+
 export interface PluginLibraryState {
   scanning: boolean;
   /** While scanning: 0..1, and the plugin being scanned. */
@@ -59,9 +65,14 @@ export interface Block {
   enabled: boolean;
   mix?: number;
   params?: Record<string, number>;
-  /** type "plugin": which plugin, and whether it failed to load (not installed). */
+  /** type "plugin": which plugin. */
   plugin?: PluginInfo;
+  /** type "nam" / "ir": the library file (a LibraryFile id). */
+  file?: string;
+  /** It failed to load: the plugin isn't installed, or the file is missing or unreadable. */
   missing?: boolean;
+  /** Something to tell the user, e.g. a NAM model trained at another sample rate. */
+  note?: string;
   /** When the plugin window was last snapshotted (ms since epoch); the image is snapshotBase + id + ".png". */
   snapshotAt?: number;
   /** The snapshot's on-screen size in CSS pixels (the image itself may be up to 2x for Retina). */
@@ -162,6 +173,8 @@ export interface GlitchState {
   device: DeviceInfo | null;
   devices: AudioDeviceOption[];
   plugins: PluginLibraryState;
+  /** NAM models and cabinet IRs in the library. */
+  library: { nam: LibraryFile[]; ir: LibraryFile[] };
   /** URL prefix for the open project's block snapshots, or "" when there are none to serve. */
   snapshotBase: string;
   monitor: MonitorState;
