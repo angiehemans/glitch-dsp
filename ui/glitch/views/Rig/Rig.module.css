@@ -34,8 +34,6 @@
 .live_chains_6a2f {
   width: 100%;
   display: none;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
 .chains_b4a5 {
@@ -531,6 +529,8 @@
 
 .root[data-content="live"] .live_chains_6a2f {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .root[data-content="live"] .chains_b4a5 {
