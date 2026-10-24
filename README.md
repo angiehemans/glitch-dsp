@@ -105,6 +105,7 @@ Click the audio device pill in the top bar for a list of devices (all types: ALS
 - **Linux list:** JUCE's ALSA type lists every PCM. The menu shows the default output, PipeWire, and one direct hardware entry per card ("M4, USB Audio"), and hides the mixing, snooping, surround and S/PDIF variants.
 - **A device the desktop is using (Linux):** direct hardware access is exclusive, so if PipeWire has the device open, Glitch only gets the other direction and says so in an error. Hand the device to Glitch by switching its PipeWire profile off (`wpctl status` for its id, then `wpctl set-profile <id> 0`; `1` or Settings > Sound to give it back), then pick it again in the menu. Or choose PipeWire Sound Server to share it, with more latency. macOS shares devices, so this doesn't apply there.
 - Chains' input and output chips are dropdowns of the channels the device actually opened (pairs first, then single outputs), labelled with the device's channel names.
+- **Sample rate and buffer size:** chips under the device list (44.1 kHz and up; buffer sizes in powers of two). Picking one restarts the device at that format, re-prepares the audio graph and NAM models, and saves it with the device setup. The line under them shows the buffer's length in ms and the latency the driver reports, which can be shorter than the true round trip.
 
 ### NAM models and cab IRs
 
