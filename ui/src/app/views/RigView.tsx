@@ -91,7 +91,7 @@ export function RigView({ state }: { state: GlitchState }) {
     image: PLUGIN_IMAGE,
   }));
   const pluginNote = state.plugins.scanning
-    ? "Scanning for plugins…"
+    ? `Scanning… ${Math.round((state.plugins.progress ?? 0) * 100)}%${state.plugins.current ? ` · ${state.plugins.current}` : ""}`
     : state.plugins.list.length === 0
       ? "No plugins yet. Scan the standard folders, or add one."
       : `${state.plugins.list.length} plugin${state.plugins.list.length === 1 ? "" : "s"}`;

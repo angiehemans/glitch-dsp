@@ -5,7 +5,7 @@ export function emptyState(): GlitchState {
   return {
     device: null,
     devices: [],
-    plugins: { scanning: false, list: [] },
+    plugins: { scanning: false, progress: 0, current: "", list: [] },
     snapshotBase: "",
     monitor: { gainDb: 0, muted: false },
     panic: false,
@@ -199,6 +199,8 @@ export function createMockEngine(): EngineBridge {
           setTimeout(() => {
             state.plugins = {
               scanning: false,
+              progress: 0,
+              current: "",
               list: [
                 { id: "mock-gain", name: "Mock Gain", manufacturer: "Glitch", format: "VST3", category: "Fx" },
                 { id: "mock-delay", name: "Mock Delay", manufacturer: "Glitch", format: "VST3", category: "Fx|Delay" },
