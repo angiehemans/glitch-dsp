@@ -41,6 +41,14 @@ function ioOptions(chain: Chain, inputNames: string[], outputNames: string[]) {
 const PLUGIN_IMAGE = "/assets/plugin.svg";
 const MAX_ART_HEIGHT = 400; // a very tall plugin window is scaled down so it can't blow up the chain strip
 
+function blockDetail(b: Block) {
+  if (b.missing) return b.type === "plugin" ? "Not installed" : "File missing";
+  if (b.note) return b.note;
+  if (b.type === "nam") return "NAM model";
+  if (b.type === "ir") return "Cab IR";
+  return b.plugin?.manufacturer || b.plugin?.category || "";
+}
+
 function blockState(b: Block) {
   if (b.missing) return "error";
   return b.enabled ? "active" : "bypassed";
@@ -64,7 +72,7 @@ function BlockView({ block, snapshotBase }: { block: Block; snapshotBase: string
       art={art ? "hug" : "fixed"}
       typeLabel={block.plugin?.format ?? block.type.toUpperCase()}
       name={block.name}
-      detail={block.missing ? "Not installed" : block.plugin?.manufacturer || block.plugin?.category || ""}
+      detail={blockDetail(block)}
       onOpen={() => send({ type: "block.openEditor", blockId: block.id })}
     >
       {art ? <img class="gl-block-art" src={art} style={size} alt="" /> : <img src={PLUGIN_IMAGE} alt="" />}
@@ -84,17 +92,27 @@ export function RigView({ state }: { state: GlitchState }) {
 
   const inputNames = state.device?.inputs ?? [];
   const outputNames = state.device?.outputs ?? [];
-  const plugins = state.plugins.list.map((p) => ({
-    id: p.id,
-    name: p.name,
-    kind: [p.format, p.category.replace(/\|/g, " · ")].filter(Boolean).join(" · "),
-    image: PLUGIN_IMAGE,
-  }));
+  // The + menu: NAM models, then cab IRs, then plugins. Ids carry the kind: "nam:<file>", "ir:<file>", "plugin:<id>".
+  const plugins = [
+    ...state.library.nam.map((f) => ({ id: `nam:${f.id}`, name: f.name, kind: "NAM model", image: PLUGIN_IMAGE })),
+    ...state.library.ir.map((f) => ({ id: `ir:${f.id}`, name: f.name, kind: "Cab IR", image: PLUGIN_IMAGE })),
+    ...state.plugins.list.map((p) => ({
+      id: `plugin:${p.id}`,
+      name: p.name,
+      kind: [p.format, p.category.replace(/\|/g, " · ")].filter(Boolean).join(" · "),
+      image: PLUGIN_IMAGE,
+    })),
+  ];
+  const counts = [
+    [state.library.nam.length, "model"],
+    [state.library.ir.length, "IR"],
+    [state.plugins.list.length, "plugin"],
+  ].filter(([n]) => n) as [number, string][];
   const pluginNote = state.plugins.scanning
     ? `Scanning… ${Math.round((state.plugins.progress ?? 0) * 100)}%${state.plugins.current ? ` · ${state.plugins.current}` : ""}`
-    : state.plugins.list.length === 0
-      ? "No plugins yet. Scan the standard folders, or add one."
-      : `${state.plugins.list.length} plugin${state.plugins.list.length === 1 ? "" : "s"}`;
+    : counts.length === 0
+      ? "Nothing yet. Scan for plugins, or add NAM models, IRs or plugins."
+      : counts.map(([n, what]) => `${n} ${what}${n === 1 ? "" : "s"}`).join(" · ");
 
   return (
     <>
@@ -131,9 +149,17 @@ export function RigView({ state }: { state: GlitchState }) {
               send({ type: "chain.setLevel", chainId: c.id, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) })
             }
             onMuteToggle={() => send({ type: "chain.setMute", chainId: c.id, muted: !c.muted })}
-            onAddPlugin={(pluginId) => send({ type: "block.add", chainId: c.id, block: { type: "plugin", pluginId } })}
+            onAddPlugin={(id) => {
+              const [kind, ...rest] = id.split(":");
+              const ref = rest.join(":"); // plugin ids and file names can contain ":"
+              send({
+                type: "block.add",
+                chainId: c.id,
+                block: kind === "plugin" ? { type: "plugin", pluginId: ref } : { type: kind as "nam" | "ir", file: ref },
+              });
+            }}
             onScanPlugins={() => send({ type: "plugins.scan" })}
-            onImportPlugin={() => send({ type: "plugins.import" })}
+            onImportPlugin={() => send({ type: "library.import" })}
           >
             {c.blocks.map((b) => (
               <BlockView key={b.id} block={b} snapshotBase={state.snapshotBase} />
