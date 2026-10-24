@@ -47,30 +47,14 @@ void PluginLibrary::scan (std::function<void()> onProgress, std::function<void()
     start ({});
 }
 
-bool PluginLibrary::import (std::function<void()> onProgress, std::function<void()> onDone)
+bool PluginLibrary::scanPaths (const juce::Array<juce::File>& paths, std::function<void()> onProgress, std::function<void()> onDone)
 {
     if (scanning)
         return false;
-    if (chooser != nullptr)
-        return true; // already open
 
-    chooser = std::make_unique<juce::FileChooser> ("Add a plugin, or a folder of plugins",
-                                                   juce::File::getSpecialLocation (juce::File::userHomeDirectory));
-
-    chooser->launchAsync (juce::FileBrowserComponent::openMode
-                              | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectDirectories,
-                          [this, onProgress = std::move (onProgress), onDone = std::move (onDone)] (const juce::FileChooser& fc)
-                          {
-                              const auto results = fc.getResults();
-                              chooser = nullptr;
-                              if (results.isEmpty() || scanning)
-                                  return;
-
-                              onScanProgress = onProgress;
-                              onScanDone = onDone;
-                              start (results);
-                          });
+    onScanProgress = std::move (onProgress);
+    onScanDone = std::move (onDone);
+    start (paths);
     return true;
 }
 

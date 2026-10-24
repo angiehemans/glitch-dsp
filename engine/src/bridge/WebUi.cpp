@@ -1,5 +1,7 @@
 #include "WebUi.h"
 #include "Protocol.h"
+#include "../blocks/IrBlock.h"
+#include "../blocks/NamBlock.h"
 
 namespace glitch
 {
@@ -108,6 +110,14 @@ namespace
         return card + suffix;
     }
 
+    juce::var libraryFiles (const juce::Array<ModelLibrary::Entry>& entries)
+    {
+        juce::Array<juce::var> result;
+        for (const auto& e : entries)
+            result.add (object ({ { "id", e.id }, { "name", e.name } }));
+        return result;
+    }
+
     juce::var pluginInfo (const juce::PluginDescription& d)
     {
         return object ({
@@ -120,10 +130,11 @@ namespace
     }
 }
 
-WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l)
+WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l, ModelLibrary& m)
     : engine (e),
       store (s),
       library (l),
+      models (m),
       uiRoot (findUiRoot()),
       browser (juce::WebBrowserComponent::Options{}
                    .withNativeIntegrationEnabled()
@@ -238,32 +249,21 @@ void WebUi::handleCommand (const juce::var& command)
             sendError ("Audio device: " + error);
         // On success the device manager's change callback syncs the graph and saves the choice.
     }
-    else if (type == protocol::command::pluginsScan || type == protocol::command::pluginsImport)
+    else if (type == protocol::command::pluginsScan)
     {
+        models.refresh(); // files dropped into the library folders by hand
         const auto safe = juce::Component::SafePointer<WebUi> (this);
-        auto onProgress = [safe]
+        library.scan ([safe] { if (safe != nullptr) safe->sendState(); }, // the menu shows how far it has got
+                      [safe] { if (safe != nullptr) { safe->syncEngine(); safe->sendState(); } }); // missing blocks may load now
+    }
+    else if (type == protocol::command::libraryImport)
+    {
+        if (library.isScanning())
         {
-            if (safe != nullptr)
-                safe->sendState(); // the menu shows how far the scan has got
-        };
-        auto onDone = [safe]
-        {
-            if (safe != nullptr)
-            {
-                safe->syncEngine(); // blocks of plugins that were missing may load now
-                safe->sendState();
-            }
-        };
-
-        if (type == protocol::command::pluginsScan)
-        {
-            library.scan (onProgress, onDone);
-        }
-        else if (! library.import (onProgress, onDone))
-        {
-            sendError ("A plugin scan is still running. Wait for it to finish, then add the plugin.");
+            sendError ("A plugin scan is still running. Wait for it to finish, then add the file.");
             return;
         }
+        importToLibrary();
     }
     else
     {
@@ -380,20 +380,39 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
             return false;
         }
 
-        const auto description = library.find (command["block"]["pluginId"].toString());
-        if (description == nullptr || command["block"]["type"].toString() != "plugin")
+        const auto spec = command["block"];
+        const auto blockType = spec["type"].toString();
+        juce::var block;
+
+        if (blockType == "plugin")
         {
-            sendError ("Unknown plugin");
+            const auto description = library.find (spec["pluginId"].toString());
+            if (description == nullptr)
+            {
+                sendError ("Unknown plugin");
+                return false;
+            }
+            block = object ({ { "id", newId() }, { "type", "plugin" }, { "name", description->name },
+                              { "enabled", true }, { "plugin", pluginInfo (*description) } });
+        }
+        else if (blockType == "nam" || blockType == "ir")
+        {
+            const auto file = models.resolve (spec["file"].toString());
+            if (file == juce::File())
+            {
+                sendError ("That file isn't in the library");
+                return false;
+            }
+            block = object ({ { "id", newId() }, { "type", blockType }, { "name", file.getFileNameWithoutExtension() },
+                              { "enabled", true }, { "file", spec["file"].toString() } });
+        }
+        else
+        {
+            sendError ("Unknown block type: " + blockType);
             return false;
         }
 
-        store.addBlock (chain, object ({
-            { "id", newId() },
-            { "type", "plugin" },
-            { "name", description->name },
-            { "enabled", true },
-            { "plugin", pluginInfo (*description) },
-        }), command["index"].isVoid() ? -1 : (int) command["index"]);
+        store.addBlock (chain, block, command["index"].isVoid() ? -1 : (int) command["index"]);
         syncEngine();
         return true;
     }
@@ -462,21 +481,31 @@ void WebUi::syncEngine()
                 {
                     const auto id = b["id"].toString();
 
+                    juce::String note;
+
                     if (! engine.hasBlock (id))
                     {
-                        juce::String error;
-                        auto plugin = library.create (b["plugin"]["id"].toString(), engine.getSampleRate(), engine.getBlockSize(), error);
+                        auto processor = createBlock (b, note);
 
-                        if (plugin != nullptr)
+                        if (processor != nullptr)
                         {
                             juce::MemoryBlock state;
                             if (state.fromBase64Encoding (store.getPluginState (id)) && state.getSize() > 0)
-                                plugin->setStateInformation (state.getData(), (int) state.getSize());
-                            engine.addBlock (id, std::move (plugin));
+                                processor->setStateInformation (state.getData(), (int) state.getSize());
+                            engine.addBlock (id, std::move (processor));
                         }
                     }
 
+                    // NAM models run at any rate but sound slightly different away from their training rate.
+                    if (auto* nam = dynamic_cast<NamBlock*> (engine.getBlockProcessor (id)))
+                    {
+                        const auto trained = nam->getExpectedSampleRate(), running = engine.getSampleRate();
+                        if (trained > 0 && std::abs (trained - running) > 1.0)
+                            note = "Trained at " + juce::String (trained / 1000.0, 1) + " kHz, running at " + juce::String (running / 1000.0, 1) + " kHz";
+                    }
+
                     b.getDynamicObject()->setProperty ("missing", ! engine.hasBlock (id));
+                    b.getDynamicObject()->setProperty ("note", note);
                     engine.setBlockEnabled (id, (bool) b["enabled"]);
                     spec.blockIds.push_back (id);
                 }
@@ -492,6 +521,67 @@ void WebUi::syncEngine()
     if (chains != nullptr)
         for (const auto& c : *chains)
             applyChainParams (c);
+}
+
+std::unique_ptr<juce::AudioProcessor> WebUi::createBlock (const juce::var& block, juce::String& error)
+{
+    const auto type = block["type"].toString();
+
+    if (type == "plugin")
+        return library.create (block["plugin"]["id"].toString(), engine.getSampleRate(), engine.getBlockSize(), error);
+
+    if (type == "nam" || type == "ir")
+    {
+        const auto file = models.resolve (block["file"].toString());
+        if (file == juce::File())
+        {
+            error = "File not in the library";
+            return nullptr;
+        }
+        if (type == "nam")
+            return NamBlock::load (file, error);
+        return IrBlock::load (file, error);
+    }
+
+    error = "Unknown block type";
+    return nullptr;
+}
+
+void WebUi::importToLibrary()
+{
+    if (chooser != nullptr)
+        return; // already open
+
+    chooser = std::make_unique<juce::FileChooser> ("Add plugins, NAM models or IRs",
+                                                   juce::File::getSpecialLocation (juce::File::userHomeDirectory),
+                                                   "*.nam;*.wav;*.aif;*.aiff;*.vst3;*.component");
+
+    const auto safe = juce::Component::SafePointer<WebUi> (this);
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                              | juce::FileBrowserComponent::canSelectDirectories | juce::FileBrowserComponent::canSelectMultipleItems,
+                          [safe] (const juce::FileChooser& fc)
+                          {
+                              if (safe == nullptr)
+                                  return;
+                              auto& ui = *safe;
+                              const auto results = fc.getResults();
+                              ui.chooser = nullptr;
+
+                              // Models and IRs are copied into the library; anything else is a plugin, or a folder to scan.
+                              juce::Array<juce::File> files, pluginPaths;
+                              for (const auto& f : results)
+                                  (ModelLibrary::kindOf (f).has_value() ? files : pluginPaths).add (f);
+
+                              if (const auto failed = ui.models.import (files); ! failed.isEmpty())
+                                  ui.sendError ("Couldn't copy " + failed.joinIntoString (", ") + " into the library");
+
+                              if (! pluginPaths.isEmpty())
+                                  ui.library.scanPaths (pluginPaths,
+                                                        [safe] { if (safe != nullptr) safe->sendState(); },
+                                                        [safe] { if (safe != nullptr) { safe->syncEngine(); safe->sendState(); } });
+                              ui.syncEngine(); // blocks whose file was missing may load now
+                              ui.sendState();
+                          });
 }
 
 void WebUi::applyChainParams (const juce::var& chain)
@@ -695,6 +785,8 @@ void WebUi::sendState()
         { "devices", devices },
         { "plugins", object ({ { "scanning", library.isScanning() }, { "progress", library.getScanProgress() },
                                { "current", library.getScanningName() }, { "list", plugins } }) },
+        { "library", object ({ { "nam", libraryFiles (models.get (ModelLibrary::Kind::nam)) },
+                               { "ir", libraryFiles (models.get (ModelLibrary::Kind::ir)) } }) },
         { "snapshotBase", project.isObject() ? juce::WebBrowserComponent::getResourceProviderRoot() + "snapshots/" + project["id"].toString() + "/"
                                              : juce::String() },
         { "monitor", object ({ { "gainDb", engine.getGainDb() }, { "muted", engine.isMuted() } }) },

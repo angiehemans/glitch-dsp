@@ -35,7 +35,7 @@ ssh "$host" "bash -lc '
 '"
 
 if [ "$run" = --run ]; then
-  config=$([ "$preset" = release ] && echo Release || echo Debug)
+  config=$([ "$preset" = release ] && echo Release || echo RelWithDebInfo)
   app="$dir/build/$preset/engine/Glitch_artefacts/$config/Glitch.app"
   echo "==> Launching $app (needs someone logged in on the Mac)"
   ssh "$host" "osascript -e 'quit app \"Glitch\"' >/dev/null 2>&1 || true; open $app"

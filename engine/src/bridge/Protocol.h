@@ -25,7 +25,7 @@ namespace glitch::protocol
         inline constexpr auto deviceScan     = "device.scan";
         inline constexpr auto deviceSelect   = "device.select";
         inline constexpr auto pluginsScan    = "plugins.scan";
-        inline constexpr auto pluginsImport  = "plugins.import";
+        inline constexpr auto libraryImport  = "library.import";
         inline constexpr auto blockAdd       = "block.add";
         inline constexpr auto blockRemove    = "block.remove";
         inline constexpr auto blockToggle    = "block.toggle";

@@ -3,6 +3,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include "../audio/Engine.h"
+#include "../blocks/ModelLibrary.h"
 #include "../plugins/PluginLibrary.h"
 #include "../plugins/PluginWindow.h"
 #include "../project/ProjectStore.h"
@@ -20,7 +21,7 @@ class WebUi : public juce::Component,
               private juce::ChangeListener
 {
 public:
-    WebUi (Engine&, ProjectStore&, PluginLibrary&);
+    WebUi (Engine&, ProjectStore&, PluginLibrary&, ModelLibrary&);
     ~WebUi() override;
 
     void resized() override;
@@ -45,6 +46,10 @@ private:
 
     /** Open project -> engine: creates and removes plugin nodes, rewires chains, sets parameters. */
     void syncEngine();
+    /** The audio processor for a block (plugin, NAM model or IR), or null with an error. */
+    std::unique_ptr<juce::AudioProcessor> createBlock (const juce::var& block, juce::String& error);
+    /** Opens a chooser for plugins, folders, .nam models and IRs. */
+    void importToLibrary();
     void applyChainParams (const juce::var& chain);
     /** Copies plugin states into the project, so they save. */
     void captureStates();
@@ -68,6 +73,8 @@ private:
     Engine& engine;
     ProjectStore& store;
     PluginLibrary& library;
+    ModelLibrary& models;
+    std::unique_ptr<juce::FileChooser> chooser;
     juce::StringArray chainIds; // of the open project, for meter keys
     std::map<juce::String, std::unique_ptr<PluginWindow>> editors;
     juce::String soundCards; // Linux: /proc/asound/cards, polled for hotplug

@@ -6,7 +6,39 @@ FetchContent_Declare(juce
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(juce)
 
-# TODO(M1): NeuralAmpModelerCore and its Eigen dependency go here (FetchContent + target_link_libraries).
+# NeuralAmpModelerCore, sources only: its own CMake builds benchmark tools. SOURCE_SUBDIR points
+# nowhere so FetchContent_MakeAvailable downloads without add_subdirectory.
+FetchContent_Declare(nam
+    GIT_REPOSITORY https://github.com/sdatkinson/NeuralAmpModelerCore.git
+    GIT_TAG v0.6.0
+    GIT_SHALLOW TRUE
+    GIT_SUBMODULES ""
+    SOURCE_SUBDIR sources-only)
+# Eigen (header-only) at the commit NAM v0.6.0 pins as its submodule.
+FetchContent_Declare(eigen
+    URL https://gitlab.com/libeigen/eigen/-/archive/bc3b39870ecb690a623a3f49149a358b95c5781d/eigen-bc3b39870ecb690a623a3f49149a358b95c5781d.tar.gz
+    URL_HASH SHA256=5f6557d1aca6e959a4b955c55f2935261fd30de59c0c79e35bc6d5cbe1de22d1
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SOURCE_SUBDIR sources-only)
+FetchContent_MakeAvailable(nam eigen)
+
+file(GLOB NAM_SOURCES CONFIGURE_DEPENDS ${nam_SOURCE_DIR}/NAM/*.cpp ${nam_SOURCE_DIR}/NAM/*/*.cpp)
+# An object library, not static: NAM registers each architecture from a static initialiser, which a
+# static library would let the linker drop ("No config parser registered for architecture").
+add_library(nam OBJECT ${NAM_SOURCES} src/blocks/NamModel.cpp)
+target_include_directories(nam SYSTEM PRIVATE ${nam_SOURCE_DIR} ${nam_SOURCE_DIR}/Dependencies/nlohmann ${eigen_SOURCE_DIR})
+target_compile_definitions(nam PRIVATE NAM_SAMPLE_FLOAT NAM_ENABLE_A2_FAST EIGEN_NO_DEBUG)
+target_compile_features(nam PRIVATE cxx_std_20)
+set_target_properties(nam PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Always optimised: unoptimised Eigen is far too slow for real time, even in a Debug build.
+target_compile_options(nam PRIVATE -O3)
+# AVX2 + FMA on Intel (the show Mac's Haswell i7 has both; Eigen is much faster with them).
+# shortcut: assumes an AVX2 CPU (Intel 2013+, AMD 2015+); an older x86 machine would crash on load.
+if(APPLE)
+    target_compile_options(nam PRIVATE -Xarch_x86_64 -mavx2 -Xarch_x86_64 -mfma)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    target_compile_options(nam PRIVATE -mavx2 -mfma)
+endif()
 
 juce_add_gui_app(Glitch
     PRODUCT_NAME "Glitch"
@@ -23,6 +55,9 @@ target_sources(Glitch PRIVATE
     src/MainComponent.cpp
     src/bridge/WebUi.cpp
     src/audio/Engine.cpp
+    src/blocks/IrBlock.cpp
+    src/blocks/ModelLibrary.cpp
+    src/blocks/NamBlock.cpp
     src/plugins/PluginLibrary.cpp
     src/project/ProjectStore.cpp)
 
@@ -44,7 +79,7 @@ target_link_libraries(Glitch
         juce::juce_gui_extra
         juce::juce_audio_utils
         juce::juce_dsp
-        # TODO(M1): NeuralAmpModelerCore
+        nam
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -70,3 +105,19 @@ if(GLITCH_BUILD_UI AND GLITCH_UI_DEV_URL STREQUAL "")
         COMMAND ${CMAKE_COMMAND} -E rm -rf "${GLITCH_UI_DEST}"
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/ui/dist" "${GLITCH_UI_DEST}")
 endif()
+
+# GlitchBench: the CPU cost of a NAM model or IR at 64/128/256 samples, using the app's blocks.
+# Not built by default: cmake --build --preset release --target GlitchBench
+juce_add_console_app(GlitchBench)
+set_target_properties(GlitchBench PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(GlitchBench PRIVATE tools/Bench.cpp src/blocks/NamBlock.cpp src/blocks/IrBlock.cpp)
+target_compile_definitions(GlitchBench PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(GlitchBench
+    PRIVATE
+        nam
+        juce::juce_audio_processors
+        juce::juce_audio_formats
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)

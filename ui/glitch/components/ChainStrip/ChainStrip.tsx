@@ -167,8 +167,8 @@ export default function ChainStrip({
         <div data-scamp-id="meter_out_8b2d" className={styles.meter_out_8b2d} data-meter={outputMeter}>
           <div data-scamp-id="meter_out_fill_9c3e" className={styles.meter_out_fill_9c3e} />
         </div>
-        <div data-scamp-id="menu_5d1a" className={styles.menu_5d1a} role="menu" aria-label="Installed plugins">
-          <p data-scamp-id="menu_title_6e2b" className={styles.menu_title_6e2b}>INSTALLED PLUGINS</p>
+        <div data-scamp-id="menu_5d1a" className={styles.menu_5d1a} role="menu" aria-label="Add a block">
+          <p data-scamp-id="menu_title_6e2b" className={styles.menu_title_6e2b}>ADD A BLOCK</p>
           <ul data-scamp-id="menu_list_7f3c" className={styles.menu_list_7f3c}>
             {plugins.map((plugin) => (
               <li data-scamp-id="menu_row_804d" className={styles.menu_row_804d} key={plugin.id}>
@@ -185,7 +185,7 @@ export default function ChainStrip({
           <p data-scamp-id="menu_note_b7e1" className={styles.menu_note_b7e1}>{menuNote}</p>
           <div data-scamp-id="menu_actions_c8f2" className={styles.menu_actions_c8f2}>
             <button data-scamp-id="menu_scan_d903" className={styles.menu_scan_d903} type="button" disabled={scanning} onClick={onScanPlugins}>Scan for plugins</button>
-            <button data-scamp-id="menu_import_e014" className={styles.menu_import_e014} type="button" disabled={scanning} data-scamp-click="menu:open=closed" onClick={onImportPlugin}>Add plugin…</button>
+            <button data-scamp-id="menu_import_e014" className={styles.menu_import_e014} type="button" disabled={scanning} data-scamp-click="menu:open=closed" onClick={onImportPlugin}>Add file…</button>
           </div>
         </div>
       </div>

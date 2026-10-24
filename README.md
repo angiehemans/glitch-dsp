@@ -38,7 +38,7 @@ cmake --preset dev && cmake --build --preset dev           # app that loads the 
 cmake --preset release && cmake --build --preset release   # app with the UI bundled in
 ```
 
-Builds land in `build/<preset>/engine/Glitch_artefacts/<Debug|Release>/`.
+Builds land in `build/<preset>/engine/Glitch_artefacts/<RelWithDebInfo|Release>/`. The dev presets are RelWithDebInfo, optimised with debug info: an unoptimised build runs DSP like convolution several times slower, so its CPU meter would mislead.
 
 ## Two UI modes
 
@@ -91,7 +91,7 @@ The UI typecheck covers every Scamp file the app imports. Scamp's `React.ReactNo
 ## Projects and chains
 
 - The app starts blank. **New project** creates a project and opens its empty rig. **+ Add chain** adds a chain (input 1 → outputs 1/2, 0 dB) up to the v1 limit of 8.
-- A chain takes one hardware input, runs it through its plugins in order, applies a smoothed level and mute, and sums into its outputs. Chains are stereo from the input stage on. Amp models (NAM) and IRs come in later milestones.
+- A chain takes one hardware input, runs it through its blocks in order (NAM models, cab IRs and plugins), applies a smoothed level and mute, and sums into its outputs. Chains are stereo from the input stage on.
 - The monitor fader is the master stage after all chains, with mute and PANIC on top. With no chains, the outputs are silent.
 - Projects are saved as JSON in `~/.config/Glitch/projects/<id>/project.json` on Linux and `~/Library/Application Support/Glitch/` on macOS. Changes are written at most once a second, on switching projects and on quit, via a temp file so a crash can't corrupt them. `settings.json` remembers the last open project.
 - **Renaming:** double-click a project's name (on its card, or in the Rig top bar) or a chain's name to edit it in place; Enter or clicking away saves, Escape cancels. A card's ⋯ menu has Rename too. New projects and chains start in rename mode, and Enter on a new project's name opens its rig. Scamp components opt in by binding `data-rename="project:<id>"` or `"chain:<id>"` on the text (`renameKey` props); `ui/src/app/rename.ts` does the editing with `contenteditable`, so text inside a `<button>` can't be renamed. Names are trimmed, one line, at most 60 characters.
@@ -105,6 +105,15 @@ Click the audio device pill in the top bar for a list of devices (all types: ALS
 - **Linux list:** JUCE's ALSA type lists every PCM. The menu shows the default output, PipeWire, and one direct hardware entry per card ("M4, USB Audio"), and hides the mixing, snooping, surround and S/PDIF variants.
 - **A device the desktop is using (Linux):** direct hardware access is exclusive, so if PipeWire has the device open, Glitch only gets the other direction and says so in an error. Hand the device to Glitch by switching its PipeWire profile off (`wpctl status` for its id, then `wpctl set-profile <id> 0`; `1` or Settings > Sound to give it back), then pick it again in the menu. Or choose PipeWire Sound Server to share it, with more latency. macOS shares devices, so this doesn't apply there.
 - Chains' input and output chips are dropdowns of the channels the device actually opened (pairs first, then single outputs), labelled with the device's channel names.
+
+### NAM models and cab IRs
+
+- **NAM block:** a `.nam` capture run by [NeuralAmpModelerCore](https://github.com/sdatkinson/NeuralAmpModelerCore). Models are mono: the block runs the left channel and feeds both. Input and Output gain; the output is normalised to the model's recorded loudness when it has one, like the NAM plugin's Normalize. A model trained at another sample rate runs anyway, and its tile says so.
+- **IR block:** a cabinet impulse response through `juce::dsp::Convolution` (loaded off the audio thread). Level, and Mix (dry/wet). A mono IR applies to both channels.
+- **Library:** models and IRs live in `<app data>/Glitch/library/nam` and `library/ir` (Linux `~/.config/Glitch/`, macOS `~/Library/Application Support/Glitch/`). **Add file…** in a chain's + menu copies them in, so projects keep working if the originals move, and accepts plugins too. Files dropped into those folders appear after **Scan**. Blocks refer to them by their path inside the library, and paths outside it are refused.
+- **Editing:** their parameters are real JUCE parameters, so clicking a tile opens the plugin window with JUCE's generic sliders under the Bypass/Remove header, and settings save like plugin state.
+- **Build:** NAM's sources (v0.6.0) and Eigen (the commit NAM pins, checked by SHA-256) are fetched by CMake and compiled as an object library, always optimised and with AVX2/FMA on Intel. It's an object library because NAM registers its model types from static initialisers, which a static library drops ("No config parser registered"). `engine/src/blocks/NamModel` keeps Eigen out of Glitch's own code. Fast tanh is on, as in the NAM plugin: it cut a standard WaveNet model from 24% to 3.7% of a buffer here.
+- **Measuring:** `cmake --build --preset release --target GlitchBench`, then `build/release/engine/GlitchBench_artefacts/Release/GlitchBench <model.nam | ir.wav> [rate]` prints the average and worst share of each buffer at 64, 128 and 256 samples. On a 2024 laptop (Core Ultra 7 258V): standard WaveNet ~3.7%, a 200 ms IR ~1.7%. The plan's number to get is the 2015 MacBook's.
 
 ### Plugins
 
@@ -154,7 +163,7 @@ JACK and ALSA are both enabled. With no JACK server running, JUCE logs a few JAC
 
 ```sh
 env -u GTK_PATH -u GTK_EXE_PREFIX -u GIO_MODULE_DIR -u GTK_IM_MODULE_FILE -u GSETTINGS_SCHEMA_DIR -u LOCPATH \
-  XDG_DATA_DIRS="$XDG_DATA_DIRS_VSCODE_SNAP_ORIG" build/dev/engine/Glitch_artefacts/Debug/Glitch
+  XDG_DATA_DIRS="$XDG_DATA_DIRS_VSCODE_SNAP_ORIG" build/dev/engine/Glitch_artefacts/RelWithDebInfo/Glitch
 ```
 
 ### Mac setup (one time)
@@ -188,6 +197,8 @@ For live UI on the Mac: run `./scripts/dev.sh` on Linux, then build `dev-remote`
 | JUCE | **8.0.15** | Not 8.0.9: on Linux, 8.0.9 crashes (`std::bad_alloc`) serving any bundled file larger than the WebView IPC pipe buffer. Fixed in 8.0.11. All 8.0.x releases list Xcode 12.4 as the minimum. Still to confirm on the Mac with Xcode 14.2. |
 | preact | **10.29.8** | Not 10.24.3: the Scamp project requires `^10.29.0`. Vite dedupes Preact, so `ui/glitch/node_modules` can't load a second copy. |
 | @preact/signals | 1.3.0 | |
+| NeuralAmpModelerCore | v0.6.0 | Sources only, compiled by `engine/CMakeLists.txt` |
+| Eigen | `bc3b3987` | The commit NAM v0.6.0 pins, as a tarball checked by SHA-256 |
 | scampjs | 0.3.4 | Only its `scampjs/runtime` interactions handler is used. It brings its own Vite 8 as a nested dependency, which the build doesn't use. Keep in step with `ui/glitch/package-lock.json`. |
 | vite | 5.4.10 | build target `safari15` |
 | @preact/preset-vite | 2.9.1 | |

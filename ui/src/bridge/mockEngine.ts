@@ -7,6 +7,7 @@ export function emptyState(): GlitchState {
     devices: [],
     plugins: { scanning: false, progress: 0, current: "", list: [] },
     snapshotBase: "",
+    library: { nam: [], ir: [] },
     monitor: { gainDb: 0, muted: false },
     panic: false,
     project: null,
@@ -209,14 +210,21 @@ export function createMockEngine(): EngineBridge {
             emitState();
           }, 800);
           break;
-        case "plugins.import":
-          return error("Adding plugin files needs the app (not available in the browser)");
+        case "library.import":
+          return error("Adding files needs the app (not available in the browser)");
         case "block.add": {
           const c = chain(cmd.chainId);
-          const plugin = state.plugins.list.find((p) => p.id === cmd.block.pluginId);
           if (!c) return error(`Unknown chain: ${cmd.chainId}`);
-          if (!plugin) return error("Unknown plugin");
-          c.blocks.splice(cmd.index ?? c.blocks.length, 0, { id: newId(), type: "plugin", name: plugin.name, enabled: true, plugin });
+          const spec = cmd.block;
+          if (spec.type === "plugin") {
+            const plugin = state.plugins.list.find((p) => p.id === spec.pluginId);
+            if (!plugin) return error("Unknown plugin");
+            c.blocks.splice(cmd.index ?? c.blocks.length, 0, { id: newId(), type: "plugin", name: plugin.name, enabled: true, plugin });
+          } else {
+            const file = state.library[spec.type].find((f) => f.id === spec.file);
+            if (!file) return error("That file isn't in the library");
+            c.blocks.splice(cmd.index ?? c.blocks.length, 0, { id: newId(), type: spec.type, name: file.name, enabled: true, file: file.id });
+          }
           break;
         }
         case "block.remove":

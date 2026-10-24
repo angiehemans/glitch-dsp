@@ -29,8 +29,8 @@ public:
 
     /** Scans the standard folders. onProgress runs after each plugin, onDone at the end. */
     void scan (std::function<void()> onProgress, std::function<void()> onDone);
-    /** Opens a file chooser, then scans the chosen plugin or folder. Returns false if a scan is running. */
-    bool import (std::function<void()> onProgress, std::function<void()> onDone);
+    /** Scans picked plugin bundles or folders. Returns false if a scan is already running. */
+    bool scanPaths (const juce::Array<juce::File>& paths, std::function<void()> onProgress, std::function<void()> onDone);
 
     std::unique_ptr<juce::AudioPluginInstance> create (const juce::String& pluginId, double sampleRate,
                                                        int blockSize, juce::String& error);
@@ -53,8 +53,6 @@ private:
     bool scanning = false;
     juce::String scanningName;
     std::function<void()> onScanProgress, onScanDone;
-
-    std::unique_ptr<juce::FileChooser> chooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginLibrary)
 };

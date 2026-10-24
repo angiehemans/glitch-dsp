@@ -4,6 +4,7 @@
 
 #include "audio/Engine.h"
 #include "bridge/WebUi.h"
+#include "blocks/ModelLibrary.h"
 #include "plugins/PluginLibrary.h"
 #include "project/ProjectStore.h"
 
@@ -22,8 +23,9 @@ private:
     // them, and the UI (which owns plugin windows) last, so it's destroyed first.
     ProjectStore store;
     PluginLibrary library { ProjectStore::getDataDir() };
+    ModelLibrary models { ProjectStore::getDataDir() };
     Engine engine { store.getDeviceState().get() };
-    WebUi webUi { engine, store, library };
+    WebUi webUi { engine, store, library, models };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
