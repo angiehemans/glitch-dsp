@@ -433,11 +433,21 @@ Keep a single Preact store fed by `state` events. Meters bypass the store and up
 - Round-trip command/event bridge working
 - M4 selected, audio passes through input 1 → output 1
 
-### M1: One chain, real tone
+### M1: One chain, real tone (done)
 - Embedded NAM block + IR block
 - Load `.nam` and IR files from the library
 - Input/output meters
 - Measure round-trip latency at 64 and 128 samples
+
+Measured on the 2015 MacBook Pro with the M4 at 48 kHz (RTL Utility, cable loopback, 3 runs per size, all identical, 2026-10-26):
+
+| Buffer | Round trip | Driver reports |
+| --- | --- | --- |
+| 64 | 371 samples (7.7 ms) | 429 samples |
+| 128 | 499 samples (10.4 ms) | 557 samples |
+| 256 | 755 samples (15.7 ms) | 813 samples |
+
+The round trip is both buffers plus a fixed 243 samples (5.1 ms) for the M4's converters and USB. The driver over-reports by 58 samples (1.2 ms), so the latency Glitch shows (from the driver) is slightly high, which is the safe side. NAM and IR blocks add no latency; hosted plugins can.
 
 ### M2: Multiple chains + routing
 - Create/delete chains, assign inputs and outputs
