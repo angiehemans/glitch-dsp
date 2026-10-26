@@ -1,6 +1,8 @@
 #include "Engine.h"
+#include "BlockMix.h"
 #include "ChainStage.h"
 
+#include <algorithm>
 #include <set>
 
 #if JUCE_LINUX
@@ -37,7 +39,54 @@ Engine::~Engine()
 }
 
 //==============================================================================
-void Engine::setChains (const std::vector<ChainSpec>& chains)
+void Engine::setChains (const std::vector<ChainSpec>& requested)
+{
+    auto chains = requested;
+    for (auto& c : chains)
+        c.blockIds.erase (std::remove_if (c.blockIds.begin(), c.blockIds.end(), [this] (const auto& id) { return ! hasBlock (id); }),
+                          c.blockIds.end());
+
+    // New chains get their stages now, so their parameters can be set; they fade in on their own.
+    for (const auto& c : chains)
+    {
+        if (chainIn.count (c.id) == 0)
+            chainIn[c.id] = graph.addNode (std::make_unique<ChainStage> (false), {}, Update::none)->nodeID;
+        if (chainOut.count (c.id) == 0)
+            chainOut[c.id] = graph.addNode (std::make_unique<ChainStage> (true), {}, Update::none)->nodeID;
+    }
+
+    // Fade out every live chain whose wiring changes, or that goes away.
+    std::set<juce::String> ids;
+    bool changed = ! nodesToRemove.empty();
+    for (const auto& c : chains)
+    {
+        ids.insert (c.id);
+        if (const auto it = appliedChains.find (c.id); it != appliedChains.end() && ! (it->second == c))
+            if (auto* stage = getStage (chainOut, c.id); stage != nullptr && ! stage->ducked.exchange (true))
+                changed = true;
+    }
+    for (const auto& [id, spec] : appliedChains)
+        if (ids.count (id) == 0)
+            if (auto* stage = getStage (chainOut, id); stage != nullptr && ! stage->ducked.exchange (true))
+                changed = true;
+
+    pendingChains = chains;
+    if (changed || phase == Phase::fadingOut)
+    {
+        if (changed)
+            phaseEnd = juce::Time::getMillisecondCounterHiRes() + 2000.0 * BlockMix::fadeSeconds;
+        phase = Phase::fadingOut;
+        startTimer (10);
+    }
+    else
+    {
+        applyChains (chains);
+        if (phase == Phase::fadingIn) // ducked chains may have changed again: give the swap its time
+            phaseEnd = juce::Time::getMillisecondCounterHiRes() + 2000.0 * BlockMix::fadeSeconds;
+    }
+}
+
+void Engine::applyChains (const std::vector<ChainSpec>& chains)
 {
     std::set<juce::String> ids;
     for (const auto& c : chains)
@@ -59,13 +108,9 @@ void Engine::setChains (const std::vector<ChainSpec>& chains)
         }
     }
 
-    for (const auto& c : chains)
-    {
-        if (chainIn.count (c.id) == 0)
-            chainIn[c.id] = graph.addNode (std::make_unique<ChainStage> (false), {}, Update::none)->nodeID;
-        if (chainOut.count (c.id) == 0)
-            chainOut[c.id] = graph.addNode (std::make_unique<ChainStage> (true), {}, Update::none)->nodeID;
-    }
+    for (const auto node : nodesToRemove)
+        graph.removeNode (node, Update::none);
+    nodesToRemove.clear();
 
     for (const auto& connection : graph.getConnections())
         graph.removeConnection (connection, Update::none);
@@ -83,8 +128,11 @@ void Engine::setChains (const std::vector<ChainSpec>& chains)
         {
             if (const auto it = blocks.find (blockId); it != blocks.end())
             {
+                const auto mix = mixes[blockId];
                 connect (previous, it->second);
-                previous = it->second;
+                connect (it->second, mix, 0, 2);
+                connect (previous, mix, 2, 2);
+                previous = mix;
             }
         }
         connect (previous, out);
@@ -102,16 +150,20 @@ void Engine::setChains (const std::vector<ChainSpec>& chains)
     }
 
     graph.rebuild();
+
+    appliedChains.clear();
+    for (const auto& c : chains)
+        appliedChains[c.id] = c;
 }
 
-void Engine::connect (NodeID from, NodeID to)
+void Engine::connect (NodeID from, NodeID to, int firstInput, int numInputs)
 {
     const auto outs = graph.getNodeForId (from)->getProcessor()->getTotalNumOutputChannels();
-    const auto ins = graph.getNodeForId (to)->getProcessor()->getTotalNumInputChannels();
+    const auto ins = numInputs >= 0 ? numInputs : graph.getNodeForId (to)->getProcessor()->getTotalNumInputChannels();
 
     // Stereo into mono takes the left channel; mono into stereo feeds both.
     for (int ch = 0; ch < ins && outs > 0; ++ch)
-        graph.addConnection ({ { from, std::min (ch, outs - 1) }, { to, ch } }, Update::none);
+        graph.addConnection ({ { from, std::min (ch, outs - 1) }, { to, firstInput + ch } }, Update::none);
 }
 
 ChainStage* Engine::getStage (const std::map<juce::String, NodeID>& stages, const juce::String& chainId) const
@@ -149,6 +201,7 @@ bool Engine::addBlock (const juce::String& blockId, std::unique_ptr<juce::AudioP
         return false;
 
     blocks[blockId] = node->nodeID;
+    mixes[blockId] = graph.addNode (std::make_unique<BlockMix>(), {}, Update::none)->nodeID;
     return true;
 }
 
@@ -156,8 +209,11 @@ void Engine::removeBlock (const juce::String& blockId)
 {
     if (const auto it = blocks.find (blockId); it != blocks.end())
     {
-        graph.removeNode (it->second, Update::none);
+        // Its chain keeps playing it until setChains has faded the chain out.
+        nodesToRemove.push_back (it->second);
+        nodesToRemove.push_back (mixes[blockId]);
         blocks.erase (it);
+        mixes.erase (blockId);
     }
 }
 
@@ -171,9 +227,58 @@ juce::StringArray Engine::getBlockIds() const
 
 void Engine::setBlockEnabled (const juce::String& blockId, bool enabled)
 {
-    if (const auto it = blocks.find (blockId); it != blocks.end())
-        if (auto* node = graph.getNodeForId (it->second))
-            node->setBypassed (! enabled);
+    const auto it = blocks.find (blockId);
+    auto* node = it != blocks.end() ? graph.getNodeForId (it->second) : nullptr;
+    auto* mix = node != nullptr ? dynamic_cast<BlockMix*> (graph.getNodeForId (mixes[blockId])->getProcessor()) : nullptr;
+    if (mix == nullptr)
+        return;
+
+    // Enabling: wake the block, then fade it in. Disabling: fade it out, and stop running it
+    // (saving its CPU) once the fade is over, in timerCallback.
+    if (enabled)
+        node->setBypassed (false);
+    else if (mix->wet.load())
+    {
+        bypassEnd = juce::Time::getMillisecondCounterHiRes() + 4000.0 * BlockMix::fadeSeconds;
+        startTimer (10);
+    }
+    mix->wet.store (enabled);
+}
+
+void Engine::finishBypasses()
+{
+    for (const auto& [blockId, nodeId] : blocks)
+        if (auto* mix = dynamic_cast<BlockMix*> (graph.getNodeForId (mixes[blockId])->getProcessor()); mix != nullptr && ! mix->wet.load())
+            graph.getNodeForId (nodeId)->setBypassed (true);
+}
+
+void Engine::timerCallback()
+{
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+
+    if (bypassEnd > 0 && now >= bypassEnd)
+    {
+        bypassEnd = 0;
+        finishBypasses();
+    }
+
+    if (phase == Phase::fadingOut && now >= phaseEnd)
+    {
+        applyChains (pendingChains);
+        // The new wiring swaps in on the audio thread's next buffer: fade in only after that.
+        phase = Phase::fadingIn;
+        phaseEnd = now + 2000.0 * BlockMix::fadeSeconds;
+    }
+    else if (phase == Phase::fadingIn && now >= phaseEnd)
+    {
+        phase = Phase::idle;
+        for (const auto& [id, node] : chainOut)
+            if (auto* stage = getStage (chainOut, id))
+                stage->ducked.store (false);
+    }
+
+    if (bypassEnd <= 0 && phase == Phase::idle)
+        stopTimer();
 }
 
 juce::AudioProcessor* Engine::getBlockProcessor (const juce::String& blockId) const

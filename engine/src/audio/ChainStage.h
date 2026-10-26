@@ -22,6 +22,7 @@ public:
 
     std::atomic<float> levelDb { 0.0f };
     std::atomic<bool> muted { false };
+    std::atomic<bool> ducked { false }; // faded out while the engine rewires the chain
     std::atomic<float> peak { 0.0f };
 
     void prepareToPlay (double sampleRate, int) override
@@ -37,7 +38,7 @@ public:
         if (appliesGain)
         {
             const auto db = levelDb.load();
-            gain.setTargetValue (muted.load() || db <= -100.0f ? 0.0f : juce::Decibels::decibelsToGain (db));
+            gain.setTargetValue (muted.load() || ducked.load() || db <= -100.0f ? 0.0f : juce::Decibels::decibelsToGain (db));
             gain.applyGain (buffer, numSamples);
         }
 
