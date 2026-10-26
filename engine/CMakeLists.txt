@@ -29,7 +29,10 @@ add_library(nam OBJECT ${NAM_SOURCES} src/blocks/NamModel.cpp)
 target_include_directories(nam SYSTEM PRIVATE ${nam_SOURCE_DIR} ${nam_SOURCE_DIR}/Dependencies/nlohmann ${eigen_SOURCE_DIR})
 target_compile_definitions(nam PRIVATE NAM_SAMPLE_FLOAT NAM_ENABLE_A2_FAST EIGEN_NO_DEBUG)
 target_compile_features(nam PRIVATE cxx_std_20)
-set_target_properties(nam PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Hidden symbols, here and on Glitch: plugins built on NAM or JUCE carry their own copies, and the
+# loader would otherwise merge their inline statics with ours (a NAM-based AU aborted on load with
+# NAM's registry already full).
+set_target_properties(nam PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 # Always optimised: unoptimised Eigen is far too slow for real time, even in a Debug build.
 target_compile_options(nam PRIVATE -O3)
 # AVX2 + FMA on Intel (the show Mac's Haswell i7 has both; Eigen is much faster with them).
@@ -49,6 +52,7 @@ juce_add_gui_app(Glitch
     MICROPHONE_PERMISSION_TEXT "Glitch needs audio input to process your instrument."
     NEEDS_WEB_BROWSER TRUE
     NEEDS_CURL FALSE)
+set_target_properties(Glitch PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 
 target_sources(Glitch PRIVATE
     src/Main.cpp
