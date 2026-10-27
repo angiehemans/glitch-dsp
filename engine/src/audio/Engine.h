@@ -15,12 +15,17 @@ class ChainStage;
 
 // Owns the audio device and the rig's audio graph. Each chain is
 //   hardware input -> input stage (meter) -> plugins in order -> output stage (level, mute, meter) -> outputs
+// with a BlockMix after each plugin that crossfades it against its own input for click-free bypass.
+// Rewiring a chain fades its output stage out first and back in after, so edits don't click either.
+// An ABY step feeds both of its paths from the same point and joins them again in an AbyMerge,
+// or, as a split exit, ends the chain with path B through a second output stage to its own outputs;
 // and every chain sums into the outputs. A master stage (the monitor fader, mute and panic) then
 // scales every output, in this class's own device callback around the graph.
 // Structural changes go through juce::AudioProcessorGraph, which rebuilds off the audio thread.
 // Parameters are atomics. Message thread for everything public.
 class Engine : private juce::AudioIODeviceCallback,
-               private juce::AudioIODeviceType::Listener
+               private juce::AudioIODeviceType::Listener,
+               private juce::Timer
 {
 public:
     static constexpr int maxChains = 8;   // plan's v1 soft limit
@@ -34,7 +39,19 @@ public:
         juce::String id;
         int input = 0;                   // 0-based hardware input
         std::vector<int> outputs;        // 0-based hardware outputs: a pair is L/R, one gets both
-        std::vector<juce::String> blockIds; // in order; blocks without a node are skipped
+        std::vector<int> outputsB;       // path B's, when the last step is a split exit
+        struct Step
+        {
+            juce::String id;                        // a block, or an ABY block when split is true
+            bool split = false;
+            bool exitSplit = false;                 // the paths go to separate outputs; must be the last step
+            std::vector<juce::String> pathA, pathB; // a split's blocks, in order
+
+            bool operator== (const Step& o) const { return id == o.id && split == o.split && exitSplit == o.exitSplit && pathA == o.pathA && pathB == o.pathB; }
+        };
+        std::vector<Step> steps; // in order; blocks and splits without a node are skipped
+
+        bool operator== (const ChainSpec& o) const { return input == o.input && outputs == o.outputs && outputsB == o.outputsB && steps == o.steps; }
     };
 
     explicit Engine (const juce::XmlElement* savedDeviceState);
@@ -48,7 +65,8 @@ public:
     bool isMuted() const    { return muted.load(); }
     bool isPanic() const    { return panic.load(); }
 
-    /** Rewires the graph to match. Creates and removes chain stages; blocks are added separately. */
+    /** Rewires the graph to match. Creates and removes chain stages; blocks are added separately.
+        Chains that change are faded out first, so the rewiring itself lands a moment later. */
     void setChains (const std::vector<ChainSpec>&);
     void setChainParams (const juce::String& chainId, float levelDb, bool isMuted);
 
@@ -58,6 +76,14 @@ public:
     juce::StringArray getBlockIds() const;
     void setBlockEnabled (const juce::String& blockId, bool enabled);
     juce::AudioProcessor* getBlockProcessor (const juce::String& blockId) const;
+
+    /** ABY splits, by their block id. Their paths' blocks are ordinary blocks. */
+    void addSplit (const juce::String& abyId);
+    void removeSplit (const juce::String& abyId);
+    bool hasSplit (const juce::String& abyId) const { return splits.count (abyId) > 0; }
+    juce::StringArray getSplitIds() const;
+    struct SplitParams { bool both = false, activeB = false; bool muted[2] { false, false }; };
+    void setSplitParams (const juce::String& abyId, const SplitParams&);
 
     /** Peaks since the last call, in dBFS. */
     float takePeakDb (Meter m);
@@ -89,9 +115,15 @@ private:
     void audioDeviceStopped() override;
     void audioDeviceError (const juce::String&) override;
     void audioDeviceListChanged() override;
+    void timerCallback() override;
 
     ChainStage* getStage (const std::map<juce::String, NodeID>&, const juce::String& chainId) const;
-    void connect (NodeID from, NodeID to);
+    bool duck (const juce::String& chainId); // fades both output stages; true if it wasn't already
+    void connectOutputs (NodeID stage, const std::vector<int>& outputs);
+    void connect (NodeID from, NodeID to, int firstInput = 0, int numInputs = -1);
+    NodeID connectBlocks (NodeID from, const std::vector<juce::String>& blockIds);
+    void applyChains (const std::vector<ChainSpec>&);
+    void finishBypasses();
     static void storePeak (std::atomic<float>& slot, float peak);
 
     juce::AudioDeviceManager deviceManager;
@@ -100,7 +132,15 @@ private:
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorPlayer player;
     NodeID inputNode, outputNode;
-    std::map<juce::String, NodeID> chainIn, chainOut, blocks;
+    std::map<juce::String, NodeID> chainIn, chainOut, chainOutB, blocks, mixes, splits; // chainOutB: path B of a split exit; mixes: by block id; splits: AbyMerge by ABY id
+
+    // Rewiring and bypass both wait for fades; the timer runs while either is due.
+    enum class Phase { idle, fadingOut, fadingIn };
+    Phase phase = Phase::idle;
+    double phaseEnd = 0, bypassEnd = 0; // Time::getMillisecondCounterHiRes
+    std::vector<ChainSpec> pendingChains;
+    std::map<juce::String, ChainSpec> appliedChains;
+    std::vector<NodeID> nodesToRemove; // removed blocks, kept playing until their chain has faded
 
     std::atomic<float> gainDb { 0.0f };
     std::atomic<bool> muted { false };

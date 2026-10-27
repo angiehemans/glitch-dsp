@@ -30,10 +30,22 @@ public:
     /** Removes a chain of the open project, with its blocks' saved states and snapshots. */
     void removeChain (const juce::String& chainId);
 
-    /** Blocks of the open project. */
+    /** Blocks of the open project, including those inside ABY paths. */
     juce::var findBlock (const juce::String& blockId) const;
     void addBlock (const juce::var& chain, const juce::var& block, int index);
+    /** Into path "A" or "B" of an ABY block. An ABY can't go inside a path. */
+    bool addBlockToPath (const juce::var& aby, const juce::String& path, const juce::var& block, int index);
+    /** Moves a block (or an ABY, with its paths) to index in a chain, or in path "A"/"B" of that
+        chain's ABY abyId. The index counts the block in its old place. Returns an error, or {}. */
+    juce::String moveBlock (const juce::String& blockId, const juce::var& chain, int index, const juce::String& abyId, const juce::String& path);
+    /** The open project's chain holding this block, at any depth. */
+    juce::var findChainOf (const juce::String& blockId) const;
+    /** Inserts an ABY at index, moving the blocks after it into path A. Returns it, or void. */
+    juce::var splitAt (const juce::var& chain, int index);
+    /** Removing an ABY keeps its path A in the chain and deletes path B's blocks. */
     void removeBlock (const juce::String& blockId);
+    /** A chain's block lists: its own, then each ABY's path A and path B. */
+    static juce::Array<juce::Array<juce::var>*> getBlockLists (const juce::var& chain);
     /** Plugin state blobs (base64), kept out of the chains so state events stay small. */
     juce::String getPluginState (const juce::String& blockId) const;
     void setPluginState (const juce::String& blockId, const juce::String& base64);
@@ -54,6 +66,7 @@ public:
 
 private:
     static juce::var normaliseProject (const juce::var&);
+    void forgetBlock (const juce::String& blockId); // its plugin state and snapshot
     static bool save (const juce::var& project);
     void saveSettings() const;
 

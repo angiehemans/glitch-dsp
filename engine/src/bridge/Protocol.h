@@ -22,6 +22,12 @@ namespace glitch::protocol
         inline constexpr auto chainSetOutputs = "chain.setOutputs";
         inline constexpr auto chainSetLevel  = "chain.setLevel";
         inline constexpr auto chainSetMute   = "chain.setMute";
+        inline constexpr auto chainSplitAt   = "chain.splitAt";
+        inline constexpr auto abySetMode     = "aby.setMode";
+        inline constexpr auto abySelect      = "aby.select";
+        inline constexpr auto abySetMute     = "aby.setMute";
+        inline constexpr auto abySetExit     = "aby.setExit";
+        inline constexpr auto abySetOutputs  = "aby.setOutputs";
         inline constexpr auto deviceScan     = "device.scan";
         inline constexpr auto deviceSelect   = "device.select";
         inline constexpr auto deviceSetFormat = "device.setFormat";
@@ -31,6 +37,7 @@ namespace glitch::protocol
         inline constexpr auto blockRemove    = "block.remove";
         inline constexpr auto blockToggle    = "block.toggle";
         inline constexpr auto blockOpenEditor = "block.openEditor";
+        inline constexpr auto blockMove      = "block.move";
     }
 
     namespace event

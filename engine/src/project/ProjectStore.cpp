@@ -34,6 +34,62 @@ namespace
             obj.setProperty (key, value);
     }
 
+    juce::var newPath()
+    {
+        auto path = object();
+        auto* obj = path.getDynamicObject();
+        obj->setProperty ("blocks", juce::Array<juce::var>());
+        obj->setProperty ("mute", false);
+        return path;
+    }
+
+    void normaliseAby (const juce::var& aby);
+
+    /** The well-formed blocks of a list. ABY blocks are only allowed at the top of a chain (no nesting in v1). */
+    juce::Array<juce::var> validBlocks (const juce::var& list, bool allowAby)
+    {
+        juce::Array<juce::var> blocks;
+        if (auto* loaded = list.getArray())
+        {
+            for (const auto& b : *loaded)
+            {
+                if (b.getDynamicObject() == nullptr || b["id"].toString().isEmpty() || b["type"].toString().isEmpty())
+                    continue;
+                if (b["type"].toString() == "aby")
+                {
+                    if (! allowAby)
+                        continue;
+                    normaliseAby (b);
+                }
+                blocks.add (b);
+            }
+        }
+        return blocks;
+    }
+
+    void normaliseAby (const juce::var& aby)
+    {
+        auto& obj = *aby.getDynamicObject();
+        setDefault (obj, "name", "ABY");
+        setDefault (obj, "enabled", true);
+        setDefault (obj, "mode", "AB");
+        setDefault (obj, "active", "A");
+        setDefault (obj, "exit", "merge");
+        if (! aby["splitOutputs"]["A"].isArray() || ! aby["splitOutputs"]["B"].isArray())
+            obj.setProperty ("exit", "merge"); // nowhere to send a split's paths
+        setDefault (obj, "crossfadeMs", 10);
+        setDefault (obj, "alignLatency", true);
+
+        for (const auto* key : { "pathA", "pathB" })
+        {
+            if (! aby[key].isObject())
+                obj.setProperty (key, newPath());
+            auto& path = *aby[key].getDynamicObject();
+            setDefault (path, "mute", false);
+            path.setProperty ("blocks", validBlocks (aby[key]["blocks"], false));
+        }
+    }
+
     /** Fills missing fields, so older or hand-edited files load. */
     juce::var normaliseChain (const juce::var& chain)
     {
@@ -48,12 +104,7 @@ namespace
         setDefault (*obj, "bypassed", false);
         setDefault (*obj, "muted", false);
 
-        juce::Array<juce::var> blocks;
-        if (auto* loaded = chain["blocks"].getArray())
-            for (const auto& b : *loaded)
-                if (b.getDynamicObject() != nullptr && b["id"].toString().isNotEmpty() && b["type"].toString().isNotEmpty())
-                    blocks.add (b);
-        obj->setProperty ("blocks", blocks);
+        obj->setProperty ("blocks", validBlocks (chain["blocks"], true));
 
         if (! chain["inputs"].isArray() || chain["inputs"].size() == 0)
         {
@@ -260,21 +311,35 @@ void ProjectStore::removeChain (const juce::String& chainId)
         if (chain["id"].toString() != chainId)
             continue;
 
-        if (auto* blocks = chain["blocks"].getArray())
-            for (const auto& b : juce::Array<juce::var> (*blocks)) // a copy: removeBlock edits the original
-                removeBlock (b["id"].toString());
+        for (auto* list : getBlockLists (chain))
+            for (const auto& b : *list)
+                forgetBlock (b["id"].toString());
 
         chains->remove (i);
     }
     markDirty();
 }
 
+juce::Array<juce::Array<juce::var>*> ProjectStore::getBlockLists (const juce::var& chain)
+{
+    juce::Array<juce::Array<juce::var>*> lists;
+    if (auto* blocks = chain["blocks"].getArray())
+    {
+        lists.add (blocks);
+        for (const auto& b : *blocks)
+            for (const auto* key : { "pathA", "pathB" })
+                if (auto* path = b[key]["blocks"].getArray())
+                    lists.add (path);
+    }
+    return lists;
+}
+
 juce::var ProjectStore::findBlock (const juce::String& blockId) const
 {
     if (auto* chains = getCurrentChains())
         for (const auto& c : *chains)
-            if (auto* blocks = c["blocks"].getArray())
-                for (const auto& b : *blocks)
+            for (auto* list : getBlockLists (c))
+                for (const auto& b : *list)
                     if (b["id"].toString() == blockId)
                         return b;
     return {};
@@ -289,15 +354,141 @@ void ProjectStore::addBlock (const juce::var& chain, const juce::var& block, int
     }
 }
 
-void ProjectStore::removeBlock (const juce::String& blockId)
+bool ProjectStore::addBlockToPath (const juce::var& aby, const juce::String& path, const juce::var& block, int index)
+{
+    auto* blocks = aby[path == "B" ? "pathB" : "pathA"]["blocks"].getArray();
+    if (aby["type"].toString() != "aby" || blocks == nullptr || block["type"].toString() == "aby")
+        return false;
+
+    blocks->insert (index < 0 || index > blocks->size() ? blocks->size() : index, block);
+    markDirty();
+    return true;
+}
+
+juce::String ProjectStore::moveBlock (const juce::String& blockId, const juce::var& chain, int index,
+                                     const juce::String& abyId, const juce::String& path)
+{
+    auto* to = chain["blocks"].getArray();
+    if (abyId.isNotEmpty())
+    {
+        const auto aby = findBlock (abyId);
+        if (aby["type"].toString() != "aby" || findChainOf (abyId)["id"] != chain["id"])
+            return "Unknown ABY block: " + abyId;
+        to = aby[path == "B" ? "pathB" : "pathA"]["blocks"].getArray();
+    }
+    if (to == nullptr)
+        return "Unknown chain";
+
+    juce::Array<juce::var>* from = nullptr;
+    int at = -1;
+    if (auto* chains = getCurrentChains())
+        for (const auto& c : *chains)
+            for (auto* list : getBlockLists (c))
+                for (int i = 0; from == nullptr && i < list->size(); ++i)
+                    if ((*list)[i]["id"].toString() == blockId)
+                        from = list, at = i;
+    if (from == nullptr)
+        return "Unknown block: " + blockId;
+
+    const auto block = (*from)[at];
+    if (block["type"].toString() == "aby" && abyId.isNotEmpty())
+        return "An ABY can't go inside another ABY's path";
+
+    if (from == to && index > at)
+        --index; // the index counted the block in its old place
+    from->remove (at);
+    index = index < 0 || index > to->size() ? to->size() : index;
+    to->insert (index, block);
+
+    // A split to separate outputs ends its chain, so it has to stay the last block.
+    for (const auto& c : *getCurrentChains())
+        if (auto* blocks = c["blocks"].getArray())
+            for (int i = 0; i < blocks->size() - 1; ++i)
+                if ((*blocks)[i]["type"].toString() == "aby" && (*blocks)[i]["exit"].toString() == "split")
+                {
+                    to->remove (index);
+                    from->insert (at, block);
+                    return "A split to separate outputs has to stay at the end of its chain";
+                }
+
+    markDirty();
+    return {};
+}
+
+juce::var ProjectStore::findChainOf (const juce::String& blockId) const
 {
     if (auto* chains = getCurrentChains())
         for (const auto& c : *chains)
-            if (auto* blocks = c["blocks"].getArray())
-                for (int i = blocks->size(); --i >= 0;)
-                    if ((*blocks)[i]["id"].toString() == blockId)
-                        blocks->remove (i);
+            for (auto* list : getBlockLists (c))
+                for (const auto& b : *list)
+                    if (b["id"].toString() == blockId)
+                        return c;
+    return {};
+}
 
+juce::var ProjectStore::splitAt (const juce::var& chain, int index)
+{
+    auto* blocks = chain["blocks"].getArray();
+    if (blocks == nullptr)
+        return {};
+    index = juce::jlimit (0, blocks->size(), index);
+
+    // "Split here": the blocks after the split move into path A; path B starts empty.
+    auto aby = object();
+    auto* obj = aby.getDynamicObject();
+    obj->setProperty ("id", newId());
+    obj->setProperty ("type", "aby");
+    normaliseAby (aby);
+    auto* pathA = aby["pathA"]["blocks"].getArray();
+    for (int i = index; i < blocks->size(); ++i)
+    {
+        if ((*blocks)[i]["type"].toString() == "aby")
+            return {}; // no ABY inside a path in v1
+        pathA->add ((*blocks)[i]);
+    }
+
+    blocks->removeRange (index, blocks->size() - index);
+    blocks->add (aby);
+    markDirty();
+    return aby;
+}
+
+void ProjectStore::removeBlock (const juce::String& blockId)
+{
+    if (auto* chains = getCurrentChains())
+    {
+        for (const auto& c : *chains)
+        {
+            for (auto* list : getBlockLists (c))
+            {
+                for (int i = list->size(); --i >= 0;)
+                {
+                    const auto b = (*list)[i];
+                    if (b["id"].toString() != blockId)
+                        continue;
+
+                    list->remove (i);
+                    if (b["type"].toString() == "aby")
+                    {
+                        // Removing a split keeps path A in the chain, in its place, and drops path B.
+                        if (auto* pathA = b["pathA"]["blocks"].getArray())
+                            for (int j = pathA->size(); --j >= 0;)
+                                list->insert (i, (*pathA)[j]);
+                        if (auto* pathB = b["pathB"]["blocks"].getArray())
+                            for (const auto& gone : *pathB)
+                                forgetBlock (gone["id"].toString());
+                    }
+                    forgetBlock (blockId);
+                    markDirty();
+                    return;
+                }
+            }
+        }
+    }
+}
+
+void ProjectStore::forgetBlock (const juce::String& blockId)
+{
     if (auto* states = current["pluginStates"].getDynamicObject())
         states->removeProperty (blockId);
     getSnapshotFile (current["id"].toString(), blockId).deleteFile();

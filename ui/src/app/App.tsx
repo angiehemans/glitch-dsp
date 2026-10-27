@@ -1,3 +1,4 @@
+import { computed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import TopBar from "@scamp/components/TopBar/TopBar";
 import { isMock } from "../bridge/engine";
@@ -5,6 +6,10 @@ import { cpuPercent, glitch, lastError, send } from "../store/glitch";
 import { route } from "./router";
 import { HomeView } from "./views/HomeView";
 import { RigView } from "./views/RigView";
+
+// A signal rendered as text updates that text node in place: reading cpuPercent.value in App would
+// re-render the whole app (every chain) on each meters event.
+const cpuText = computed(() => `${cpuPercent.value}%`);
 
 // Routes match the links Scamp's views use: "/" (projects) and "/rig". The top bar's back arrow goes home.
 export function App() {
@@ -28,7 +33,7 @@ export function App() {
           presetName="—"
           modified={false}
           songName="—"
-          cpuLoad={`${cpuPercent.value}%`}
+          cpuLoad={cpuText as unknown as string}
           audioDevice={device ? device.name : "NO AUDIO DEVICE"}
           devices={(state?.devices ?? []).map((d, i) => ({ id: String(i), name: d.label || d.name, kind: d.type, current: d.current }))}
           midiDevice={state?.midi.device ?? "NO MIDI"}

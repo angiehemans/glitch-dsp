@@ -86,6 +86,26 @@ namespace
         return (v.isInt() || v.isInt64()) && (int) v >= 1 && (int) v <= Engine::maxChannels;
     }
 
+    /** An outputs list's first hwChannels, checked; empty when any channel is invalid or repeated. */
+    juce::Array<juce::var> outputChannels (const juce::var& outputs)
+    {
+        const auto requested = outputs[0]["hwChannels"];
+        juce::Array<juce::var> hwChannels;
+        if (auto* list = requested.getArray())
+            for (const auto& ch : *list)
+                if (isChannel (ch) && ! hwChannels.contains ((int) ch))
+                    hwChannels.add ((int) ch);
+        return hwChannels.size() == requested.size() ? hwChannels : juce::Array<juce::var>();
+    }
+
+    /** The chain's last block, when it's an ABY whose paths exit to their own outputs. */
+    juce::var splitExit (const juce::var& chain)
+    {
+        const auto* blocks = chain["blocks"].getArray();
+        const auto last = blocks != nullptr && ! blocks->isEmpty() ? blocks->getLast() : juce::var();
+        return last["type"].toString() == "aby" && last["exit"].toString() == "split" ? last : juce::var();
+    }
+
     /** Ids are 8 hex chars plus dashes (see newId); anything else never names a file. */
     bool isId (const juce::String& s)
     {
@@ -258,6 +278,11 @@ void WebUi::handleCommand (const juce::var& command)
         if (! handleBlockCommand (type, command))
             return;
     }
+    else if (type.startsWith ("aby."))
+    {
+        if (! handleAbyCommand (type, command))
+            return;
+    }
     else if (type == protocol::command::deviceScan)
     {
         engine.rescanDevices();
@@ -347,14 +372,8 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
     }
     else if (type == protocol::command::chainSetOutputs)
     {
-        const auto requested = command["outputs"][0]["hwChannels"];
-        juce::Array<juce::var> hwChannels;
-        if (auto* list = requested.getArray())
-            for (const auto& ch : *list)
-                if (isChannel (ch) && ! hwChannels.contains ((int) ch))
-                    hwChannels.add ((int) ch);
-
-        if (hwChannels.isEmpty() || hwChannels.size() != requested.size())
+        const auto hwChannels = outputChannels (command["outputs"]);
+        if (hwChannels.isEmpty())
         {
             sendError ("Invalid output channels");
             return false;
@@ -387,12 +406,95 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
         obj->setProperty ("muted", (bool) command["muted"]);
         applyChainParams (chain);
     }
+    else if (type == protocol::command::chainSplitAt)
+    {
+        const auto blocks = chain["blocks"];
+        const auto index = command["index"].isVoid() ? blocks.size() : (int) command["index"];
+        if (splitExit (chain).isObject() && index >= blocks.size())
+        {
+            sendError ("This chain ends in a split to separate outputs");
+            return false;
+        }
+        if (store.splitAt (chain, index).isVoid())
+        {
+            sendError ("An ABY can't go inside another ABY's path");
+            return false;
+        }
+        syncEngine();
+    }
     else
     {
         sendError ("Unknown command: " + type);
         return false;
     }
 
+    store.markDirty();
+    return true;
+}
+
+bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command)
+{
+    const auto aby = store.findBlock (command["blockId"].toString());
+    auto* obj = aby.getDynamicObject();
+    if (obj == nullptr || aby["type"].toString() != "aby")
+    {
+        sendError ("Unknown ABY block: " + command["blockId"].toString());
+        return false;
+    }
+
+    const auto pathKey = command["path"].toString() == "B" ? "pathB" : "pathA";
+
+    if (type == protocol::command::abySetMode)
+    {
+        obj->setProperty ("mode", command["mode"].toString() == "Y" ? "Y" : "AB");
+    }
+    else if (type == protocol::command::abySelect)
+    {
+        obj->setProperty ("active", command["path"].toString() == "B" ? "B" : "A");
+    }
+    else if (type == protocol::command::abySetMute)
+    {
+        aby[pathKey].getDynamicObject()->setProperty ("mute", (bool) command["muted"]);
+    }
+    else if (type == protocol::command::abySetExit)
+    {
+        const auto split = command["exit"].toString() == "split";
+        if (split)
+        {
+            const auto chain = store.findChainOf (aby["id"].toString());
+            if (chain["blocks"].getArray() == nullptr || chain["blocks"].getArray()->getLast()["id"] != aby["id"])
+            {
+                sendError ("Only an ABY at the end of a chain can split to separate outputs");
+                return false;
+            }
+            // Both paths start on the chain's outputs; pick each one's from there.
+            if (! aby["splitOutputs"].isObject())
+            {
+                obj->setProperty ("splitOutputs", object ({ { "A", chain["outputs"].clone() }, { "B", chain["outputs"].clone() } }));
+            }
+        }
+        obj->setProperty ("exit", split ? "split" : "merge");
+        syncEngine();
+    }
+    else if (type == protocol::command::abySetOutputs)
+    {
+        const auto hwChannels = outputChannels (command["outputs"]);
+        const auto output = aby["splitOutputs"][command["path"].toString() == "B" ? "B" : "A"][0];
+        if (hwChannels.isEmpty() || output.getDynamicObject() == nullptr)
+        {
+            sendError ("Invalid output channels");
+            return false;
+        }
+        output.getDynamicObject()->setProperty ("hwChannels", hwChannels);
+        syncEngine();
+    }
+    else
+    {
+        sendError ("Unknown command: " + type);
+        return false;
+    }
+
+    applyAbyParams (aby); // no rewiring: switching and muting only change the merge's gains
     store.markDirty();
     return true;
 }
@@ -440,8 +542,38 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
             return false;
         }
 
-        store.addBlock (chain, block, command["index"].isVoid() ? -1 : (int) command["index"]);
+        const auto index = command["index"].isVoid() ? -1 : (int) command["index"];
+        if (const auto abyId = command["abyId"].toString(); abyId.isNotEmpty())
+        {
+            if (! store.addBlockToPath (store.findBlock (abyId), command["path"].toString(), block, index))
+            {
+                sendError ("Unknown ABY block: " + abyId);
+                return false;
+            }
+        }
+        else
+        {
+            if (splitExit (chain).isObject() && (index < 0 || index >= chain["blocks"].size()))
+            {
+                sendError ("This chain ends in a split to separate outputs: add blocks to path A or B");
+                return false;
+            }
+            store.addBlock (chain, block, index);
+        }
         syncEngine();
+        return true;
+    }
+
+    if (type == protocol::command::blockMove)
+    {
+        const auto error = store.moveBlock (command["blockId"].toString(), store.findChain (command["chainId"].toString()),
+                                            (int) command["index"], command["abyId"].toString(), command["path"].toString());
+        if (error.isNotEmpty())
+        {
+            sendError (error);
+            return false;
+        }
+        syncEngine(); // rewires; blocks keep running, even when they change chain
         return true;
     }
 
@@ -450,6 +582,12 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
     if (! block.isObject())
     {
         sendError ("Unknown block: " + blockId);
+        return false;
+    }
+
+    if (block["type"].toString() == "aby" && type != protocol::command::blockRemove)
+    {
+        sendError ("An ABY block has no window or bypass of its own");
         return false;
     }
 
@@ -473,24 +611,69 @@ void WebUi::syncEngine()
 {
     const auto* chains = store.getCurrentChains();
 
-    juce::StringArray wanted;
+    juce::StringArray wantedBlocks, wantedSplits;
     if (chains != nullptr)
         for (const auto& c : *chains)
-            if (auto* blocks = c["blocks"].getArray())
-                for (const auto& b : *blocks)
-                    wanted.add (b["id"].toString());
+            for (auto* list : ProjectStore::getBlockLists (c))
+                for (const auto& b : *list)
+                    (b["type"].toString() == "aby" ? wantedSplits : wantedBlocks).add (b["id"].toString());
 
     for (const auto& id : engine.getBlockIds())
     {
-        if (! wanted.contains (id))
+        if (! wantedBlocks.contains (id))
         {
             closeEditor (id);
             engine.removeBlock (id);
         }
     }
+    for (const auto& id : engine.getSplitIds())
+        if (! wantedSplits.contains (id))
+            engine.removeSplit (id);
 
     std::vector<Engine::ChainSpec> specs;
     chainIds.clear();
+
+    // Loads a block if it isn't yet, and returns its id for the chain's wiring.
+    const auto prepare = [this] (const juce::var& b)
+    {
+        const auto id = b["id"].toString();
+        juce::String note;
+
+        if (! engine.hasBlock (id))
+        {
+            auto processor = createBlock (b, note);
+
+            if (processor != nullptr)
+            {
+                juce::MemoryBlock state;
+                if (state.fromBase64Encoding (store.getPluginState (id)) && state.getSize() > 0)
+                    processor->setStateInformation (state.getData(), (int) state.getSize());
+                engine.addBlock (id, std::move (processor));
+            }
+        }
+
+        // NAM models run at any rate but sound slightly different away from their training rate.
+        if (auto* nam = dynamic_cast<NamBlock*> (engine.getBlockProcessor (id)))
+        {
+            const auto trained = nam->getExpectedSampleRate(), running = engine.getSampleRate();
+            if (trained > 0 && std::abs (trained - running) > 1.0)
+                note = "Trained at " + juce::String (trained / 1000.0, 1) + " kHz, running at " + juce::String (running / 1000.0, 1) + " kHz";
+        }
+
+        b.getDynamicObject()->setProperty ("missing", ! engine.hasBlock (id));
+        b.getDynamicObject()->setProperty ("note", note);
+        engine.setBlockEnabled (id, (bool) b["enabled"]);
+        return id;
+    };
+
+    const auto preparePath = [&prepare] (const juce::var& path)
+    {
+        std::vector<juce::String> ids;
+        if (auto* blocks = path["blocks"].getArray())
+            for (const auto& b : *blocks)
+                ids.push_back (prepare (b));
+        return ids;
+    };
 
     if (chains != nullptr)
     {
@@ -507,35 +690,30 @@ void WebUi::syncEngine()
             {
                 for (const auto& b : *blocks)
                 {
-                    const auto id = b["id"].toString();
-
-                    juce::String note;
-
-                    if (! engine.hasBlock (id))
+                    Engine::ChainSpec::Step step;
+                    if (b["type"].toString() == "aby")
                     {
-                        auto processor = createBlock (b, note);
-
-                        if (processor != nullptr)
+                        step.id = b["id"].toString();
+                        step.split = true;
+                        step.exitSplit = b["exit"].toString() == "split" && b["id"] == c["blocks"].getArray()->getLast()["id"];
+                        if (step.exitSplit)
                         {
-                            juce::MemoryBlock state;
-                            if (state.fromBase64Encoding (store.getPluginState (id)) && state.getSize() > 0)
-                                processor->setStateInformation (state.getData(), (int) state.getSize());
-                            engine.addBlock (id, std::move (processor));
+                            spec.outputs.clear();
+                            for (const auto* path : { "A", "B" })
+                                if (auto* hwChannels = b["splitOutputs"][path][0]["hwChannels"].getArray())
+                                    for (const auto& ch : *hwChannels)
+                                        (juce::String (path) == "A" ? spec.outputs : spec.outputsB).push_back ((int) ch - 1);
                         }
+                        step.pathA = preparePath (b["pathA"]);
+                        step.pathB = preparePath (b["pathB"]);
+                        engine.addSplit (step.id);
+                        applyAbyParams (b);
                     }
-
-                    // NAM models run at any rate but sound slightly different away from their training rate.
-                    if (auto* nam = dynamic_cast<NamBlock*> (engine.getBlockProcessor (id)))
+                    else
                     {
-                        const auto trained = nam->getExpectedSampleRate(), running = engine.getSampleRate();
-                        if (trained > 0 && std::abs (trained - running) > 1.0)
-                            note = "Trained at " + juce::String (trained / 1000.0, 1) + " kHz, running at " + juce::String (running / 1000.0, 1) + " kHz";
+                        step.id = prepare (b);
                     }
-
-                    b.getDynamicObject()->setProperty ("missing", ! engine.hasBlock (id));
-                    b.getDynamicObject()->setProperty ("note", note);
-                    engine.setBlockEnabled (id, (bool) b["enabled"]);
-                    spec.blockIds.push_back (id);
+                    spec.steps.push_back (step);
                 }
             }
 
@@ -615,6 +793,18 @@ void WebUi::importToLibrary()
 void WebUi::applyChainParams (const juce::var& chain)
 {
     engine.setChainParams (chain["id"].toString(), (float) chain["outputs"][0]["level"], (bool) chain["muted"]);
+}
+
+void WebUi::applyAbyParams (const juce::var& aby)
+{
+    Engine::SplitParams params;
+    params.both = aby["mode"].toString() == "Y";
+    params.activeB = aby["active"].toString() == "B";
+    for (int p = 0; p < 2; ++p)
+    {
+        params.muted[p] = (bool) aby[p == 0 ? "pathA" : "pathB"]["mute"];
+    }
+    engine.setSplitParams (aby["id"].toString(), params);
 }
 
 void WebUi::captureStates()

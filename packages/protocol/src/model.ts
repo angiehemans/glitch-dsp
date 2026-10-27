@@ -84,7 +84,8 @@ export interface Block {
   snapshotHeight?: number;
 }
 
-export interface AbyPath { blocks: Block[]; level: number; pan: number; mute: boolean }
+/** A path plays at full level, or -3 dB each in Y mode so the sum doesn't jump. */
+export interface AbyPath { blocks: Block[]; mute: boolean }
 
 export interface AbyBlock extends Block {
   type: "aby";

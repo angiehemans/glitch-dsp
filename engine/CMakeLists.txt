@@ -29,7 +29,10 @@ add_library(nam OBJECT ${NAM_SOURCES} src/blocks/NamModel.cpp)
 target_include_directories(nam SYSTEM PRIVATE ${nam_SOURCE_DIR} ${nam_SOURCE_DIR}/Dependencies/nlohmann ${eigen_SOURCE_DIR})
 target_compile_definitions(nam PRIVATE NAM_SAMPLE_FLOAT NAM_ENABLE_A2_FAST EIGEN_NO_DEBUG)
 target_compile_features(nam PRIVATE cxx_std_20)
-set_target_properties(nam PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# Hidden symbols, here and in Glitch: on macOS dyld merges exported weak symbols across a process, so
+# a plugin with its own NAM inside (e.g. Punk Sans) would share our ConfigParserRegistry, register
+# its architectures a second time, and throw while loading, which aborts the app.
+set_target_properties(nam PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON)
 # Always optimised: unoptimised Eigen is far too slow for real time, even in a Debug build.
 target_compile_options(nam PRIVATE -O3)
 # AVX2 + FMA on Intel (the show Mac's Haswell i7 has both; Eigen is much faster with them).
@@ -73,6 +76,8 @@ target_compile_definitions(Glitch PRIVATE
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_definitions(Glitch PRIVATE JUCE_JACK=1 JUCE_ALSA=1)
 endif()
+
+set_target_properties(Glitch PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON) # see nam above
 
 target_link_libraries(Glitch
     PRIVATE
@@ -118,6 +123,19 @@ target_link_libraries(GlitchBench
         juce::juce_audio_processors
         juce::juce_audio_formats
         juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# FadeTest: checks click-free bypass and ABY switching fades. Not built by default:
+# cmake --build --preset dev --target FadeTest
+juce_add_console_app(FadeTest)
+set_target_properties(FadeTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(FadeTest PRIVATE tools/FadeTest.cpp)
+target_compile_definitions(FadeTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(FadeTest
+    PRIVATE
+        juce::juce_audio_processors
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

@@ -262,9 +262,103 @@ body {
 }
 
 /* A plugin-window snapshot as a block tile's artwork, at the size RigView gives it */
+/* A block's picture fills its tile's fixed height; the tile's width follows the picture. */
 .gl-block-art {
   display: block;
   flex-shrink: 0;
+  height: 100%;
+  width: auto;
+}
+
+/* A chain's blocks, or an ABY path's (RigView): a drop target for blocks dragged by their grip */
+.gl-lane {
+  display: flex;
+  flex-grow: 1;
+  gap: inherit;
+  align-items: center;
+  min-width: 60px;
+  min-height: 110px;
+  position: relative;
+}
+
+/* where the dragged block will land (RigView's dropSpot sets --drop-x) */
+.gl-lane[data-over]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--drop-x) - 2px);
+  width: 4px;
+  border-radius: 2px;
+  background: var(--color-text-hi);
+  box-shadow: 0 0 4px 1px var(--color-accent), 0 0 12px 3px var(--color-accent), 0 0 24px 6px var(--color-accent-soft);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* the + in a lane's gap: adds a block there (RigView's Lane sets data-gap and --add-x) */
+.gl-insert {
+  position: absolute;
+  top: 50%;
+  left: var(--add-x);
+  width: 24px;
+  height: 24px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-accent);
+  background: var(--color-bg-1);
+  color: var(--color-accent);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.gl-insert:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-text-hi);
+}
+
+.gl-lane[data-gap] > .gl-insert {
+  display: flex;
+}
+
+.gl-lane[data-over] > .gl-insert {
+  display: none;
+}
+
+/* the small copy of a pedal that follows the pointer while dragging (RigView's startDrag moves it) */
+.gl-drag-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 64px;
+  height: auto;
+  opacity: 0.85;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.gl-dragging,
+.gl-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.gl-dragging .gl-insert {
+  display: none !important;
+}
+
+.gl-drag {
+  display: flex;
+}
+
+/* a split ABY stretches to the end of the chain */
+.gl-drag:has(> [data-exit="split"]) {
+  flex-grow: 1;
 }
 
 /* A project or chain name being renamed in place (app/rename.ts) */
