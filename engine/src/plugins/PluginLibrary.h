@@ -9,13 +9,18 @@ namespace glitch
 // or a plugin/folder the user picks. Saved to <app data>/plugins.xml.
 // Scans run on the message thread, one plugin per timer tick, as JUCE's own plugin list does:
 // Audio Units (and some VST3s) must be loaded on the main thread, and scanning them on a background
-// thread stalls on macOS. A plugin that crashes a scan is skipped next time (dead man's pedal file).
-// shortcut: scans run in-process, so a crashing plugin takes the app down once, and a slow one
-// pauses the UI while it loads. Upgrade to an out-of-process scanner before relying on unknown
-// plugins at a show.
+// thread stalls on macOS. Each plugin is loaded in a helper process (Glitch started again with
+// a scanner command line), so a plugin that crashes or hangs while being scanned only takes the
+// helper down; it's then left out, and the next plugin gets a fresh helper. A crash of Glitch
+// itself mid-scan is still caught by the dead man's pedal file, and that plugin skipped next time.
+// shortcut: the UI still pauses while each plugin loads, since the scan waits on the message thread.
 class PluginLibrary : private juce::Timer
 {
 public:
+    /** In the scanner helper: starts serving scans if the command line is the helper's, else returns null. */
+    static std::unique_ptr<juce::ChildProcessWorker> startScanHelper (const juce::String& commandLine);
+    static bool isScanHelper (const juce::String& commandLine);
+
     explicit PluginLibrary (juce::File dataDir);
     ~PluginLibrary() override;
 
