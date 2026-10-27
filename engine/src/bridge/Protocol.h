@@ -25,8 +25,10 @@ namespace glitch::protocol
         inline constexpr auto chainSplitAt   = "chain.splitAt";
         inline constexpr auto abySetMode     = "aby.setMode";
         inline constexpr auto abySelect      = "aby.select";
-        inline constexpr auto abySetLevel    = "aby.setLevel";
         inline constexpr auto abySetMute     = "aby.setMute";
+        inline constexpr auto abySetExit     = "aby.setExit";
+        inline constexpr auto abySetOutputs  = "aby.setOutputs";
+        inline constexpr auto abyMoveBlock   = "aby.moveBlock";
         inline constexpr auto deviceScan     = "device.scan";
         inline constexpr auto deviceSelect   = "device.select";
         inline constexpr auto deviceSetFormat = "device.setFormat";

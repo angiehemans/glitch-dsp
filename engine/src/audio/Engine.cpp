@@ -65,8 +65,9 @@ void Engine::setChains (const std::vector<ChainSpec>& requested)
     {
         if (chainIn.count (c.id) == 0)
             chainIn[c.id] = graph.addNode (std::make_unique<ChainStage> (false), {}, Update::none)->nodeID;
-        if (chainOut.count (c.id) == 0)
-            chainOut[c.id] = graph.addNode (std::make_unique<ChainStage> (true), {}, Update::none)->nodeID;
+        for (auto* stages : { &chainOut, &chainOutB })
+            if (stages->count (c.id) == 0)
+                (*stages)[c.id] = graph.addNode (std::make_unique<ChainStage> (true), {}, Update::none)->nodeID;
     }
 
     // Fade out every live chain whose wiring changes, or that goes away.
@@ -76,13 +77,11 @@ void Engine::setChains (const std::vector<ChainSpec>& requested)
     {
         ids.insert (c.id);
         if (const auto it = appliedChains.find (c.id); it != appliedChains.end() && ! (it->second == c))
-            if (auto* stage = getStage (chainOut, c.id); stage != nullptr && ! stage->ducked.exchange (true))
-                changed = true;
+            changed = duck (c.id) || changed;
     }
     for (const auto& [id, spec] : appliedChains)
         if (ids.count (id) == 0)
-            if (auto* stage = getStage (chainOut, id); stage != nullptr && ! stage->ducked.exchange (true))
-                changed = true;
+            changed = duck (id) || changed;
 
     pendingChains = chains;
     if (changed || phase == Phase::fadingOut)
@@ -106,7 +105,7 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
     for (const auto& c : chains)
         ids.insert (c.id);
 
-    for (auto* stages : { &chainIn, &chainOut })
+    for (auto* stages : { &chainIn, &chainOut, &chainOutB })
     {
         for (auto it = stages->begin(); it != stages->end();)
         {
@@ -150,20 +149,21 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
             const auto merge = splits[step.id];
             connect (connectBlocks (previous, step.pathA), merge, 0, 2);
             connect (connectBlocks (previous, step.pathB), merge, 2, 2);
+            if (auto* m = dynamic_cast<AbyMerge*> (graph.getNodeForId (merge)->getProcessor()))
+                m->split.store (step.exitSplit); // the chain is faded out, so the switch doesn't click
             previous = merge;
-        }
-        connect (previous, out);
 
-        if (c.outputs.size() >= 2)
-        {
-            graph.addConnection ({ { out, 0 }, { outputNode, c.outputs[0] } }, Update::none);
-            graph.addConnection ({ { out, 1 }, { outputNode, c.outputs[1] } }, Update::none);
+            if (step.exitSplit)
+            {
+                const auto outB = chainOutB[c.id];
+                for (int ch = 0; ch < 2; ++ch)
+                    graph.addConnection ({ { merge, ch + 2 }, { outB, ch } }, Update::none);
+                connectOutputs (outB, c.outputsB);
+                break; // a split exit ends the chain
+            }
         }
-        else if (c.outputs.size() == 1)
-        {
-            for (int ch = 0; ch < 2; ++ch)
-                graph.addConnection ({ { out, ch }, { outputNode, c.outputs[0] } }, Update::none);
-        }
+        connect (previous, out); // a split's outputs 0-1 are path A, or the merged sum
+        connectOutputs (out, c.outputs);
     }
 
     graph.rebuild();
@@ -171,6 +171,29 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
     appliedChains.clear();
     for (const auto& c : chains)
         appliedChains[c.id] = c;
+}
+
+void Engine::connectOutputs (NodeID stage, const std::vector<int>& outputs)
+{
+    if (outputs.size() >= 2)
+    {
+        graph.addConnection ({ { stage, 0 }, { outputNode, outputs[0] } }, Update::none);
+        graph.addConnection ({ { stage, 1 }, { outputNode, outputs[1] } }, Update::none);
+    }
+    else if (outputs.size() == 1)
+    {
+        for (int ch = 0; ch < 2; ++ch)
+            graph.addConnection ({ { stage, ch }, { outputNode, outputs[0] } }, Update::none);
+    }
+}
+
+bool Engine::duck (const juce::String& chainId)
+{
+    auto* b = getStage (chainOutB, chainId);
+    if (b != nullptr)
+        b->ducked.store (true);
+    auto* stage = getStage (chainOut, chainId);
+    return stage != nullptr && ! stage->ducked.exchange (true);
 }
 
 void Engine::connect (NodeID from, NodeID to, int firstInput, int numInputs)
@@ -211,10 +234,13 @@ ChainStage* Engine::getStage (const std::map<juce::String, NodeID>& stages, cons
 
 void Engine::setChainParams (const juce::String& chainId, float levelDb, bool isMuted)
 {
-    if (auto* stage = getStage (chainOut, chainId))
+    for (auto* stages : { &chainOut, &chainOutB })
     {
-        stage->levelDb.store (levelDb);
-        stage->muted.store (isMuted);
+        if (auto* stage = getStage (*stages, chainId))
+        {
+            stage->levelDb.store (levelDb);
+            stage->muted.store (isMuted);
+        }
     }
 }
 
@@ -306,9 +332,10 @@ void Engine::timerCallback()
     else if (phase == Phase::fadingIn && now >= phaseEnd)
     {
         phase = Phase::idle;
-        for (const auto& [id, node] : chainOut)
-            if (auto* stage = getStage (chainOut, id))
-                stage->ducked.store (false);
+        for (auto* stages : { &chainOut, &chainOutB })
+            for (const auto& [id, node] : *stages)
+                if (auto* stage = getStage (*stages, id))
+                    stage->ducked.store (false);
     }
 
     if (bypassEnd <= 0 && phase == Phase::idle)
@@ -347,10 +374,7 @@ void Engine::setSplitParams (const juce::String& abyId, const SplitParams& param
         merge->both.store (params.both);
         merge->activeB.store (params.activeB);
         for (int p = 0; p < 2; ++p)
-        {
-            merge->levelDb[p].store (params.levelDb[p]);
             merge->muted[p].store (params.muted[p]);
-        }
     }
 }
 
@@ -369,8 +393,11 @@ float Engine::takePeakDb (Meter m)
 
 float Engine::takeChainPeakDb (const juce::String& chainId, bool output)
 {
+    // A split exit's output meter shows the louder of its two paths.
     auto* stage = getStage (output ? chainOut : chainIn, chainId);
-    return juce::Decibels::gainToDecibels (stage != nullptr ? stage->peak.exchange (0.0f) : 0.0f, silenceDb);
+    auto* b = output ? getStage (chainOutB, chainId) : nullptr;
+    const auto peak = std::max (stage != nullptr ? stage->peak.exchange (0.0f) : 0.0f, b != nullptr ? b->peak.exchange (0.0f) : 0.0f);
+    return juce::Decibels::gainToDecibels (peak, silenceDb);
 }
 
 void Engine::storePeak (std::atomic<float>& slot, float peak)

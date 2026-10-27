@@ -6,6 +6,8 @@ type BlockTileProps = {
   art?: "fixed" | "hug";
   size?: "regular" | "small";
   name?: string;
+  bypassLabel?: string;
+  onBypass?: () => void;
   onRemove?: () => void;
   onOpen?: () => void;
   children?: React.ReactNode;
@@ -13,12 +15,12 @@ type BlockTileProps = {
   className?: string;
 };
 
-export default function BlockTile({ state = "active", modal = "closed", art = "fixed", size = "regular", name = "Vintage Amp", bypassed = "false", onOpen, onBypass, onRemove, children, plugin, className }: BlockTileProps) {
+export default function BlockTile({ state = "active", modal = "closed", art = "fixed", size = "regular", name = "Vintage Amp", bypassLabel = "Bypass", onOpen, onBypass, onRemove, children, plugin, className }: BlockTileProps) {
   return (
     <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-state={state} data-modal={modal} data-art={art} data-size={size} data-scamp-escape="modal:open=closed">
       <div data-scamp-id="head_3a7c" className={styles.head_3a7c}>
         <p data-scamp-id="name_d4f5" className={styles.name_d4f5}>{name}</p>
-        <button data-scamp-id="bypass_4b8d" className={styles.bypass_4b8d} type="button" aria-label="Bypass" aria-pressed="{bypassed" as "true" | "false"} onClick={onBypass}>
+        <button data-scamp-id="bypass_4b8d" className={styles.bypass_4b8d} type="button" aria-label={bypassLabel} onClick={onBypass}>
           <svg data-scamp-id="power_svg_5c9e" className={styles.power_svg_5c9e} viewBox="0 0 24 24"><path d="M7 6a7.75 7.75 0 1 0 10 0" /><path d="M12 4l0 8" /></svg>
         </button>
         <button data-scamp-id="remove_6daf" className={styles.remove_6daf} type="button" aria-label="Remove" onClick={onRemove}>✕</button>
@@ -40,4 +42,4 @@ export default function BlockTile({ state = "active", modal = "closed", art = "f
   );
 }
 
-export const _scamp = { contract: 2, events: ['onRemove', 'onOpen'] } as const;
+export const _scamp = { contract: 2, events: ['onBypass', 'onRemove', 'onOpen'] } as const;

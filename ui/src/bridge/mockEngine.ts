@@ -92,7 +92,11 @@ export function createMockEngine(): EngineBridge {
     const found = findBlock(id);
     return found?.block.type === "aby" ? (found.block as AbyBlock) : null;
   };
-  const newPath = () => ({ blocks: [] as Block[], level: 0, pan: 0, mute: false });
+  const newPath = () => ({ blocks: [] as Block[], mute: false });
+  const endsInSplit = (c: Chain) => {
+    const last = c.blocks[c.blocks.length - 1];
+    return last?.type === "aby" && (last as AbyBlock).exit === "split";
+  };
 
   let t = 0;
   setInterval(() => {
@@ -240,6 +244,8 @@ export function createMockEngine(): EngineBridge {
           const aby = cmd.abyId ? findAby(cmd.abyId) : null;
           if (cmd.abyId && !aby) return error(`Unknown ABY block: ${cmd.abyId}`);
           const list = aby ? (cmd.path === "B" ? aby.pathB : aby.pathA).blocks : c.blocks;
+          if (!aby && endsInSplit(c) && (cmd.index ?? list.length) >= list.length)
+            return error("This chain ends in a split to separate outputs: add blocks to path A or B");
           const spec = cmd.block;
           if (spec.type === "plugin") {
             const plugin = state.plugins.list.find((p) => p.id === spec.pluginId);
@@ -256,6 +262,7 @@ export function createMockEngine(): EngineBridge {
           const c = chain(cmd.chainId);
           if (!c) return error(`Unknown chain: ${cmd.chainId}`);
           const index = Math.max(0, Math.min(cmd.index ?? c.blocks.length, c.blocks.length));
+          if (endsInSplit(c) && index >= c.blocks.length) return error("This chain ends in a split to separate outputs");
           if (c.blocks.slice(index).some((b) => b.type === "aby")) return error("An ABY can't go inside another ABY's path");
           const aby: AbyBlock = {
             id: newId(), type: "aby", name: "ABY", enabled: true, mode: "AB", active: "A",
@@ -267,20 +274,40 @@ export function createMockEngine(): EngineBridge {
         }
         case "aby.setMode":
         case "aby.select":
-        case "aby.setLevel":
         case "aby.setMute": {
           const aby = findAby(cmd.blockId);
           if (!aby) return error(`Unknown ABY block: ${cmd.blockId}`);
-          if (cmd.type === "aby.setMode") {
-            if (cmd.mode === "Y" && !aby.usedY) {
-              for (const path of [aby.pathA, aby.pathB]) if (path.level === 0) path.level = -3;
-              aby.usedY = true;
-            }
-            aby.mode = cmd.mode;
-          }
+          if (cmd.type === "aby.setMode") aby.mode = cmd.mode;
           if (cmd.type === "aby.select") aby.active = cmd.path;
-          if (cmd.type === "aby.setLevel") (cmd.path === "B" ? aby.pathB : aby.pathA).level = Math.max(SILENCE_DB, Math.min(10, cmd.levelDb));
           if (cmd.type === "aby.setMute") (cmd.path === "B" ? aby.pathB : aby.pathA).mute = cmd.muted;
+          break;
+        }
+        case "aby.setExit":
+        case "aby.setOutputs":
+        case "aby.moveBlock": {
+          const found = findBlock(cmd.blockId);
+          const aby = found?.block.type === "aby" ? (found.block as AbyBlock) : null;
+          if (!found || !aby) return error(`Unknown ABY block: ${cmd.blockId}`);
+          if (cmd.type === "aby.setExit") {
+            if (cmd.exit === "split" && found.chain.blocks[found.chain.blocks.length - 1] !== aby)
+              return error("Only an ABY at the end of a chain can split to separate outputs");
+            aby.splitOutputs ??= { A: structuredClone(found.chain.outputs), B: structuredClone(found.chain.outputs) };
+            aby.exit = cmd.exit;
+          }
+          if (cmd.type === "aby.setOutputs") {
+            const out = aby.splitOutputs?.[cmd.path][0];
+            if (!out || !cmd.outputs[0]?.hwChannels.length) return error("Invalid output channels");
+            out.hwChannels = [...cmd.outputs[0].hwChannels];
+          }
+          if (cmd.type === "aby.moveBlock") {
+            const from = [aby.pathA.blocks, aby.pathB.blocks].find((l) => l.some((b) => b.id === cmd.moveId));
+            if (!from) return error("That block isn't in this ABY");
+            const to = (cmd.path === "B" ? aby.pathB : aby.pathA).blocks;
+            const i = from.findIndex((b) => b.id === cmd.moveId);
+            const [block] = from.splice(i, 1);
+            // The index counted the block in its old place.
+            to.splice(Math.min(from === to && cmd.index > i ? cmd.index - 1 : cmd.index, to.length), 0, block);
+          }
           break;
         }
         case "block.remove":

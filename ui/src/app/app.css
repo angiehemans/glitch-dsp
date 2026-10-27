@@ -270,6 +270,26 @@ body {
   width: auto;
 }
 
+/* An ABY path's blocks (RigView): a drop target for blocks dragged from either path */
+.gl-lane {
+  display: flex;
+  gap: inherit;
+  align-items: center;
+  min-width: 60px;
+  min-height: 110px;
+  border-radius: var(--radius-md);
+}
+
+.gl-lane[data-over] {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 4px;
+}
+
+.gl-drag {
+  display: flex;
+  cursor: grab;
+}
+
 /* A project or chain name being renamed in place (app/rename.ts) */
 [data-rename][contenteditable="plaintext-only"],
 [data-rename][contenteditable="true"] {

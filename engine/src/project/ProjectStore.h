@@ -35,6 +35,10 @@ public:
     void addBlock (const juce::var& chain, const juce::var& block, int index);
     /** Into path "A" or "B" of an ABY block. An ABY can't go inside a path. */
     bool addBlockToPath (const juce::var& aby, const juce::String& path, const juce::var& block, int index);
+    /** Moves a block of an ABY's paths to path "A" or "B" of the same ABY, at index. */
+    bool moveBlockInAby (const juce::var& aby, const juce::String& blockId, const juce::String& path, int index);
+    /** The open project's chain holding this block, at any depth. */
+    juce::var findChainOf (const juce::String& blockId) const;
     /** Inserts an ABY at index, moving the blocks after it into path A. Returns it, or void. */
     juce::var splitAt (const juce::var& chain, int index);
     /** Removing an ABY keeps its path A in the chain and deletes path B's blocks. */

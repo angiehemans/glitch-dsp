@@ -43,11 +43,15 @@ export type Command =
   | { type: "chain.splitAt"; chainId: string; index?: number }
   | { type: "aby.setMode"; blockId: string; mode: "Y" | "AB" }
   | { type: "aby.select"; blockId: string; path: "A" | "B" }
-  | { type: "aby.setLevel"; blockId: string; path: "A" | "B"; levelDb: number }
   | { type: "aby.setMute"; blockId: string; path: "A" | "B"; muted: boolean }
+  // A split exit sends each path to its own outputs (splitOutputs) and ends the chain, so only the
+  // chain's last block can split. It starts with both paths on the chain's outputs.
+  | { type: "aby.setExit"; blockId: string; exit: "merge" | "split" }
+  | { type: "aby.setOutputs"; blockId: string; path: "A" | "B"; outputs: Pick<OutputRef, "hwChannels">[] }
+  /** Moves moveId, a block in either path of this ABY, to index in path. */
+  | { type: "aby.moveBlock"; blockId: string; moveId: string; path: "A" | "B"; index: number }
   // Stubbed from the plan; not handled until their milestone.
   | { type: "block.setParam"; blockId: string; param: string; value: number }
-  | { type: "aby.moveBlock"; blockId: string; toPath: "A" | "B" | "main"; index: number }
   | { type: "project.setMainOutput"; outputs: number[] }
   | { type: "setlist.create"; name: string; projectId?: string }
   | { type: "setlist.addToProject"; setlistId: string; projectId: string }

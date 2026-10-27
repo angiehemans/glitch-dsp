@@ -84,7 +84,8 @@ export interface Block {
   snapshotHeight?: number;
 }
 
-export interface AbyPath { blocks: Block[]; level: number; pan: number; mute: boolean }
+/** A path plays at full level, or -3 dB each in Y mode so the sum doesn't jump. */
+export interface AbyPath { blocks: Block[]; mute: boolean }
 
 export interface AbyBlock extends Block {
   type: "aby";
@@ -96,8 +97,6 @@ export interface AbyBlock extends Block {
   splitOutputs?: { A: OutputRef[]; B: OutputRef[] };
   crossfadeMs: number;
   alignLatency: boolean;
-  /** Set once the block has been in Y mode; the first switch to Y drops both paths to -3 dB. */
-  usedY?: boolean;
 }
 
 export interface Chain {

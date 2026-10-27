@@ -39,8 +39,6 @@ namespace
         auto path = object();
         auto* obj = path.getDynamicObject();
         obj->setProperty ("blocks", juce::Array<juce::var>());
-        obj->setProperty ("level", 0.0);
-        obj->setProperty ("pan", 0.0);
         obj->setProperty ("mute", false);
         return path;
     }
@@ -77,6 +75,8 @@ namespace
         setDefault (obj, "mode", "AB");
         setDefault (obj, "active", "A");
         setDefault (obj, "exit", "merge");
+        if (! aby["splitOutputs"]["A"].isArray() || ! aby["splitOutputs"]["B"].isArray())
+            obj.setProperty ("exit", "merge"); // nowhere to send a split's paths
         setDefault (obj, "crossfadeMs", 10);
         setDefault (obj, "alignLatency", true);
 
@@ -85,8 +85,6 @@ namespace
             if (! aby[key].isObject())
                 obj.setProperty (key, newPath());
             auto& path = *aby[key].getDynamicObject();
-            setDefault (path, "level", 0.0);
-            setDefault (path, "pan", 0.0);
             setDefault (path, "mute", false);
             path.setProperty ("blocks", validBlocks (aby[key]["blocks"], false));
         }
@@ -365,6 +363,43 @@ bool ProjectStore::addBlockToPath (const juce::var& aby, const juce::String& pat
     blocks->insert (index < 0 || index > blocks->size() ? blocks->size() : index, block);
     markDirty();
     return true;
+}
+
+bool ProjectStore::moveBlockInAby (const juce::var& aby, const juce::String& blockId, const juce::String& path, int index)
+{
+    auto* to = aby[path == "B" ? "pathB" : "pathA"]["blocks"].getArray();
+    if (to == nullptr)
+        return false;
+
+    for (const auto* key : { "pathA", "pathB" })
+    {
+        auto* from = aby[key]["blocks"].getArray();
+        for (int i = 0; from != nullptr && i < from->size(); ++i)
+        {
+            if ((*from)[i]["id"].toString() != blockId)
+                continue;
+
+            const auto block = (*from)[i];
+            from->remove (i);
+            if (from == to && index > i)
+                --index; // the index counted the block in its old place
+            to->insert (index < 0 || index > to->size() ? to->size() : index, block);
+            markDirty();
+            return true;
+        }
+    }
+    return false;
+}
+
+juce::var ProjectStore::findChainOf (const juce::String& blockId) const
+{
+    if (auto* chains = getCurrentChains())
+        for (const auto& c : *chains)
+            for (auto* list : getBlockLists (c))
+                for (const auto& b : *list)
+                    if (b["id"].toString() == blockId)
+                        return c;
+    return {};
 }
 
 juce::var ProjectStore::splitAt (const juce::var& chain, int index)

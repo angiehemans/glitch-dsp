@@ -86,6 +86,26 @@ namespace
         return (v.isInt() || v.isInt64()) && (int) v >= 1 && (int) v <= Engine::maxChannels;
     }
 
+    /** An outputs list's first hwChannels, checked; empty when any channel is invalid or repeated. */
+    juce::Array<juce::var> outputChannels (const juce::var& outputs)
+    {
+        const auto requested = outputs[0]["hwChannels"];
+        juce::Array<juce::var> hwChannels;
+        if (auto* list = requested.getArray())
+            for (const auto& ch : *list)
+                if (isChannel (ch) && ! hwChannels.contains ((int) ch))
+                    hwChannels.add ((int) ch);
+        return hwChannels.size() == requested.size() ? hwChannels : juce::Array<juce::var>();
+    }
+
+    /** The chain's last block, when it's an ABY whose paths exit to their own outputs. */
+    juce::var splitExit (const juce::var& chain)
+    {
+        const auto* blocks = chain["blocks"].getArray();
+        const auto last = blocks != nullptr && ! blocks->isEmpty() ? blocks->getLast() : juce::var();
+        return last["type"].toString() == "aby" && last["exit"].toString() == "split" ? last : juce::var();
+    }
+
     /** Ids are 8 hex chars plus dashes (see newId); anything else never names a file. */
     bool isId (const juce::String& s)
     {
@@ -352,14 +372,8 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
     }
     else if (type == protocol::command::chainSetOutputs)
     {
-        const auto requested = command["outputs"][0]["hwChannels"];
-        juce::Array<juce::var> hwChannels;
-        if (auto* list = requested.getArray())
-            for (const auto& ch : *list)
-                if (isChannel (ch) && ! hwChannels.contains ((int) ch))
-                    hwChannels.add ((int) ch);
-
-        if (hwChannels.isEmpty() || hwChannels.size() != requested.size())
+        const auto hwChannels = outputChannels (command["outputs"]);
+        if (hwChannels.isEmpty())
         {
             sendError ("Invalid output channels");
             return false;
@@ -396,6 +410,11 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
     {
         const auto blocks = chain["blocks"];
         const auto index = command["index"].isVoid() ? blocks.size() : (int) command["index"];
+        if (splitExit (chain).isObject() && index >= blocks.size())
+        {
+            sendError ("This chain ends in a split to separate outputs");
+            return false;
+        }
         if (store.splitAt (chain, index).isVoid())
         {
             sendError ("An ABY can't go inside another ABY's path");
@@ -427,28 +446,56 @@ bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command
 
     if (type == protocol::command::abySetMode)
     {
-        const auto mode = command["mode"].toString() == "Y" ? "Y" : "AB";
-        // The plan: each path starts at -3 dB the first time a block goes to Y, so the sum doesn't jump.
-        if (juce::String (mode) == "Y" && ! (bool) aby["usedY"])
-        {
-            for (const auto* key : { "pathA", "pathB" })
-                if (auto* path = aby[key].getDynamicObject(); path != nullptr && (float) aby[key]["level"] == 0.0f)
-                    path->setProperty ("level", -3.0);
-            obj->setProperty ("usedY", true);
-        }
-        obj->setProperty ("mode", mode);
+        obj->setProperty ("mode", command["mode"].toString() == "Y" ? "Y" : "AB");
     }
     else if (type == protocol::command::abySelect)
     {
         obj->setProperty ("active", command["path"].toString() == "B" ? "B" : "A");
     }
-    else if (type == protocol::command::abySetLevel)
-    {
-        aby[pathKey].getDynamicObject()->setProperty ("level", juce::jlimit (Engine::silenceDb, 10.0f, (float) command["levelDb"]));
-    }
     else if (type == protocol::command::abySetMute)
     {
         aby[pathKey].getDynamicObject()->setProperty ("mute", (bool) command["muted"]);
+    }
+    else if (type == protocol::command::abySetExit)
+    {
+        const auto split = command["exit"].toString() == "split";
+        if (split)
+        {
+            const auto chain = store.findChainOf (aby["id"].toString());
+            if (chain["blocks"].getArray() == nullptr || chain["blocks"].getArray()->getLast()["id"] != aby["id"])
+            {
+                sendError ("Only an ABY at the end of a chain can split to separate outputs");
+                return false;
+            }
+            // Both paths start on the chain's outputs; pick each one's from there.
+            if (! aby["splitOutputs"].isObject())
+            {
+                obj->setProperty ("splitOutputs", object ({ { "A", chain["outputs"].clone() }, { "B", chain["outputs"].clone() } }));
+            }
+        }
+        obj->setProperty ("exit", split ? "split" : "merge");
+        syncEngine();
+    }
+    else if (type == protocol::command::abySetOutputs)
+    {
+        const auto hwChannels = outputChannels (command["outputs"]);
+        const auto output = aby["splitOutputs"][command["path"].toString() == "B" ? "B" : "A"][0];
+        if (hwChannels.isEmpty() || output.getDynamicObject() == nullptr)
+        {
+            sendError ("Invalid output channels");
+            return false;
+        }
+        output.getDynamicObject()->setProperty ("hwChannels", hwChannels);
+        syncEngine();
+    }
+    else if (type == protocol::command::abyMoveBlock)
+    {
+        if (! store.moveBlockInAby (aby, command["moveId"].toString(), command["path"].toString(), (int) command["index"]))
+        {
+            sendError ("That block isn't in this ABY");
+            return false;
+        }
+        syncEngine();
     }
     else
     {
@@ -456,7 +503,7 @@ bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command
         return false;
     }
 
-    applyAbyParams (aby); // no rewiring: switching and faders only change the merge's gains
+    applyAbyParams (aby); // no rewiring: switching and muting only change the merge's gains
     store.markDirty();
     return true;
 }
@@ -515,6 +562,11 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
         }
         else
         {
+            if (splitExit (chain).isObject() && (index < 0 || index >= chain["blocks"].size()))
+            {
+                sendError ("This chain ends in a split to separate outputs: add blocks to path A or B");
+                return false;
+            }
             store.addBlock (chain, block, index);
         }
         syncEngine();
@@ -639,6 +691,15 @@ void WebUi::syncEngine()
                     {
                         step.id = b["id"].toString();
                         step.split = true;
+                        step.exitSplit = b["exit"].toString() == "split" && b["id"] == c["blocks"].getArray()->getLast()["id"];
+                        if (step.exitSplit)
+                        {
+                            spec.outputs.clear();
+                            for (const auto* path : { "A", "B" })
+                                if (auto* hwChannels = b["splitOutputs"][path][0]["hwChannels"].getArray())
+                                    for (const auto& ch : *hwChannels)
+                                        (juce::String (path) == "A" ? spec.outputs : spec.outputsB).push_back ((int) ch - 1);
+                        }
                         step.pathA = preparePath (b["pathA"]);
                         step.pathB = preparePath (b["pathB"]);
                         engine.addSplit (step.id);
@@ -737,9 +798,7 @@ void WebUi::applyAbyParams (const juce::var& aby)
     params.activeB = aby["active"].toString() == "B";
     for (int p = 0; p < 2; ++p)
     {
-        const auto path = aby[p == 0 ? "pathA" : "pathB"];
-        params.levelDb[p] = (float) path["level"];
-        params.muted[p] = (bool) path["mute"];
+        params.muted[p] = (bool) aby[p == 0 ? "pathA" : "pathB"]["mute"];
     }
     engine.setSplitParams (aby["id"].toString(), params);
 }

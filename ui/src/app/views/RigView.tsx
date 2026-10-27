@@ -1,4 +1,4 @@
-import { SILENCE_DB, type AbyBlock, type Block, type Chain, type GlitchState } from "@glitch/protocol";
+import { SILENCE_DB, type AbyBlock, type Block, type Chain, type GlitchState, type OutputRef } from "@glitch/protocol";
 import AbyFork from "@scamp/components/AbyFork/AbyFork";
 import AbyPedal from "@scamp/components/AbyPedal/AbyPedal";
 import BlockTile from "@scamp/components/BlockTile/BlockTile";
@@ -20,10 +20,31 @@ function outputChoices(n: number): number[][] {
   return [...pairs, ...singles];
 }
 
-/** Dropdown rows for a chain's input and output chips. Ids are the channel numbers ("2", "1-2"). */
+/** The chain's last block when it's an ABY: only that one can split to separate outputs. */
+const endAby = (chain: Chain) => {
+  const last = chain.blocks[chain.blocks.length - 1];
+  return last?.type === "aby" ? (last as AbyBlock) : undefined;
+};
+
+/**
+ * Dropdown rows for a chain's input and output chips. Ids are the channel numbers ("2", "1-2"). A chain
+ * ending in an ABY also gets a row to split or merge it, and a split lists each path's choices ("A:1-2").
+ */
 function ioOptions(chain: Chain, inputNames: string[], outputNames: string[]) {
-  const outputs = outputNames.length ? outputChoices(outputNames.length) : []; // none open: say so, don't invent a pair
-  const current = chain.outputs[0].hwChannels.join("-");
+  const choices = outputNames.length ? outputChoices(outputNames.length) : []; // none open: say so, don't invent a pair
+  const rows = (prefix: string, current: OutputRef[] | undefined) =>
+    choices.map((channels) => ({
+      id: prefix + channels.join("-"),
+      label: prefix.replace(":", " · ") + outputLabel(channels),
+      detail: channels.map((ch) => outputNames[ch - 1] ?? `Output ${ch}`).join(" / "),
+      current: channels.join("-") === current?.[0]?.hwChannels.join("-"),
+    }));
+  const aby = endAby(chain);
+  const split = aby?.exit === "split" ? aby.splitOutputs : undefined;
+  // Split: the A chip's menu has A's choices and the way back to a merge; the B chip's has B's.
+  const outputs = split
+    ? [...rows("A:", split.A), { id: "exit:merge", label: "Merge A and B", detail: "Both paths to one output", current: false }]
+    : [...rows("", chain.outputs), ...(aby ? [{ id: "exit:split", label: "Split A and B", detail: "Each path to its own outputs", current: false }] : [])];
   return {
     inputs: (inputNames.length ? inputNames : ["Input 1"]).map((name, i) => ({
       id: String(i + 1),
@@ -31,12 +52,8 @@ function ioOptions(chain: Chain, inputNames: string[], outputNames: string[]) {
       detail: name,
       current: chain.inputs[0].hwChannel === i + 1,
     })),
-    outputs: outputs.map((channels) => ({
-      id: channels.join("-"),
-      label: outputLabel(channels),
-      detail: channels.map((ch) => outputNames[ch - 1] ?? `Output ${ch}`).join(" / "),
-      current: channels.join("-") === current,
-    })),
+    outputs,
+    outputsB: split ? rows("B:", split.B) : [],
   };
 }
 
@@ -61,12 +78,12 @@ function BlockView({ block, snapshotBase, small = false }: { block: Block; snaps
       state={blockState(block)}
       size={small ? "small" : "regular"}
       name={block.name}
-      bypassed={String(!block.enabled)}
+      bypassLabel={block.enabled ? "Bypass" : "Turn on"}
       onOpen={() => send({ type: "block.openEditor", blockId: block.id })}
       onBypass={() => send({ type: "block.toggle", blockId: block.id })}
       onRemove={() => send({ type: "block.remove", blockId: block.id })}
     >
-      <img class="gl-block-art" src={art} alt="" />
+      <img class="gl-block-art" src={art} alt="" draggable={false} />
     </BlockTile>
   );
 }
@@ -91,6 +108,8 @@ function addFromMenu(chainId: string, rowId: string, into?: { abyId: string; pat
 const blockCount = (c: Chain) =>
   c.blocks.reduce((n, b) => n + (b.type === "aby" ? (b as AbyBlock).pathA.blocks.length + (b as AbyBlock).pathB.blocks.length : 1), 0);
 
+const DRAG_TYPE = "application/x-glitch-block"; // data: "<abyId> <blockId>"
+
 /**
  * An ABY block: the pedal switches A/B and Y, and each path is its own lane of blocks with a level,
  * a mute and a + menu. Removing it keeps path A in the chain.
@@ -98,27 +117,44 @@ const blockCount = (c: Chain) =>
 function AbyView({ chainId, aby, plugins, snapshotBase }: { chainId: string; aby: AbyBlock; plugins: MenuRow[]; snapshotBase: string }) {
   const mode = aby.mode === "Y" ? "y" : aby.active === "B" ? "b" : "a";
   const other = aby.active === "A" ? "B" : "A";
-  const setLevel = (path: "A" | "B") => (value: string) =>
-    send({ type: "aby.setLevel", blockId: aby.id, path, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) });
-  const lane = (blocks: Block[]) => blocks.map((b) => <BlockView key={b.id} block={b} snapshotBase={snapshotBase} small />);
+  const lane = (path: "A" | "B", blocks: Block[]) => (
+    <div
+      class="gl-lane"
+      onDragOver={(e) => {
+        if (!e.dataTransfer?.types.includes(DRAG_TYPE)) return;
+        e.preventDefault(); // allows the drop
+        e.currentTarget.dataset.over = "";
+      }}
+      onDragLeave={(e) => delete e.currentTarget.dataset.over}
+      onDrop={(e) => {
+        delete e.currentTarget.dataset.over;
+        const [fromAby, moveId] = (e.dataTransfer?.getData(DRAG_TYPE) ?? "").split(" ");
+        if (fromAby !== aby.id || !moveId) return; // only between this ABY's lanes
+        e.preventDefault();
+        // Dropped before the first tile whose middle is right of the pointer.
+        const tiles = [...e.currentTarget.children].map((el) => el.getBoundingClientRect());
+        const index = tiles.filter((r) => r.left + r.width / 2 < e.clientX).length;
+        send({ type: "aby.moveBlock", blockId: aby.id, moveId, path, index });
+      }}
+    >
+      {blocks.map((b) => (
+        <div key={b.id} class="gl-drag" draggable onDragStart={(e) => e.dataTransfer?.setData(DRAG_TYPE, `${aby.id} ${b.id}`)}>
+          <BlockView block={b} snapshotBase={snapshotBase} small />
+        </div>
+      ))}
+    </div>
+  );
   const goneB = aby.pathB.blocks.length;
 
   return (
     <AbyFork
       mode={mode}
+      exit={aby.exit}
       removeLabel={goneB ? `Keep A, remove B's ${goneB === 1 ? "block" : `${goneB} blocks`}` : "Remove split"}
-      levelB={String(Math.round(dbToPosition(aby.pathB.level) * 100))}
-      mutedB={aby.pathB.mute}
       pluginsB={plugins}
-      levelA={String(Math.round(dbToPosition(aby.pathA.level) * 100))}
-      mutedA={aby.pathA.mute}
       pluginsA={plugins}
       onRemove={() => send({ type: "block.remove", blockId: aby.id })}
-      onLevelBChange={setLevel("B")}
-      onMuteBToggle={() => send({ type: "aby.setMute", blockId: aby.id, path: "B", muted: !aby.pathB.mute })}
       onAddB={(id) => addFromMenu(chainId, id, { abyId: aby.id, path: "B" })}
-      onLevelAChange={setLevel("A")}
-      onMuteAToggle={() => send({ type: "aby.setMute", blockId: aby.id, path: "A", muted: !aby.pathA.mute })}
       onAddA={(id) => addFromMenu(chainId, id, { abyId: aby.id, path: "A" })}
       pedal={
         <AbyPedal
@@ -132,10 +168,20 @@ function AbyView({ chainId, aby, plugins, snapshotBase }: { chainId: string; aby
           onToggleY={() => send({ type: "aby.setMode", blockId: aby.id, mode: aby.mode === "Y" ? "AB" : "Y" })}
         />
       }
-      laneB={lane(aby.pathB.blocks)}
-      laneA={lane(aby.pathA.blocks)}
+      laneB={lane("B", aby.pathB.blocks)}
+      laneA={lane("A", aby.pathA.blocks)}
     />
   );
+}
+
+/** Acts on an output menu row from ioOptions. */
+function selectOutput(c: Chain, id: string) {
+  const [what, channels] = id.includes(":") ? id.split(":") : ["", id];
+  const blockId = endAby(c)?.id ?? "";
+  const outputs = [{ hwChannels: channels.split("-").map(Number) }];
+  if (what === "exit") send({ type: "aby.setExit", blockId, exit: channels as "merge" | "split" });
+  else if (what === "A" || what === "B") send({ type: "aby.setOutputs", blockId, path: what, outputs });
+  else send({ type: "chain.setOutputs", chainId: c.id, outputs });
 }
 
 /** A chain ending in a split ABY sends each path to its own outputs; otherwise there's one output. */
@@ -216,7 +262,8 @@ export function RigView({ state }: { state: GlitchState }) {
             menuNote={pluginNote}
             scanning={state.plugins.scanning}
             onSelectInput={(id) => send({ type: "chain.setInputs", chainId: c.id, inputs: [{ hwChannel: Number(id) }] })}
-            onSelectOutput={(id) => send({ type: "chain.setOutputs", chainId: c.id, outputs: [{ hwChannels: id.split("-").map(Number) }] })}
+            onSelectOutput={(id) => selectOutput(c, id)}
+            onSelectOutputB={(id) => selectOutput(c, id)}
             onLevelChange={(value) =>
               send({ type: "chain.setLevel", chainId: c.id, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) })
             }

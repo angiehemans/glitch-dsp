@@ -173,80 +173,6 @@
   text-align: center;
 }
 
-.controls_b_1a2f {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.level_b_18c7 {
-  width: 72px;
-  height: 6px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--color-line-strong);
-  border-radius: 3px;
-  cursor: grab;
-}
-
-.level_b_18c7::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 10px;
-  height: 16px;
-  border: 1px solid var(--divider-dark);
-  border-radius: 3px;
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
-}
-
-.level_b_18c7::-moz-range-thumb {
-  width: 10px;
-  height: 16px;
-  border: 1px solid var(--divider-dark);
-  border-radius: 3px;
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
-}
-
-.level_b_18c7::-moz-range-progress {
-  height: 6px;
-  background: var(--color-accent);
-  border-radius: 3px;
-}
-
-.mute_b_29d8 {
-  display: flex;
-  cursor: pointer;
-}
-
-.mute_b_input_3ae9 {
-  display: none;
-}
-
-.mute_b_text_4bfa {
-  width: 24px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-text-dim);
-}
-
-.mute_b_input_3ae9:checked + .mute_b_text_4bfa {
-  color: var(--fader-mute-on-text);
-  background: var(--fader-mute-on-bg);
-  box-shadow: var(--fader-mute-on-shadow);
-}
-
 .slot_b_5c0b {
   display: flex;
   gap: var(--space-6);
@@ -411,80 +337,6 @@
   text-align: center;
 }
 
-.controls_a_3b40 {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.level_a_5f61 {
-  width: 72px;
-  height: 6px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--color-line-strong);
-  border-radius: 3px;
-  cursor: grab;
-}
-
-.level_a_5f61::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 10px;
-  height: 16px;
-  border: 1px solid var(--divider-dark);
-  border-radius: 3px;
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
-}
-
-.level_a_5f61::-moz-range-thumb {
-  width: 10px;
-  height: 16px;
-  border: 1px solid var(--divider-dark);
-  border-radius: 3px;
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
-}
-
-.level_a_5f61::-moz-range-progress {
-  height: 6px;
-  background: var(--color-accent);
-  border-radius: 3px;
-}
-
-.mute_a_6072 {
-  display: flex;
-  cursor: pointer;
-}
-
-.mute_a_input_7183 {
-  display: none;
-}
-
-.mute_a_text_8294 {
-  width: 24px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-text-dim);
-}
-
-.mute_a_input_7183:checked + .mute_a_text_8294 {
-  color: var(--fader-mute-on-text);
-  background: var(--fader-mute-on-bg);
-  box-shadow: var(--fader-mute-on-shadow);
-}
-
 .slot_a_93a5 {
   display: flex;
   gap: var(--space-6);
@@ -616,6 +468,43 @@
   font-size: 16px;
   color: var(--color-lcd-text);
   box-shadow: var(--bevel-inset);
+}
+
+/* split exit: one line out of each lane to the end of the chain, over the chain's centre line */
+.exit_lines_c4d5 {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-6);
+  align-self: stretch;
+  flex-grow: 1;
+  margin-left: calc(-1 * var(--space-6));
+  background: var(--color-bg-1);
+}
+
+.exit_b_d5e6 {
+  flex-grow: 1;
+  background: linear-gradient(var(--color-line-strong), var(--color-line-strong)) center / 100% 2px no-repeat;
+}
+
+.exit_a_e6f7 {
+  flex-grow: 1;
+  background: linear-gradient(var(--color-line-strong), var(--color-line-strong)) center / 100% 2px no-repeat;
+}
+
+.root[data-exit="split"] {
+  flex-grow: 1;
+}
+
+.root[data-exit="split"] .exit_lines_c4d5 {
+  display: flex;
+}
+
+.root[data-exit="split"] .merge_9a8b {
+  display: none;
+}
+
+.root[data-exit="split"] .lanes_e5b4::after {
+  display: none;
 }
 
 .root[data-mode="b"] .lane_b_f6a5 {
