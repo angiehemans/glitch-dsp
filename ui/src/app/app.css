@@ -262,9 +262,12 @@ body {
 }
 
 /* A plugin-window snapshot as a block tile's artwork, at the size RigView gives it */
+/* A block's picture fills its tile's fixed height; the tile's width follows the picture. */
 .gl-block-art {
   display: block;
   flex-shrink: 0;
+  height: 100%;
+  width: auto;
 }
 
 /* A project or chain name being renamed in place (app/rename.ts) */

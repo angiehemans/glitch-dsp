@@ -1,4 +1,4 @@
-import { SILENCE_DB, type Chain, type Command, type EngineEvent, type GlitchState, type Project } from "@glitch/protocol";
+import { SILENCE_DB, type AbyBlock, type Block, type Chain, type Command, type EngineEvent, type GlitchState, type Project } from "@glitch/protocol";
 import type { EngineBridge } from "./engine";
 
 export function emptyState(): GlitchState {
@@ -75,13 +75,24 @@ export function createMockEngine(): EngineBridge {
     return p;
   };
   const chain = (id: string) => state.chains.find((c) => c.id === id);
+  // Every block list of a chain: its own, then each ABY's paths (as ProjectStore::getBlockLists).
+  const blockLists = (c: Chain) => [
+    c.blocks,
+    ...c.blocks.filter((b): b is AbyBlock => b.type === "aby").flatMap((a) => [a.pathA.blocks, a.pathB.blocks]),
+  ];
   const findBlock = (id: string) => {
-    for (const c of state.chains) {
-      const i = c.blocks.findIndex((b) => b.id === id);
-      if (i >= 0) return { chain: c, index: i, block: c.blocks[i] };
-    }
+    for (const c of state.chains)
+      for (const list of blockLists(c)) {
+        const i = list.findIndex((b) => b.id === id);
+        if (i >= 0) return { chain: c, list, index: i, block: list[i] };
+      }
     return null;
   };
+  const findAby = (id: string) => {
+    const found = findBlock(id);
+    return found?.block.type === "aby" ? (found.block as AbyBlock) : null;
+  };
+  const newPath = () => ({ blocks: [] as Block[], level: 0, pan: 0, mute: false });
 
   let t = 0;
   setInterval(() => {
@@ -226,16 +237,50 @@ export function createMockEngine(): EngineBridge {
         case "block.add": {
           const c = chain(cmd.chainId);
           if (!c) return error(`Unknown chain: ${cmd.chainId}`);
+          const aby = cmd.abyId ? findAby(cmd.abyId) : null;
+          if (cmd.abyId && !aby) return error(`Unknown ABY block: ${cmd.abyId}`);
+          const list = aby ? (cmd.path === "B" ? aby.pathB : aby.pathA).blocks : c.blocks;
           const spec = cmd.block;
           if (spec.type === "plugin") {
             const plugin = state.plugins.list.find((p) => p.id === spec.pluginId);
             if (!plugin) return error("Unknown plugin");
-            c.blocks.splice(cmd.index ?? c.blocks.length, 0, { id: newId(), type: "plugin", name: plugin.name, enabled: true, plugin });
+            list.splice(cmd.index ?? list.length, 0, { id: newId(), type: "plugin", name: plugin.name, enabled: true, plugin });
           } else {
             const file = state.library[spec.type].find((f) => f.id === spec.file);
             if (!file) return error("That file isn't in the library");
-            c.blocks.splice(cmd.index ?? c.blocks.length, 0, { id: newId(), type: spec.type, name: file.name, enabled: true, file: file.id });
+            list.splice(cmd.index ?? list.length, 0, { id: newId(), type: spec.type, name: file.name, enabled: true, file: file.id });
           }
+          break;
+        }
+        case "chain.splitAt": {
+          const c = chain(cmd.chainId);
+          if (!c) return error(`Unknown chain: ${cmd.chainId}`);
+          const index = Math.max(0, Math.min(cmd.index ?? c.blocks.length, c.blocks.length));
+          if (c.blocks.slice(index).some((b) => b.type === "aby")) return error("An ABY can't go inside another ABY's path");
+          const aby: AbyBlock = {
+            id: newId(), type: "aby", name: "ABY", enabled: true, mode: "AB", active: "A",
+            pathA: { ...newPath(), blocks: c.blocks.splice(index) }, pathB: newPath(),
+            exit: "merge", crossfadeMs: 10, alignLatency: true,
+          };
+          c.blocks.push(aby);
+          break;
+        }
+        case "aby.setMode":
+        case "aby.select":
+        case "aby.setLevel":
+        case "aby.setMute": {
+          const aby = findAby(cmd.blockId);
+          if (!aby) return error(`Unknown ABY block: ${cmd.blockId}`);
+          if (cmd.type === "aby.setMode") {
+            if (cmd.mode === "Y" && !aby.usedY) {
+              for (const path of [aby.pathA, aby.pathB]) if (path.level === 0) path.level = -3;
+              aby.usedY = true;
+            }
+            aby.mode = cmd.mode;
+          }
+          if (cmd.type === "aby.select") aby.active = cmd.path;
+          if (cmd.type === "aby.setLevel") (cmd.path === "B" ? aby.pathB : aby.pathA).level = Math.max(SILENCE_DB, Math.min(10, cmd.levelDb));
+          if (cmd.type === "aby.setMute") (cmd.path === "B" ? aby.pathB : aby.pathA).mute = cmd.muted;
           break;
         }
         case "block.remove":
@@ -243,7 +288,10 @@ export function createMockEngine(): EngineBridge {
         case "block.openEditor": {
           const found = findBlock(cmd.blockId);
           if (!found) return error(`Unknown block: ${cmd.blockId}`);
-          if (cmd.type === "block.remove") found.chain.blocks.splice(found.index, 1);
+          if (found.block.type === "aby" && cmd.type !== "block.remove") return error("An ABY block has no window or bypass of its own");
+          // Removing an ABY keeps path A in the chain, in its place.
+          if (cmd.type === "block.remove")
+            found.list.splice(found.index, 1, ...(found.block.type === "aby" ? (found.block as AbyBlock).pathA.blocks : []));
           if (cmd.type === "block.toggle") found.block.enabled = !found.block.enabled;
           if (cmd.type === "block.openEditor") return error("Plugin windows need the app (not available in the browser)");
           break;

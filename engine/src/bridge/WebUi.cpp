@@ -258,6 +258,11 @@ void WebUi::handleCommand (const juce::var& command)
         if (! handleBlockCommand (type, command))
             return;
     }
+    else if (type.startsWith ("aby."))
+    {
+        if (! handleAbyCommand (type, command))
+            return;
+    }
     else if (type == protocol::command::deviceScan)
     {
         engine.rescanDevices();
@@ -387,12 +392,71 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
         obj->setProperty ("muted", (bool) command["muted"]);
         applyChainParams (chain);
     }
+    else if (type == protocol::command::chainSplitAt)
+    {
+        const auto blocks = chain["blocks"];
+        const auto index = command["index"].isVoid() ? blocks.size() : (int) command["index"];
+        if (store.splitAt (chain, index).isVoid())
+        {
+            sendError ("An ABY can't go inside another ABY's path");
+            return false;
+        }
+        syncEngine();
+    }
     else
     {
         sendError ("Unknown command: " + type);
         return false;
     }
 
+    store.markDirty();
+    return true;
+}
+
+bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command)
+{
+    const auto aby = store.findBlock (command["blockId"].toString());
+    auto* obj = aby.getDynamicObject();
+    if (obj == nullptr || aby["type"].toString() != "aby")
+    {
+        sendError ("Unknown ABY block: " + command["blockId"].toString());
+        return false;
+    }
+
+    const auto pathKey = command["path"].toString() == "B" ? "pathB" : "pathA";
+
+    if (type == protocol::command::abySetMode)
+    {
+        const auto mode = command["mode"].toString() == "Y" ? "Y" : "AB";
+        // The plan: each path starts at -3 dB the first time a block goes to Y, so the sum doesn't jump.
+        if (juce::String (mode) == "Y" && ! (bool) aby["usedY"])
+        {
+            for (const auto* key : { "pathA", "pathB" })
+                if (auto* path = aby[key].getDynamicObject(); path != nullptr && (float) aby[key]["level"] == 0.0f)
+                    path->setProperty ("level", -3.0);
+            obj->setProperty ("usedY", true);
+        }
+        obj->setProperty ("mode", mode);
+    }
+    else if (type == protocol::command::abySelect)
+    {
+        obj->setProperty ("active", command["path"].toString() == "B" ? "B" : "A");
+    }
+    else if (type == protocol::command::abySetLevel)
+    {
+        aby[pathKey].getDynamicObject()->setProperty ("level", juce::jlimit (Engine::silenceDb, 10.0f, (float) command["levelDb"]));
+    }
+    else if (type == protocol::command::abySetMute)
+    {
+        aby[pathKey].getDynamicObject()->setProperty ("mute", (bool) command["muted"]);
+    }
+    else
+    {
+        sendError ("Unknown command: " + type);
+        return false;
+    }
+
+    applyAbyParams (aby); // no rewiring: switching and faders only change the merge's gains
     store.markDirty();
     return true;
 }
@@ -440,7 +504,19 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
             return false;
         }
 
-        store.addBlock (chain, block, command["index"].isVoid() ? -1 : (int) command["index"]);
+        const auto index = command["index"].isVoid() ? -1 : (int) command["index"];
+        if (const auto abyId = command["abyId"].toString(); abyId.isNotEmpty())
+        {
+            if (! store.addBlockToPath (store.findBlock (abyId), command["path"].toString(), block, index))
+            {
+                sendError ("Unknown ABY block: " + abyId);
+                return false;
+            }
+        }
+        else
+        {
+            store.addBlock (chain, block, index);
+        }
         syncEngine();
         return true;
     }
@@ -450,6 +526,12 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
     if (! block.isObject())
     {
         sendError ("Unknown block: " + blockId);
+        return false;
+    }
+
+    if (block["type"].toString() == "aby" && type != protocol::command::blockRemove)
+    {
+        sendError ("An ABY block has no window or bypass of its own");
         return false;
     }
 
@@ -473,24 +555,69 @@ void WebUi::syncEngine()
 {
     const auto* chains = store.getCurrentChains();
 
-    juce::StringArray wanted;
+    juce::StringArray wantedBlocks, wantedSplits;
     if (chains != nullptr)
         for (const auto& c : *chains)
-            if (auto* blocks = c["blocks"].getArray())
-                for (const auto& b : *blocks)
-                    wanted.add (b["id"].toString());
+            for (auto* list : ProjectStore::getBlockLists (c))
+                for (const auto& b : *list)
+                    (b["type"].toString() == "aby" ? wantedSplits : wantedBlocks).add (b["id"].toString());
 
     for (const auto& id : engine.getBlockIds())
     {
-        if (! wanted.contains (id))
+        if (! wantedBlocks.contains (id))
         {
             closeEditor (id);
             engine.removeBlock (id);
         }
     }
+    for (const auto& id : engine.getSplitIds())
+        if (! wantedSplits.contains (id))
+            engine.removeSplit (id);
 
     std::vector<Engine::ChainSpec> specs;
     chainIds.clear();
+
+    // Loads a block if it isn't yet, and returns its id for the chain's wiring.
+    const auto prepare = [this] (const juce::var& b)
+    {
+        const auto id = b["id"].toString();
+        juce::String note;
+
+        if (! engine.hasBlock (id))
+        {
+            auto processor = createBlock (b, note);
+
+            if (processor != nullptr)
+            {
+                juce::MemoryBlock state;
+                if (state.fromBase64Encoding (store.getPluginState (id)) && state.getSize() > 0)
+                    processor->setStateInformation (state.getData(), (int) state.getSize());
+                engine.addBlock (id, std::move (processor));
+            }
+        }
+
+        // NAM models run at any rate but sound slightly different away from their training rate.
+        if (auto* nam = dynamic_cast<NamBlock*> (engine.getBlockProcessor (id)))
+        {
+            const auto trained = nam->getExpectedSampleRate(), running = engine.getSampleRate();
+            if (trained > 0 && std::abs (trained - running) > 1.0)
+                note = "Trained at " + juce::String (trained / 1000.0, 1) + " kHz, running at " + juce::String (running / 1000.0, 1) + " kHz";
+        }
+
+        b.getDynamicObject()->setProperty ("missing", ! engine.hasBlock (id));
+        b.getDynamicObject()->setProperty ("note", note);
+        engine.setBlockEnabled (id, (bool) b["enabled"]);
+        return id;
+    };
+
+    const auto preparePath = [&prepare] (const juce::var& path)
+    {
+        std::vector<juce::String> ids;
+        if (auto* blocks = path["blocks"].getArray())
+            for (const auto& b : *blocks)
+                ids.push_back (prepare (b));
+        return ids;
+    };
 
     if (chains != nullptr)
     {
@@ -507,35 +634,21 @@ void WebUi::syncEngine()
             {
                 for (const auto& b : *blocks)
                 {
-                    const auto id = b["id"].toString();
-
-                    juce::String note;
-
-                    if (! engine.hasBlock (id))
+                    Engine::ChainSpec::Step step;
+                    if (b["type"].toString() == "aby")
                     {
-                        auto processor = createBlock (b, note);
-
-                        if (processor != nullptr)
-                        {
-                            juce::MemoryBlock state;
-                            if (state.fromBase64Encoding (store.getPluginState (id)) && state.getSize() > 0)
-                                processor->setStateInformation (state.getData(), (int) state.getSize());
-                            engine.addBlock (id, std::move (processor));
-                        }
+                        step.id = b["id"].toString();
+                        step.split = true;
+                        step.pathA = preparePath (b["pathA"]);
+                        step.pathB = preparePath (b["pathB"]);
+                        engine.addSplit (step.id);
+                        applyAbyParams (b);
                     }
-
-                    // NAM models run at any rate but sound slightly different away from their training rate.
-                    if (auto* nam = dynamic_cast<NamBlock*> (engine.getBlockProcessor (id)))
+                    else
                     {
-                        const auto trained = nam->getExpectedSampleRate(), running = engine.getSampleRate();
-                        if (trained > 0 && std::abs (trained - running) > 1.0)
-                            note = "Trained at " + juce::String (trained / 1000.0, 1) + " kHz, running at " + juce::String (running / 1000.0, 1) + " kHz";
+                        step.id = prepare (b);
                     }
-
-                    b.getDynamicObject()->setProperty ("missing", ! engine.hasBlock (id));
-                    b.getDynamicObject()->setProperty ("note", note);
-                    engine.setBlockEnabled (id, (bool) b["enabled"]);
-                    spec.blockIds.push_back (id);
+                    spec.steps.push_back (step);
                 }
             }
 
@@ -615,6 +728,20 @@ void WebUi::importToLibrary()
 void WebUi::applyChainParams (const juce::var& chain)
 {
     engine.setChainParams (chain["id"].toString(), (float) chain["outputs"][0]["level"], (bool) chain["muted"]);
+}
+
+void WebUi::applyAbyParams (const juce::var& aby)
+{
+    Engine::SplitParams params;
+    params.both = aby["mode"].toString() == "Y";
+    params.activeB = aby["active"].toString() == "B";
+    for (int p = 0; p < 2; ++p)
+    {
+        const auto path = aby[p == 0 ? "pathA" : "pathB"];
+        params.levelDb[p] = (float) path["level"];
+        params.muted[p] = (bool) path["mute"];
+    }
+    engine.setSplitParams (aby["id"].toString(), params);
 }
 
 void WebUi::captureStates()

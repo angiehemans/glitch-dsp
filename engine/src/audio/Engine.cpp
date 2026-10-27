@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "AbyMerge.h"
 #include "BlockMix.h"
 #include "ChainStage.h"
 
@@ -41,10 +42,23 @@ Engine::~Engine()
 //==============================================================================
 void Engine::setChains (const std::vector<ChainSpec>& requested)
 {
+    const auto dropMissing = [this] (std::vector<juce::String>& ids)
+    {
+        ids.erase (std::remove_if (ids.begin(), ids.end(), [this] (const auto& id) { return ! hasBlock (id); }), ids.end());
+    };
+
     auto chains = requested;
     for (auto& c : chains)
-        c.blockIds.erase (std::remove_if (c.blockIds.begin(), c.blockIds.end(), [this] (const auto& id) { return ! hasBlock (id); }),
-                          c.blockIds.end());
+    {
+        c.steps.erase (std::remove_if (c.steps.begin(), c.steps.end(),
+                                       [this] (const auto& s) { return s.split ? ! hasSplit (s.id) : ! hasBlock (s.id); }),
+                       c.steps.end());
+        for (auto& s : c.steps)
+        {
+            dropMissing (s.pathA);
+            dropMissing (s.pathB);
+        }
+    }
 
     // New chains get their stages now, so their parameters can be set; they fade in on their own.
     for (const auto& c : chains)
@@ -124,16 +138,19 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
             graph.addConnection ({ { inputNode, c.input }, { in, ch } }, Update::none);
 
         auto previous = in;
-        for (const auto& blockId : c.blockIds)
+        for (const auto& step : c.steps)
         {
-            if (const auto it = blocks.find (blockId); it != blocks.end())
+            if (! step.split)
             {
-                const auto mix = mixes[blockId];
-                connect (previous, it->second);
-                connect (it->second, mix, 0, 2);
-                connect (previous, mix, 2, 2);
-                previous = mix;
+                previous = connectBlocks (previous, { step.id });
+                continue;
             }
+
+            // Both paths start from the same point; an empty path is the dry signal.
+            const auto merge = splits[step.id];
+            connect (connectBlocks (previous, step.pathA), merge, 0, 2);
+            connect (connectBlocks (previous, step.pathB), merge, 2, 2);
+            previous = merge;
         }
         connect (previous, out);
 
@@ -164,6 +181,23 @@ void Engine::connect (NodeID from, NodeID to, int firstInput, int numInputs)
     // Stereo into mono takes the left channel; mono into stereo feeds both.
     for (int ch = 0; ch < ins && outs > 0; ++ch)
         graph.addConnection ({ { from, std::min (ch, outs - 1) }, { to, firstInput + ch } }, Update::none);
+}
+
+Engine::NodeID Engine::connectBlocks (NodeID from, const std::vector<juce::String>& blockIds)
+{
+    auto previous = from;
+    for (const auto& blockId : blockIds)
+    {
+        if (const auto it = blocks.find (blockId); it != blocks.end())
+        {
+            const auto mix = mixes[blockId];
+            connect (previous, it->second);
+            connect (it->second, mix, 0, 2);
+            connect (previous, mix, 2, 2);
+            previous = mix;
+        }
+    }
+    return previous;
 }
 
 ChainStage* Engine::getStage (const std::map<juce::String, NodeID>& stages, const juce::String& chainId) const
@@ -279,6 +313,45 @@ void Engine::timerCallback()
 
     if (bypassEnd <= 0 && phase == Phase::idle)
         stopTimer();
+}
+
+void Engine::addSplit (const juce::String& abyId)
+{
+    if (! hasSplit (abyId))
+        splits[abyId] = graph.addNode (std::make_unique<AbyMerge>(), {}, Update::none)->nodeID;
+}
+
+void Engine::removeSplit (const juce::String& abyId)
+{
+    if (const auto it = splits.find (abyId); it != splits.end())
+    {
+        nodesToRemove.push_back (it->second); // removed once its chain has faded, like a block
+        splits.erase (it);
+    }
+}
+
+juce::StringArray Engine::getSplitIds() const
+{
+    juce::StringArray ids;
+    for (const auto& [id, node] : splits)
+        ids.add (id);
+    return ids;
+}
+
+void Engine::setSplitParams (const juce::String& abyId, const SplitParams& params)
+{
+    const auto it = splits.find (abyId);
+    auto* node = it != splits.end() ? graph.getNodeForId (it->second) : nullptr;
+    if (auto* merge = node != nullptr ? dynamic_cast<AbyMerge*> (node->getProcessor()) : nullptr)
+    {
+        merge->both.store (params.both);
+        merge->activeB.store (params.activeB);
+        for (int p = 0; p < 2; ++p)
+        {
+            merge->levelDb[p].store (params.levelDb[p]);
+            merge->muted[p].store (params.muted[p]);
+        }
+    }
 }
 
 juce::AudioProcessor* Engine::getBlockProcessor (const juce::String& blockId) const

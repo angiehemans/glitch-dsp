@@ -96,6 +96,8 @@ export interface AbyBlock extends Block {
   splitOutputs?: { A: OutputRef[]; B: OutputRef[] };
   crossfadeMs: number;
   alignLatency: boolean;
+  /** Set once the block has been in Y mode; the first switch to Y drops both paths to -3 dB. */
+  usedY?: boolean;
 }
 
 export interface Chain {

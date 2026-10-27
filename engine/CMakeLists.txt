@@ -122,13 +122,13 @@ target_link_libraries(GlitchBench
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
 
-# BlockMixTest: checks click-free bypass fades. Not built by default:
-# cmake --build --preset dev --target BlockMixTest
-juce_add_console_app(BlockMixTest)
-set_target_properties(BlockMixTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
-target_sources(BlockMixTest PRIVATE tools/BlockMixTest.cpp)
-target_compile_definitions(BlockMixTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
-target_link_libraries(BlockMixTest
+# FadeTest: checks click-free bypass and ABY switching fades. Not built by default:
+# cmake --build --preset dev --target FadeTest
+juce_add_console_app(FadeTest)
+set_target_properties(FadeTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(FadeTest PRIVATE tools/FadeTest.cpp)
+target_compile_definitions(FadeTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(FadeTest
     PRIVATE
         juce::juce_audio_processors
     PUBLIC

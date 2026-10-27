@@ -1,4 +1,6 @@
-import { SILENCE_DB, type Block, type Chain, type GlitchState } from "@glitch/protocol";
+import { SILENCE_DB, type AbyBlock, type Block, type Chain, type GlitchState } from "@glitch/protocol";
+import AbyFork from "@scamp/components/AbyFork/AbyFork";
+import AbyPedal from "@scamp/components/AbyPedal/AbyPedal";
 import BlockTile from "@scamp/components/BlockTile/BlockTile";
 import ChainStrip from "@scamp/components/ChainStrip/ChainStrip";
 import Rig from "@scamp/views/Rig/Rig";
@@ -39,15 +41,6 @@ function ioOptions(chain: Chain, inputNames: string[], outputNames: string[]) {
 }
 
 const PLUGIN_IMAGE = "/assets/plugin.svg";
-const MAX_ART_HEIGHT = 400; // a very tall plugin window is scaled down so it can't blow up the chain strip
-
-function blockDetail(b: Block) {
-  if (b.missing) return b.type === "plugin" ? "Not installed" : "File missing";
-  if (b.note) return b.note;
-  if (b.type === "nam") return "NAM model";
-  if (b.type === "ir") return "Cab IR";
-  return b.plugin?.manufacturer || b.plugin?.category || "";
-}
 
 function blockState(b: Block) {
   if (b.missing) return "error";
@@ -55,29 +48,107 @@ function blockState(b: Block) {
 }
 
 /**
- * A block in a chain. Clicking it opens the plugin's own window (native: it can't render in the
- * WebView), whose header has Bypass and Remove from chain.
+ * A block in a chain, at a fixed height (half height inside an ABY path); its picture keeps its
+ * aspect ratio. Its header bypasses or removes it; clicking it opens the plugin's own window
+ * (native: it can't render in the WebView) for everything else.
  */
-function BlockView({ block, snapshotBase }: { block: Block; snapshotBase: string }) {
+function BlockView({ block, snapshotBase, small = false }: { block: Block; snapshotBase: string; small?: boolean }) {
   // Engine-captured picture of the plugin's window; the version busts the image cache after each capture.
-  const art = block.snapshotAt && snapshotBase ? `${snapshotBase}${block.id}.png?v=${block.snapshotAt}` : null;
-  // The tile hugs the snapshot at the plugin window's size (older snapshots without a size: the image's own).
-  const w = block.snapshotWidth ?? 0, h = block.snapshotHeight ?? 0;
-  const scale = h > MAX_ART_HEIGHT ? MAX_ART_HEIGHT / h : 1;
-  const size = w && h ? { width: `${Math.round(w * scale)}px`, height: `${Math.round(h * scale)}px` } : { maxHeight: `${MAX_ART_HEIGHT}px` };
+  const art = block.snapshotAt && snapshotBase ? `${snapshotBase}${block.id}.png?v=${block.snapshotAt}` : PLUGIN_IMAGE;
 
   return (
     <BlockTile
       state={blockState(block)}
-      art={art ? "hug" : "fixed"}
-      typeLabel={block.plugin?.format ?? block.type.toUpperCase()}
+      size={small ? "small" : "regular"}
       name={block.name}
-      detail={blockDetail(block)}
+      bypassed={String(!block.enabled)}
       onOpen={() => send({ type: "block.openEditor", blockId: block.id })}
+      onBypass={() => send({ type: "block.toggle", blockId: block.id })}
+      onRemove={() => send({ type: "block.remove", blockId: block.id })}
     >
-      {art ? <img class="gl-block-art" src={art} style={size} alt="" /> : <img src={PLUGIN_IMAGE} alt="" />}
+      <img class="gl-block-art" src={art} alt="" />
     </BlockTile>
   );
+}
+
+type MenuRow = { id: string; name: string; kind: string; image: string };
+const ABY_ROW: MenuRow = { id: "aby", name: "ABY splitter", kind: "Built-in · split into paths A and B", image: PLUGIN_IMAGE };
+
+/** Adds the block a + menu row stands for ("nam:<file>", "ir:<file>", "plugin:<id>"), to the chain or into an ABY path. */
+function addFromMenu(chainId: string, rowId: string, into?: { abyId: string; path: "A" | "B" }) {
+  if (rowId === ABY_ROW.id) return send({ type: "chain.splitAt", chainId });
+  const [kind, ...rest] = rowId.split(":");
+  const ref = rest.join(":"); // plugin ids and file names can contain ":"
+  send({
+    type: "block.add",
+    chainId,
+    block: kind === "plugin" ? { type: "plugin", pluginId: ref } : { type: kind as "nam" | "ir", file: ref },
+    ...into,
+  });
+}
+
+/** Blocks in a chain, counting those inside ABY paths but not the ABY itself. */
+const blockCount = (c: Chain) =>
+  c.blocks.reduce((n, b) => n + (b.type === "aby" ? (b as AbyBlock).pathA.blocks.length + (b as AbyBlock).pathB.blocks.length : 1), 0);
+
+/**
+ * An ABY block: the pedal switches A/B and Y, and each path is its own lane of blocks with a level,
+ * a mute and a + menu. Removing it keeps path A in the chain.
+ */
+function AbyView({ chainId, aby, plugins, snapshotBase }: { chainId: string; aby: AbyBlock; plugins: MenuRow[]; snapshotBase: string }) {
+  const mode = aby.mode === "Y" ? "y" : aby.active === "B" ? "b" : "a";
+  const other = aby.active === "A" ? "B" : "A";
+  const setLevel = (path: "A" | "B") => (value: string) =>
+    send({ type: "aby.setLevel", blockId: aby.id, path, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) });
+  const lane = (blocks: Block[]) => blocks.map((b) => <BlockView key={b.id} block={b} snapshotBase={snapshotBase} small />);
+  const goneB = aby.pathB.blocks.length;
+
+  return (
+    <AbyFork
+      mode={mode}
+      removeLabel={goneB ? `Keep A, remove B's ${goneB === 1 ? "block" : `${goneB} blocks`}` : "Remove split"}
+      levelB={String(Math.round(dbToPosition(aby.pathB.level) * 100))}
+      mutedB={aby.pathB.mute}
+      pluginsB={plugins}
+      levelA={String(Math.round(dbToPosition(aby.pathA.level) * 100))}
+      mutedA={aby.pathA.mute}
+      pluginsA={plugins}
+      onRemove={() => send({ type: "block.remove", blockId: aby.id })}
+      onLevelBChange={setLevel("B")}
+      onMuteBToggle={() => send({ type: "aby.setMute", blockId: aby.id, path: "B", muted: !aby.pathB.mute })}
+      onAddB={(id) => addFromMenu(chainId, id, { abyId: aby.id, path: "B" })}
+      onLevelAChange={setLevel("A")}
+      onMuteAToggle={() => send({ type: "aby.setMute", blockId: aby.id, path: "A", muted: !aby.pathA.mute })}
+      onAddA={(id) => addFromMenu(chainId, id, { abyId: aby.id, path: "A" })}
+      pedal={
+        <AbyPedal
+          mode={mode}
+          // A/B picks the other path; from Y it drops back to the path that was active.
+          onToggleAb={() =>
+            aby.mode === "Y"
+              ? send({ type: "aby.setMode", blockId: aby.id, mode: "AB" })
+              : send({ type: "aby.select", blockId: aby.id, path: other })
+          }
+          onToggleY={() => send({ type: "aby.setMode", blockId: aby.id, mode: aby.mode === "Y" ? "AB" : "Y" })}
+        />
+      }
+      laneB={lane(aby.pathB.blocks)}
+      laneA={lane(aby.pathA.blocks)}
+    />
+  );
+}
+
+/** A chain ending in a split ABY sends each path to its own outputs; otherwise there's one output. */
+function exitOutputs(c: Chain) {
+  const last = c.blocks[c.blocks.length - 1];
+  const split = last?.type === "aby" && (last as AbyBlock).exit === "split" ? (last as AbyBlock).splitOutputs : undefined;
+  return split
+    ? {
+        exit: "split" as const,
+        outputA: split.A.length ? outputLabel(split.A[0].hwChannels) : "No output",
+        outputB: split.B.length ? outputLabel(split.B[0].hwChannels) : "No output",
+      }
+    : { exit: "single" as const };
 }
 
 /** The rig of the open project, with the monitor strip under it. */
@@ -93,7 +164,7 @@ export function RigView({ state }: { state: GlitchState }) {
   const inputNames = state.device?.inputs ?? [];
   const outputNames = state.device?.outputs ?? [];
   // The + menu: NAM models, then cab IRs, then plugins. Ids carry the kind: "nam:<file>", "ir:<file>", "plugin:<id>".
-  const plugins = [
+  const plugins: MenuRow[] = [
     ...state.library.nam.map((f) => ({ id: `nam:${f.id}`, name: f.name, kind: "NAM model", image: PLUGIN_IMAGE })),
     ...state.library.ir.map((f) => ({ id: `ir:${f.id}`, name: f.name, kind: "Cab IR", image: PLUGIN_IMAGE })),
     ...state.plugins.list.map((p) => ({
@@ -130,7 +201,7 @@ export function RigView({ state }: { state: GlitchState }) {
             color={c.color as ChainColor}
             name={c.name}
             renameKey={`chain:${c.id}`}
-            removeLabel={c.blocks.length ? `Remove “${c.name}” and its ${c.blocks.length === 1 ? "plugin" : `${c.blocks.length} plugins`}` : `Remove “${c.name}”`}
+            removeLabel={blockCount(c) ? `Remove “${c.name}” and its ${blockCount(c) === 1 ? "plugin" : `${blockCount(c)} plugins`}` : `Remove “${c.name}”`}
             onRename={() => renameByKey(`chain:${c.id}`)}
             onRemove={() => send({ type: "chain.remove", chainId: c.id })}
             input={`In ${c.inputs[0].hwChannel}`}
@@ -139,8 +210,9 @@ export function RigView({ state }: { state: GlitchState }) {
             muted={c.muted}
             inputMeter={`chain:${c.id}:in`}
             output={outputLabel(c.outputs[0].hwChannels)}
+            {...exitOutputs(c)}
             outputMeter={`chain:${c.id}:out`}
-            plugins={plugins}
+            plugins={[ABY_ROW, ...plugins]}
             menuNote={pluginNote}
             scanning={state.plugins.scanning}
             onSelectInput={(id) => send({ type: "chain.setInputs", chainId: c.id, inputs: [{ hwChannel: Number(id) }] })}
@@ -149,21 +221,17 @@ export function RigView({ state }: { state: GlitchState }) {
               send({ type: "chain.setLevel", chainId: c.id, levelDb: Math.max(SILENCE_DB, positionToDb(Number(value) / 100)) })
             }
             onMuteToggle={() => send({ type: "chain.setMute", chainId: c.id, muted: !c.muted })}
-            onAddPlugin={(id) => {
-              const [kind, ...rest] = id.split(":");
-              const ref = rest.join(":"); // plugin ids and file names can contain ":"
-              send({
-                type: "block.add",
-                chainId: c.id,
-                block: kind === "plugin" ? { type: "plugin", pluginId: ref } : { type: kind as "nam" | "ir", file: ref },
-              });
-            }}
+            onAddPlugin={(id) => addFromMenu(c.id, id)}
             onScanPlugins={() => send({ type: "plugins.scan" })}
             onImportPlugin={() => send({ type: "library.import" })}
           >
-            {c.blocks.map((b) => (
-              <BlockView key={b.id} block={b} snapshotBase={state.snapshotBase} />
-            ))}
+            {c.blocks.map((b) =>
+              b.type === "aby" ? (
+                <AbyView key={b.id} chainId={c.id} aby={b as AbyBlock} plugins={plugins} snapshotBase={state.snapshotBase} />
+              ) : (
+                <BlockView key={b.id} block={b} snapshotBase={state.snapshotBase} />
+              ),
+            )}
           </ChainStrip>
         ))}
       />

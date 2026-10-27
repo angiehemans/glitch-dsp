@@ -31,15 +31,22 @@ export type Command =
       chainId: string;
       block: { type: "plugin"; pluginId: string } | { type: "nam" | "ir"; file: string };
       index?: number;
+      /** Add into a path of this chain's ABY block instead of the chain itself. */
+      abyId?: string;
+      path?: "A" | "B";
     }
   | { type: "block.remove"; blockId: string }
   | { type: "block.toggle"; blockId: string }
   | { type: "block.openEditor"; blockId: string }
-  // Stubbed from the plan; not handled until their milestone.
-  | { type: "block.setParam"; blockId: string; param: string; value: number }
-  | { type: "chain.splitAt"; chainId: string; index: number; duplicate?: boolean }
+  // ABY: splitAt inserts one at index (default: the end), moving the blocks after it into path A.
+  // block.remove on an ABY keeps path A in the chain and deletes path B.
+  | { type: "chain.splitAt"; chainId: string; index?: number }
   | { type: "aby.setMode"; blockId: string; mode: "Y" | "AB" }
   | { type: "aby.select"; blockId: string; path: "A" | "B" }
+  | { type: "aby.setLevel"; blockId: string; path: "A" | "B"; levelDb: number }
+  | { type: "aby.setMute"; blockId: string; path: "A" | "B"; muted: boolean }
+  // Stubbed from the plan; not handled until their milestone.
+  | { type: "block.setParam"; blockId: string; param: string; value: number }
   | { type: "aby.moveBlock"; blockId: string; toPath: "A" | "B" | "main"; index: number }
   | { type: "project.setMainOutput"; outputs: number[] }
   | { type: "setlist.create"; name: string; projectId?: string }
