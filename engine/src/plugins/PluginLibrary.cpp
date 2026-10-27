@@ -1,7 +1,165 @@
 #include "PluginLibrary.h"
 
+#include <atomic>
+#include <condition_variable>
+#include <cstdlib>
+#include <mutex>
+
+#include <signal.h>
+#include <unistd.h>
+
 namespace glitch
 {
+
+namespace
+{
+    const juce::String helperId = "glitch-plugin-scanner";
+    constexpr int helperTimeoutMs = 60000; // longest a plugin may take to load before it's given up on
+    constexpr int helperPingMs = 2000;     // how soon a crashed helper is noticed (JUCE's default is 8 s)
+
+    // A request is the format name and the plugin's file or identifier; the reply is a LIST of
+    // PluginDescription XML (empty if the plugin loaded but had nothing to offer). On connecting,
+    // the helper sends its process id, so a helper stuck in a hung plugin can be killed.
+    const juce::String pidPrefix = "PID ";
+    class ScanHelper final : public juce::ChildProcessWorker
+    {
+    public:
+        ScanHelper() { juce::addDefaultFormatsToManager (formats); }
+
+    private:
+        void handleConnectionMade() override
+        {
+            const auto message = pidPrefix + juce::String ((int) getpid());
+            sendMessageToCoordinator ({ message.toRawUTF8(), message.getNumBytesAsUTF8() });
+        }
+
+        void handleMessageFromCoordinator (const juce::MemoryBlock& request) override
+        {
+            // Arrives on the connection's thread; plugins load on the message thread, as in Glitch.
+            juce::MessageManager::callAsync ([this, request]
+            {
+                juce::MemoryInputStream in (request, false);
+                const auto formatName = in.readString(), identifier = in.readString();
+
+                juce::OwnedArray<juce::PluginDescription> found;
+                for (auto* format : formats.getFormats())
+                    if (format->getName() == formatName)
+                        format->findAllTypesForFile (found, identifier);
+
+                juce::XmlElement list ("LIST");
+                for (auto* description : found)
+                    list.addChildElement (description->createXml().release());
+                const auto reply = list.toString();
+                sendMessageToCoordinator ({ reply.toRawUTF8(), reply.getNumBytesAsUTF8() });
+            });
+        }
+
+        // Exit at once rather than quit: the message thread may be stuck inside a hung plugin.
+        void handleConnectionLost() override { std::_Exit (0); }
+
+        juce::AudioPluginFormatManager formats;
+    };
+
+    // Runs every scan through a ScanHelper process, started on first use and restarted after a crash.
+    class HelperScanner final : public juce::KnownPluginList::CustomScanner,
+                                private juce::ChildProcessCoordinator
+    {
+    public:
+        ~HelperScanner() override { killWorkerProcess(); }
+
+        bool findPluginTypesFor (juce::AudioPluginFormat& format, juce::OwnedArray<juce::PluginDescription>& result,
+                                 const juce::String& fileOrIdentifier) override
+        {
+            if (! running)
+                running = launchWorkerProcess (juce::File::getSpecialLocation (juce::File::currentExecutableFile), helperId, helperPingMs);
+
+            juce::MemoryBlock request;
+            {
+                juce::MemoryOutputStream out (request, false);
+                out.writeString (format.getName());
+                out.writeString (fileOrIdentifier);
+            }
+
+            {
+                const std::lock_guard<std::mutex> lock (mutex);
+                reply.reset();
+                lost = false;
+            }
+
+            if (! running || ! sendMessageToWorker (request))
+                return giveUp();
+
+            std::unique_lock<std::mutex> lock (mutex);
+            if (! replied.wait_for (lock, std::chrono::milliseconds (helperTimeoutMs), [this] { return reply != nullptr || lost; })
+                || reply == nullptr)
+            {
+                lock.unlock();
+                return giveUp(); // crashed or hung: false leaves the plugin out
+            }
+
+            for (const auto* item : reply->getChildIterator())
+                if (auto description = std::make_unique<juce::PluginDescription>(); description->loadFromXml (*item))
+                    result.add (std::move (description));
+            return true;
+        }
+
+        void scanFinished() override
+        {
+            killWorkerProcess();
+            running = false;
+        }
+
+    private:
+        bool giveUp()
+        {
+            if (const auto pid = helperPid.exchange (0); pid > 0)
+                ::kill (pid, SIGKILL); // a hung helper never sees the disconnect
+            killWorkerProcess();
+            running = false;
+            return false;
+        }
+
+        // Both on the connection's thread, while findPluginTypesFor waits on the message thread.
+        void handleMessageFromWorker (const juce::MemoryBlock& message) override
+        {
+            if (const auto text = message.toString(); text.startsWith (pidPrefix))
+                return helperPid.store (text.substring (pidPrefix.length()).getIntValue());
+
+            const std::lock_guard<std::mutex> lock (mutex);
+            reply = juce::parseXML (message.toString());
+            if (reply == nullptr)
+                lost = true;
+            replied.notify_one();
+        }
+
+        void handleConnectionLost() override
+        {
+            const std::lock_guard<std::mutex> lock (mutex);
+            lost = true;
+            replied.notify_one();
+        }
+
+        bool running = false; // message thread only
+        std::atomic<int> helperPid { 0 };
+        std::mutex mutex;
+        std::condition_variable replied;
+        std::unique_ptr<juce::XmlElement> reply;
+        bool lost = false;
+    };
+}
+
+std::unique_ptr<juce::ChildProcessWorker> PluginLibrary::startScanHelper (const juce::String& commandLine)
+{
+    auto helper = std::make_unique<ScanHelper>();
+    if (! helper->initialiseFromCommandLine (commandLine, helperId))
+        return nullptr;
+    return helper;
+}
+
+bool PluginLibrary::isScanHelper (const juce::String& commandLine)
+{
+    return commandLine.contains ("--" + helperId + ":");
+}
 
 PluginLibrary::PluginLibrary (juce::File dataDir)
     : listFile (dataDir.getChildFile ("plugins.xml")),
@@ -12,6 +170,8 @@ PluginLibrary::PluginLibrary (juce::File dataDir)
 
     if (const auto xml = juce::parseXML (listFile))
         known.recreateFromXml (*xml);
+
+    known.setCustomScanner (std::make_unique<HelperScanner>());
 }
 
 PluginLibrary::~PluginLibrary()
@@ -138,6 +298,7 @@ void PluginLibrary::finish()
 {
     stopTimer();
     scanners.clear();
+    known.scanFinished(); // stops the helper
     scanning = false;
     scanningName = {};
 

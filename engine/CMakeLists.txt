@@ -125,3 +125,18 @@ target_link_libraries(GlitchBench
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
+
+# GlitchScanTest: scans plugin bundles through the helper-process scanner. Not built by default:
+# cmake --build --preset dev --target GlitchScanTest
+juce_add_console_app(GlitchScanTest)
+set_target_properties(GlitchScanTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(GlitchScanTest PRIVATE tools/ScanTest.cpp src/plugins/PluginLibrary.cpp)
+target_compile_definitions(GlitchScanTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
+    JUCE_PLUGINHOST_VST3=1 JUCE_PLUGINHOST_AU=$<BOOL:${APPLE}>)
+target_link_libraries(GlitchScanTest
+    PRIVATE
+        juce::juce_audio_processors
+        juce::juce_gui_basics
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
