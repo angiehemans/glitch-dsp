@@ -26,7 +26,7 @@ glitch/                          repo root (GitHub repo: glitch)
 ├── package.json                 npm workspaces: ["ui", "packages/*"]
 ├── CMakeLists.txt               root: options + add_subdirectory(engine)
 ├── CMakePresets.json            "dev", "dev-remote" and "release" presets
-├── .gitignore  .editorconfig  .nvmrc (20)
+├── .gitignore  .editorconfig  .nvmrc (24)
 │
 ├── docs/
 │   ├── plan.md                  (was rig-plan.md)
@@ -170,7 +170,7 @@ Code is written on Angie's Linux machine. The MacBook is the test and show machi
 - Linux is a first-class build target from M0, not a later port.
 
 ### 5.3 Mac setup (one time)
-- Install Xcode 14.2 (or its command line tools), CMake 3.22+ and Node 20 from their official installers. Homebrew's support for Monterey is limited, so don't depend on it.
+- Install Xcode 14.2 (or its command line tools), CMake 3.22+ and Node 22 from their official installers (Node 24 needs macOS 13.5). Homebrew's support for Monterey is limited, so don't depend on it.
 - Update Safari to 17.6, so the app's WebView has the newest engine Monterey allows.
 - Turn on **System Preferences > Sharing > Remote Login** so the Linux machine can SSH in. Set up an SSH key and a host alias (e.g. `glitch-mac` in `~/.ssh/config`).
 - Clone the repo once on the Mac (e.g. `~/code/glitch`) so the JUCE download and build cache persist between syncs.
