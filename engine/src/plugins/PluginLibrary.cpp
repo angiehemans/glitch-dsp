@@ -95,6 +95,9 @@ void PluginLibrary::start (const juce::Array<juce::File>& targets)
                                                                              true));
     }
 
+    // Plugins that crashed the last scan are skipped, here as well as in the directory scanners.
+    juce::PluginDirectoryScanner::applyBlacklistingsFromDeadMansPedal (known, deadMansPedal);
+
     bundlesTotal = bundles.size();
     scanning = true;
     scanningName = {};
@@ -109,7 +112,9 @@ void PluginLibrary::timerCallback()
         const auto bundle = bundles.removeAndReturn (0);
         scanningName = juce::File (bundle.path).getFileNameWithoutExtension();
         juce::OwnedArray<juce::PluginDescription> found;
+        deadMansPedal.replaceWithText (bundle.path); // left behind if this plugin crashes the app
         known.scanAndAddFile (bundle.path, true, found, *bundle.format);
+        deadMansPedal.deleteFile();
     }
     else if (currentScanner < scanners.size())
     {
