@@ -120,11 +120,13 @@ Click the audio device pill in the top bar for a list of devices (all types: ALS
 ### ABY splitter
 
 - **Adding one:** **ABY splitter** at the top of a chain's **+** menu adds an ABY at the end of the chain (`chain.splitAt`; with an `index`, the blocks after it move into path A). Each path is a lane with its own **+** menu, and blocks added with the chain's **+** go after the merge. The fork is `ui/glitch/components/AbyFork`, holding the `AbyPedal` in a slot.
-- **Paths:** paths have no level or pan of their own; put a gain plugin in a path for that. Drag a block between the A and B lanes, or along one, to move it.
+- **Paths:** paths have no level or pan of their own; put a gain plugin in a path for that.
 - **Split exit:** when the ABY is the chain's last block, the chain's output menu has **Split A and B**. Each path then picks its own outputs from that menu, the chain's level and mute apply to both, and the output meter shows the louder path. Nothing can be added after a split exit; **Merge A and B** joins the paths again.
 - **Modes:** the pedal's A/B switch picks the path you hear, crossfading over 10 ms; its Y switch plays both, summed at -3 dB each so the blend isn't louder than one path. Path mute is in the protocol (`aby.setMute`) for the footswitch (M4), with no control in the UI. Both paths keep running in AB mode, so tails ring out and amps stay warm, and the graph delays the faster path by the slower one's latency, so a Y blend doesn't comb filter.
 - **Removing one:** the ✕ in its header (then the confirm under the pedal) keeps path A in the chain, where the ABY was, and deletes path B's blocks.
-- **Not yet:** a "Split here" control for putting an ABY mid-chain (`chain.splitAt` takes an `index`, but the UI only adds one at the end), dragging blocks into or out of a path, and footswitch actions (M4). An ABY can't go inside another ABY's path.
+- **Moving:** drag any block or an ABY by the grip in its header to anywhere in a chain, into or out of a path, or to another chain (`block.move`). A drop anywhere on an A/B box goes into that path.
+- **Adding between blocks:** hover a gap in a chain or path for a **+**; it opens that lane's add menu and inserts there. **ABY splitter** from a chain's in-between **+** splits the chain at that spot. The blocks keep running, so nothing reloads. A split to separate outputs has to stay its chain's last block.
+- **Not yet:** moving blocks without a mouse (dragging is the only way), and footswitch actions (M4). An ABY can't go inside another ABY's path.
 - **Engine:** a split is an `AbyMerge` node (`engine/src/audio/AbyMerge.h`); both paths start from the block before it, and an empty path is the dry signal. A split exit sends path B through a second chain output stage to its own outputs. Projects store it as the plan's `aby` block, with its paths' blocks inside it.
 
 ### Plugins

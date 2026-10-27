@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { SILENCE_DB, type AbyBlock, type Block, type Chain, type GlitchState, type OutputRef } from "@glitch/protocol";
 import AbyFork from "@scamp/components/AbyFork/AbyFork";
 import AbyPedal from "@scamp/components/AbyPedal/AbyPedal";
@@ -93,56 +94,180 @@ const ABY_ROW: MenuRow = { id: "aby", name: "ABY splitter", kind: "Built-in · s
 
 /** Adds the block a + menu row stands for ("nam:<file>", "ir:<file>", "plugin:<id>"), to the chain or into an ABY path. */
 function addFromMenu(chainId: string, rowId: string, into?: { abyId: string; path: "A" | "B" }) {
-  if (rowId === ABY_ROW.id) return send({ type: "chain.splitAt", chainId });
+  // A lane's in-between + opened this menu: add at its spot.
+  const spot = insertAt;
+  insertAt = null;
+  const index = spot && spot.chainId === chainId && spot.abyId === into?.abyId && spot.path === into?.path ? spot.index : undefined;
+
+  if (rowId === ABY_ROW.id) return send({ type: "chain.splitAt", chainId, index });
   const [kind, ...rest] = rowId.split(":");
   const ref = rest.join(":"); // plugin ids and file names can contain ":"
   send({
     type: "block.add",
     chainId,
     block: kind === "plugin" ? { type: "plugin", pluginId: ref } : { type: kind as "nam" | "ir", file: ref },
+    index,
     ...into,
   });
 }
+
+/** Set by a lane's in-between +, which then opens the chain's or path's own + menu. */
+let insertAt: { chainId: string; abyId?: string; path?: "A" | "B"; index: number } | null = null;
+// The real + buttons add at the end: a click on one by hand (not ours, which isn't trusted) forgets the spot.
+document.addEventListener("click", (e) => e.isTrusted && (e.target as Element).closest?.('[data-scamp-id^="add_"]') && (insertAt = null), true);
 
 /** Blocks in a chain, counting those inside ABY paths but not the ABY itself. */
 const blockCount = (c: Chain) =>
   c.blocks.reduce((n, b) => n + (b.type === "aby" ? (b as AbyBlock).pathA.blocks.length + (b as AbyBlock).pathB.blocks.length : 1), 0);
 
-const DRAG_TYPE = "application/x-glitch-block"; // data: "<abyId> <blockId>"
+/**
+ * Wraps a tile or ABY so it can be dragged by its grip (its Scamp id starts "grip_"), so clicks on the
+ * tile still open it. Dragging follows the pointer by hand: JUCE's Linux WebView never delivers
+ * HTML drag-and-drop events.
+ */
+function Draggable({ id, children }: { id: string; children: ComponentChildren }) {
+  return (
+    <div class="gl-drag" onPointerDown={(e) => startDrag(e, id)}>
+      {children}
+    </div>
+  );
+}
+
+function startDrag(down: PointerEvent, blockId: string) {
+  if (down.button !== 0 || !(down.target as Element).closest('[data-scamp-id^="grip_"]')) return;
+  down.preventDefault(); // no text selection
+  down.stopPropagation(); // an ABY's wrapper holds its paths' tiles
+
+  // A small copy of the pedal follows the pointer: the ABY's pedal, or the tile's picture.
+  const wrapper = down.currentTarget as HTMLElement;
+  const abyPedal = wrapper.querySelector('[aria-label="ABY splitter pedal"]');
+  const source = abyPedal ?? wrapper.querySelector(".gl-block-art");
+  let preview: HTMLElement | null = null;
+  let lane: HTMLElement | null = null;
+
+  const move = (e: PointerEvent) => {
+    if (!preview) {
+      if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 4) return; // still a click
+      preview = (source?.cloneNode(true) as HTMLElement) ?? document.createElement("div");
+      preview.classList.add("gl-drag-preview");
+      // Inline: the pedal's own Scamp class (width: 100%, position: relative) loads after app.css.
+      Object.assign(preview.style, { position: "fixed", top: "0", left: "0", width: "64px", margin: "0" });
+      document.body.append(preview);
+      document.body.classList.add("gl-dragging");
+    }
+    preview.style.translate = `${e.clientX - preview.offsetWidth / 2}px ${e.clientY - preview.offsetHeight / 2}px`;
+
+    lane?.removeAttribute("data-over");
+    lane = laneAt(e.clientX, e.clientY, !!abyPedal);
+    if (lane) {
+      lane.dataset.over = "";
+      lane.style.setProperty("--drop-x", `${spot(lane, e.clientX).x}px`);
+    }
+  };
+  const end = (e: PointerEvent | KeyboardEvent) => {
+    removeEventListener("pointermove", move, true);
+    removeEventListener("pointerup", end, true);
+    removeEventListener("keydown", escape);
+    lane?.removeAttribute("data-over");
+    preview?.remove();
+    document.body.classList.remove("gl-dragging");
+    if (!preview || !lane || !(e instanceof PointerEvent)) return; // a click, a drop outside, or Escape
+    const { chain, aby, path } = lane.dataset;
+    send({ type: "block.move", blockId, chainId: chain!, index: spot(lane, e.clientX).index, abyId: aby, path: path as "A" | "B" | undefined });
+  };
+  const escape = (e: KeyboardEvent) => e.key === "Escape" && end(e);
+  // Capture: lanes stop pointermove for their + (and Scamp may stop events), but the drag needs them all.
+  addEventListener("pointermove", move, true);
+  addEventListener("pointerup", end, true);
+  addEventListener("keydown", escape);
+}
+
+/** The lane under the pointer: the path lane of an A/B box anywhere over that box, or a chain's.
+ * An ABY can't go inside a path, so dragging one only finds chains. */
+function laneAt(x: number, y: number, chainsOnly: boolean) {
+  const el = document.elementFromPoint(x, y);
+  if (chainsOnly) return el?.closest<HTMLElement>(".gl-lane:not([data-aby])") ?? null;
+  const box = el?.closest('[data-scamp-id^="lane_a_"], [data-scamp-id^="lane_b_"]');
+  return box?.querySelector<HTMLElement>(".gl-lane") ?? el?.closest<HTMLElement>(".gl-lane") ?? null;
+}
 
 /**
- * An ABY block: the pedal switches A/B and Y, and each path is its own lane of blocks with a level,
- * a mute and a + menu. Removing it keeps path A in the chain.
+ * A row of Draggables: a chain, or one path of its ABY (abyId and path set), where drags land.
+ * Hovering a gap shows a + that adds a block there.
+ */
+function Lane({ chainId, abyId, path, children }: { chainId: string; abyId?: string; path?: "A" | "B"; children: ComponentChildren }) {
+  return (
+    <div
+      class="gl-lane"
+      data-chain={chainId}
+      data-aby={abyId}
+      data-path={path}
+      onPointerMove={(e) => {
+        const lane = e.currentTarget;
+        if ((e.target as Element).closest(".gl-insert")) return; // keep it where it is while it's pointed at
+        e.stopPropagation(); // a path lane sits inside the chain's lane, whose + it hides
+        lane.parentElement?.closest<HTMLElement>(".gl-lane")?.removeAttribute("data-gap");
+        const overTile = (e.target as Element).closest(".gl-drag, .gl-lane") !== lane && (e.target as Element).closest(".gl-drag");
+        const at = spot(lane, e.clientX);
+        // Nothing can follow a split to separate outputs.
+        const afterSplit = at.index === tiles(lane).length && lane.lastElementChild?.querySelector('[data-exit="split"]');
+        if (overTile || afterSplit) return delete lane.dataset.gap;
+        lane.dataset.gap = String(at.index);
+        lane.style.setProperty("--add-x", `${at.x}px`);
+      }}
+      onPointerLeave={(e) => delete e.currentTarget.dataset.gap}
+    >
+      {children}
+      <button
+        class="gl-insert"
+        type="button"
+        aria-label="Add a block here"
+        onClick={(e) => {
+          const lane = e.currentTarget.parentElement as HTMLElement;
+          insertAt = { chainId, abyId, path, index: Number(lane.dataset.gap) };
+          // Open the lane's own + menu: the chain's, or the A/B box's.
+          const box = path ? lane.closest(`[data-scamp-id^="lane_${path.toLowerCase()}_"]`) : lane.closest("section");
+          box?.querySelector<HTMLElement>(path ? `[data-scamp-id^="add_${path.toLowerCase()}_"]` : '[data-scamp-id="add_btn_690a"]')?.click();
+        }}
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+const tiles = (lane: HTMLElement) => [...lane.children].filter((el) => el.classList.contains("gl-drag"));
+
+/** Where a drop or insert at clientX lands in a lane: before the first tile whose middle is right of
+ * it. x is the marker's position in the lane, halfway across the gap there. */
+function spot(lane: HTMLElement, clientX: number) {
+  const box = lane.getBoundingClientRect();
+  const rects = tiles(lane).map((el) => el.getBoundingClientRect());
+  const index = rects.filter((r) => r.left + r.width / 2 < clientX).length;
+  const before = rects[index - 1], after = rects[index];
+  const x =
+    before && after ? (before.right + after.left) / 2
+    : after ? after.left - 8
+    : before ? before.right + 8
+    : box.left + 8;
+  return { index, x: Math.max(8, x - box.left) };
+}
+
+/**
+ * An ABY block: the pedal switches A/B and Y, and each path is its own lane of blocks with a + menu.
+ * Removing it keeps path A in the chain.
  */
 function AbyView({ chainId, aby, plugins, snapshotBase }: { chainId: string; aby: AbyBlock; plugins: MenuRow[]; snapshotBase: string }) {
   const mode = aby.mode === "Y" ? "y" : aby.active === "B" ? "b" : "a";
   const other = aby.active === "A" ? "B" : "A";
   const lane = (path: "A" | "B", blocks: Block[]) => (
-    <div
-      class="gl-lane"
-      onDragOver={(e) => {
-        if (!e.dataTransfer?.types.includes(DRAG_TYPE)) return;
-        e.preventDefault(); // allows the drop
-        e.currentTarget.dataset.over = "";
-      }}
-      onDragLeave={(e) => delete e.currentTarget.dataset.over}
-      onDrop={(e) => {
-        delete e.currentTarget.dataset.over;
-        const [fromAby, moveId] = (e.dataTransfer?.getData(DRAG_TYPE) ?? "").split(" ");
-        if (fromAby !== aby.id || !moveId) return; // only between this ABY's lanes
-        e.preventDefault();
-        // Dropped before the first tile whose middle is right of the pointer.
-        const tiles = [...e.currentTarget.children].map((el) => el.getBoundingClientRect());
-        const index = tiles.filter((r) => r.left + r.width / 2 < e.clientX).length;
-        send({ type: "aby.moveBlock", blockId: aby.id, moveId, path, index });
-      }}
-    >
+    <Lane chainId={chainId} abyId={aby.id} path={path}>
       {blocks.map((b) => (
-        <div key={b.id} class="gl-drag" draggable onDragStart={(e) => e.dataTransfer?.setData(DRAG_TYPE, `${aby.id} ${b.id}`)}>
+        <Draggable key={b.id} id={b.id}>
           <BlockView block={b} snapshotBase={snapshotBase} small />
-        </div>
+        </Draggable>
       ))}
-    </div>
+    </Lane>
   );
   const goneB = aby.pathB.blocks.length;
 
@@ -272,13 +397,17 @@ export function RigView({ state }: { state: GlitchState }) {
             onScanPlugins={() => send({ type: "plugins.scan" })}
             onImportPlugin={() => send({ type: "library.import" })}
           >
-            {c.blocks.map((b) =>
-              b.type === "aby" ? (
-                <AbyView key={b.id} chainId={c.id} aby={b as AbyBlock} plugins={plugins} snapshotBase={state.snapshotBase} />
-              ) : (
-                <BlockView key={b.id} block={b} snapshotBase={state.snapshotBase} />
-              ),
-            )}
+            <Lane chainId={c.id}>
+              {c.blocks.map((b) => (
+                <Draggable key={b.id} id={b.id}>
+                  {b.type === "aby" ? (
+                    <AbyView chainId={c.id} aby={b as AbyBlock} plugins={plugins} snapshotBase={state.snapshotBase} />
+                  ) : (
+                    <BlockView block={b} snapshotBase={state.snapshotBase} />
+                  )}
+                </Draggable>
+              ))}
+            </Lane>
           </ChainStrip>
         ))}
       />

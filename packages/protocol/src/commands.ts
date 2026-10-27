@@ -38,6 +38,11 @@ export type Command =
   | { type: "block.remove"; blockId: string }
   | { type: "block.toggle"; blockId: string }
   | { type: "block.openEditor"; blockId: string }
+  /**
+   * Moves a block, or an ABY with its paths, to index in a chain, or into a path of that chain's ABY
+   * abyId. The index counts the block in its old place. A split exit has to stay its chain's last block.
+   */
+  | { type: "block.move"; blockId: string; chainId: string; index: number; abyId?: string; path?: "A" | "B" }
   // ABY: splitAt inserts one at index (default: the end), moving the blocks after it into path A.
   // block.remove on an ABY keeps path A in the chain and deletes path B.
   | { type: "chain.splitAt"; chainId: string; index?: number }
@@ -48,8 +53,6 @@ export type Command =
   // chain's last block can split. It starts with both paths on the chain's outputs.
   | { type: "aby.setExit"; blockId: string; exit: "merge" | "split" }
   | { type: "aby.setOutputs"; blockId: string; path: "A" | "B"; outputs: Pick<OutputRef, "hwChannels">[] }
-  /** Moves moveId, a block in either path of this ABY, to index in path. */
-  | { type: "aby.moveBlock"; blockId: string; moveId: string; path: "A" | "B"; index: number }
   // Stubbed from the plan; not handled until their milestone.
   | { type: "block.setParam"; blockId: string; param: string; value: number }
   | { type: "project.setMainOutput"; outputs: number[] }

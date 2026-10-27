@@ -19,6 +19,7 @@ export default function BlockTile({ state = "active", modal = "closed", art = "f
   return (
     <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-state={state} data-modal={modal} data-art={art} data-size={size} data-scamp-escape="modal:open=closed">
       <div data-scamp-id="head_3a7c" className={styles.head_3a7c}>
+        <span data-scamp-id="grip_7e8f" className={styles.grip_7e8f} title="Drag to move" aria-hidden="true"><svg data-scamp-id="grip_svg_8f90" className={styles.grip_svg_8f90} viewBox="0 0 24 24"><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg></span>
         <p data-scamp-id="name_d4f5" className={styles.name_d4f5}>{name}</p>
         <button data-scamp-id="bypass_4b8d" className={styles.bypass_4b8d} type="button" aria-label={bypassLabel} onClick={onBypass}>
           <svg data-scamp-id="power_svg_5c9e" className={styles.power_svg_5c9e} viewBox="0 0 24 24"><path d="M7 6a7.75 7.75 0 1 0 10 0" /><path d="M12 4l0 8" /></svg>

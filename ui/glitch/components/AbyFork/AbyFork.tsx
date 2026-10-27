@@ -45,6 +45,7 @@ export default function AbyFork({
     <div data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} role="group" aria-label="ABY split" data-mode={mode} data-exit={exit} data-menua={menua} data-menub={menub} data-options={options} data-scamp-outside="menua:open=closed menub:open=closed options:confirm=closed" data-scamp-escape="menua:open=closed menub:open=closed options:confirm=closed">
       <div data-scamp-id="pedal_col_a1f0" className={styles.pedal_col_a1f0}>
         <div data-scamp-id="head_7c1e" className={styles.head_7c1e}>
+          <span data-scamp-id="grip_9f0a" className={styles.grip_9f0a} title="Drag to move" aria-hidden="true"><svg data-scamp-id="grip_svg_a0b1" className={styles.grip_svg_a0b1} viewBox="0 0 24 24"><path d="M9 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M9 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M15 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg></span>
           <p data-scamp-id="name_8d2f" className={styles.name_8d2f}>ABY</p>
           <button data-scamp-id="remove_c3d2" className={styles.remove_c3d2} type="button" aria-label="Remove split" data-scamp-click="options:closed=confirm,confirm=closed">✕</button>
         </div>

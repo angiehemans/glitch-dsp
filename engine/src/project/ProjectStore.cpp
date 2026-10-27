@@ -365,30 +365,54 @@ bool ProjectStore::addBlockToPath (const juce::var& aby, const juce::String& pat
     return true;
 }
 
-bool ProjectStore::moveBlockInAby (const juce::var& aby, const juce::String& blockId, const juce::String& path, int index)
+juce::String ProjectStore::moveBlock (const juce::String& blockId, const juce::var& chain, int index,
+                                     const juce::String& abyId, const juce::String& path)
 {
-    auto* to = aby[path == "B" ? "pathB" : "pathA"]["blocks"].getArray();
-    if (to == nullptr)
-        return false;
-
-    for (const auto* key : { "pathA", "pathB" })
+    auto* to = chain["blocks"].getArray();
+    if (abyId.isNotEmpty())
     {
-        auto* from = aby[key]["blocks"].getArray();
-        for (int i = 0; from != nullptr && i < from->size(); ++i)
-        {
-            if ((*from)[i]["id"].toString() != blockId)
-                continue;
-
-            const auto block = (*from)[i];
-            from->remove (i);
-            if (from == to && index > i)
-                --index; // the index counted the block in its old place
-            to->insert (index < 0 || index > to->size() ? to->size() : index, block);
-            markDirty();
-            return true;
-        }
+        const auto aby = findBlock (abyId);
+        if (aby["type"].toString() != "aby" || findChainOf (abyId)["id"] != chain["id"])
+            return "Unknown ABY block: " + abyId;
+        to = aby[path == "B" ? "pathB" : "pathA"]["blocks"].getArray();
     }
-    return false;
+    if (to == nullptr)
+        return "Unknown chain";
+
+    juce::Array<juce::var>* from = nullptr;
+    int at = -1;
+    if (auto* chains = getCurrentChains())
+        for (const auto& c : *chains)
+            for (auto* list : getBlockLists (c))
+                for (int i = 0; from == nullptr && i < list->size(); ++i)
+                    if ((*list)[i]["id"].toString() == blockId)
+                        from = list, at = i;
+    if (from == nullptr)
+        return "Unknown block: " + blockId;
+
+    const auto block = (*from)[at];
+    if (block["type"].toString() == "aby" && abyId.isNotEmpty())
+        return "An ABY can't go inside another ABY's path";
+
+    if (from == to && index > at)
+        --index; // the index counted the block in its old place
+    from->remove (at);
+    index = index < 0 || index > to->size() ? to->size() : index;
+    to->insert (index, block);
+
+    // A split to separate outputs ends its chain, so it has to stay the last block.
+    for (const auto& c : *getCurrentChains())
+        if (auto* blocks = c["blocks"].getArray())
+            for (int i = 0; i < blocks->size() - 1; ++i)
+                if ((*blocks)[i]["type"].toString() == "aby" && (*blocks)[i]["exit"].toString() == "split")
+                {
+                    to->remove (index);
+                    from->insert (at, block);
+                    return "A split to separate outputs has to stay at the end of its chain";
+                }
+
+    markDirty();
+    return {};
 }
 
 juce::var ProjectStore::findChainOf (const juce::String& blockId) const

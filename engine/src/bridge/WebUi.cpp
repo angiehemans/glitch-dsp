@@ -488,15 +488,6 @@ bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command
         output.getDynamicObject()->setProperty ("hwChannels", hwChannels);
         syncEngine();
     }
-    else if (type == protocol::command::abyMoveBlock)
-    {
-        if (! store.moveBlockInAby (aby, command["moveId"].toString(), command["path"].toString(), (int) command["index"]))
-        {
-            sendError ("That block isn't in this ABY");
-            return false;
-        }
-        syncEngine();
-    }
     else
     {
         sendError ("Unknown command: " + type);
@@ -570,6 +561,19 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
             store.addBlock (chain, block, index);
         }
         syncEngine();
+        return true;
+    }
+
+    if (type == protocol::command::blockMove)
+    {
+        const auto error = store.moveBlock (command["blockId"].toString(), store.findChain (command["chainId"].toString()),
+                                            (int) command["index"], command["abyId"].toString(), command["path"].toString());
+        if (error.isNotEmpty())
+        {
+            sendError (error);
+            return false;
+        }
+        syncEngine(); // rewires; blocks keep running, even when they change chain
         return true;
     }
 

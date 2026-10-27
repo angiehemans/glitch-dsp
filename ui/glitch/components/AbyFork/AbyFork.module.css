@@ -35,7 +35,28 @@
   display: flex;
   gap: 2px;
   align-items: center;
-  padding: 0px 2px 0px 6px;
+  padding: 0px 2px;
+}
+
+.grip_9f0a {
+  width: 14px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-text-lo);
+  cursor: grab;
+}
+
+.grip_9f0a:hover {
+  color: var(--color-text-hi);
+}
+
+.grip_svg_a0b1 {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
 }
 
 .name_8d2f {

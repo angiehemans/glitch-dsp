@@ -283,8 +283,7 @@ export function createMockEngine(): EngineBridge {
           break;
         }
         case "aby.setExit":
-        case "aby.setOutputs":
-        case "aby.moveBlock": {
+        case "aby.setOutputs": {
           const found = findBlock(cmd.blockId);
           const aby = found?.block.type === "aby" ? (found.block as AbyBlock) : null;
           if (!found || !aby) return error(`Unknown ABY block: ${cmd.blockId}`);
@@ -299,14 +298,23 @@ export function createMockEngine(): EngineBridge {
             if (!out || !cmd.outputs[0]?.hwChannels.length) return error("Invalid output channels");
             out.hwChannels = [...cmd.outputs[0].hwChannels];
           }
-          if (cmd.type === "aby.moveBlock") {
-            const from = [aby.pathA.blocks, aby.pathB.blocks].find((l) => l.some((b) => b.id === cmd.moveId));
-            if (!from) return error("That block isn't in this ABY");
-            const to = (cmd.path === "B" ? aby.pathB : aby.pathA).blocks;
-            const i = from.findIndex((b) => b.id === cmd.moveId);
-            const [block] = from.splice(i, 1);
-            // The index counted the block in its old place.
-            to.splice(Math.min(from === to && cmd.index > i ? cmd.index - 1 : cmd.index, to.length), 0, block);
+          break;
+        }
+        case "block.move": {
+          const found = findBlock(cmd.blockId);
+          const c = chain(cmd.chainId);
+          const aby = cmd.abyId ? findAby(cmd.abyId) : null;
+          if (!found || !c) return error("Unknown block or chain");
+          if (cmd.abyId && (!aby || !c.blocks.includes(aby))) return error(`Unknown ABY block: ${cmd.abyId}`);
+          if (aby && found.block.type === "aby") return error("An ABY can't go inside another ABY's path");
+          const to = aby ? (cmd.path === "B" ? aby.pathB : aby.pathA).blocks : c.blocks;
+          const index = found.list === to && cmd.index > found.index ? cmd.index - 1 : cmd.index; // counted the block in its old place
+          found.list.splice(found.index, 1);
+          to.splice(Math.min(index, to.length), 0, found.block);
+          if (state.chains.some((ch) => ch.blocks.slice(0, -1).some((b) => b.type === "aby" && (b as AbyBlock).exit === "split"))) {
+            to.splice(to.indexOf(found.block), 1);
+            found.list.splice(found.index, 0, found.block);
+            return error("A split to separate outputs has to stay at the end of its chain");
           }
           break;
         }
