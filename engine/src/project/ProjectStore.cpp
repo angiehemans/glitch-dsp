@@ -177,6 +177,8 @@ juce::var ProjectStore::normaliseProject (const juce::var& project)
     setDefault (*obj, "setlists", juce::Array<juce::var>());
     setDefault (*obj, "songPresets", object());
     setDefault (*obj, "trackMix", object());
+    if (! project["mappings"].isArray())
+        obj->setProperty ("mappings", juce::Array<juce::var>());
     if (! project["pluginStates"].isObject())
         obj->setProperty ("pluginStates", object());
 
@@ -716,6 +718,39 @@ void ProjectStore::setDeviceState (const juce::XmlElement& xml)
 {
     settings.getDynamicObject()->setProperty ("audioDevice", xml.toString (juce::XmlElement::TextFormat().singleLine()));
     saveSettings();
+}
+
+void ProjectStore::setMidiDevice (const juce::String& name)
+{
+    settings.getDynamicObject()->setProperty ("midiDevice", name);
+    saveSettings();
+}
+
+juce::var ProjectStore::getMidiSwitches() const
+{
+    return settings["midiSwitches"].isArray() ? settings["midiSwitches"] : juce::var (juce::Array<juce::var>());
+}
+
+bool ProjectStore::addMidiSwitch (int channel, int cc)
+{
+    if (! settings["midiSwitches"].isArray())
+        settings.getDynamicObject()->setProperty ("midiSwitches", juce::Array<juce::var>());
+    auto* switches = settings["midiSwitches"].getArray();
+    for (const auto& s : *switches)
+        if ((int) s["channel"] == channel && (int) s["cc"] == cc)
+            return false;
+    switches->add (object ({ { "channel", channel }, { "cc", cc } }));
+    saveSettings();
+    return true;
+}
+
+void ProjectStore::removeMidiSwitch (int channel, int cc)
+{
+    if (auto* switches = settings["midiSwitches"].getArray())
+    {
+        switches->removeIf ([&] (const juce::var& s) { return (int) s["channel"] == channel && (int) s["cc"] == cc; });
+        saveSettings();
+    }
 }
 
 void ProjectStore::saveSettings() const

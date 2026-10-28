@@ -270,6 +270,11 @@ body {
   width: auto;
 }
 
+/* The footswitch panel on the Rig, above the monitor strip (RigView) */
+.gl-footswitch {
+  padding: 0 var(--space-6) var(--space-4);
+}
+
 /* Rig / Routing switch under the top bar (App) */
 .gl-tabs {
   display: flex;

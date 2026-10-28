@@ -4,6 +4,7 @@
 
 #include "../audio/Engine.h"
 #include "../blocks/ModelLibrary.h"
+#include "../midi/Footswitch.h"
 #include "../plugins/PluginLibrary.h"
 #include "../plugins/PluginWindow.h"
 #include "../project/ProjectStore.h"
@@ -57,6 +58,16 @@ private:
     bool handleAbyCommand (const juce::String& type, const juce::var& command);
     bool handleRouteCommand (const juce::String& type, const juce::var& command);
     bool handlePresetCommand (const juce::String& type, const juce::var& command);
+    bool handleMidiCommand (const juce::String& type, const juce::var& command);
+
+    // Footswitch: mappings are the project's, per switch and page, each with a tap and a hold action.
+    juce::var findMapping (Footswitch::Switch, int onPage) const;
+    int pageCount() const;
+    /** Runs a mapped action: a command (block.toggle, preset.load, aby.select, panic.toggle) or a footswitch one
+        (chain.toggleMute, preset.next/prev, aby.toggleAB/toggleY, page.next). */
+    void runAction (const juce::var& action);
+    /** Opens the chosen MIDI input when it's there, closes it when it's gone. Polled. */
+    void connectMidi();
     /** Copies plugin states into the project, so they save. */
     void captureStates();
     void openEditor (const juce::String& blockId);
@@ -86,6 +97,13 @@ private:
     juce::String soundCards; // Linux: /proc/asound/cards, polled for hotplug
     int ticks = 0;
     bool presetModified = false; // as last sent, so a knob turned in a plugin window updates it
+
+    Footswitch footswitch;
+    int page = 0;
+    juce::var learning;             // { action, gesture, page } while MIDI learn waits for a press
+    juce::var lastSwitch;           // { channel, cc } of the last press, for the mapping screen
+    juce::StringArray midiNames;    // MIDI inputs as last seen, polled for hotplug
+    bool learnedNow = false;        // the press that was learned doesn't also run an action
 
     const juce::String devUrl { GLITCH_UI_DEV_URL };
     const juce::File uiRoot;

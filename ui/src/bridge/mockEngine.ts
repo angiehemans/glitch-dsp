@@ -1,4 +1,15 @@
-import { SILENCE_DB, type AbyBlock, type Block, type Chain, type Command, type EngineEvent, type GlitchState, type Project } from "@glitch/protocol";
+import {
+  SILENCE_DB,
+  type AbyBlock,
+  type ActionRef,
+  type Block,
+  type Chain,
+  type Command,
+  type EngineEvent,
+  type GlitchState,
+  type Mapping,
+  type Project,
+} from "@glitch/protocol";
 import type { EngineBridge } from "./engine";
 
 export function emptyState(): GlitchState {
@@ -21,7 +32,7 @@ export function emptyState(): GlitchState {
     songs: [],
     transport: { playing: false, songId: null, position: 0 },
     tuneMode: { active: false, tunerInput: 1, reference: 440, vocalChainId: null, backingTracks: "pause" },
-    midi: { device: null },
+    midi: { device: null, connected: false, devices: [], learning: null, page: 0, pageCount: 1, lastSwitch: null, switches: [] },
   };
 }
 
@@ -36,7 +47,7 @@ const newId = () => Math.random().toString(16).slice(2, 10);
 export function createMockEngine(): EngineBridge {
   const listeners = new Set<(e: EngineEvent) => void>();
   type MockPreset = { id: string; name: string; chains: Chain[] };
-  const projects: (Project & { chains: Chain[]; openedAt: number; presets: MockPreset[]; currentPresetId: string | null })[] = [];
+  const projects: (Project & { chains: Chain[]; openedAt: number; presets: MockPreset[]; currentPresetId: string | null; mappings: Mapping[] })[] = [];
   // The rig as saved: without what the engine fills in as it runs (as ProjectStore's rigJson).
   const rigJson = (chains: Chain[]) =>
     JSON.stringify(chains, (key, value) => (["missing", "note", "snapshotAt", "snapshotWidth", "snapshotHeight"].includes(key) ? undefined : value));
@@ -69,6 +80,8 @@ export function createMockEngine(): EngineBridge {
     state.currentPresetId = current?.currentPresetId ?? null;
     const preset = current?.presets.find((p) => p.id === current.currentPresetId);
     state.presetModified = !!preset && rigJson(preset.chains) !== rigJson(current!.chains);
+    state.mappings = current?.mappings ?? [];
+    state.midi = { ...state.midi, connected: state.midi.device !== null, devices: ["Mock Chocolate"], pageCount: pageCount() };
     state.projects = [...projects]
       .sort((a, b) => b.openedAt - a.openedAt)
       .map((p) => ({ id: p.id, name: p.name, color: p.color, chainCount: p.chains.length, openedAt: p.openedAt }));
@@ -128,7 +141,74 @@ export function createMockEngine(): EngineBridge {
     emit({ type: "meters", levels, cpu: 0.08 + Math.random() * 0.04 });
   }, 1000 / 30);
 
-  return {
+  // Footswitch, as the engine's Footswitch and WebUi: tap/hold, MIDI learn, pages, actions.
+  const mappings = () => projects.find((p) => p.id === state.project?.id)?.mappings;
+  const findMapping = (channel: number, cc: number, page: number) =>
+    mappings()?.find((m) => m.switch.channel === channel && m.switch.cc === cc && m.page === page);
+  const pageCount = () => Math.max(1, ...(mappings() ?? []).map((m) => m.page + 1));
+  const held = new Map<string, { done: boolean; timer?: ReturnType<typeof setTimeout> }>();
+  const press = (channel: number, cc: number) => {
+    const key = `${channel}:${cc}`;
+    if (held.has(key)) return; // a repeated press
+    state.midi.lastSwitch = { channel, cc };
+    if (!state.midi.switches.some((s) => s.channel === channel && s.cc === cc)) state.midi.switches.push({ channel, cc });
+    const learn = state.midi.learning;
+    if (learn) {
+      const m = findMapping(channel, cc, learn.page) ?? { switch: { channel, cc }, page: learn.page, tap: null, hold: null };
+      if (!mappings()?.includes(m)) mappings()?.push(m);
+      m[learn.gesture] = learn.action;
+      state.midi.learning = null;
+      held.set(key, { done: true }); // the learned press doesn't run anything
+      return emitState();
+    }
+    const m = findMapping(channel, cc, state.midi.page);
+    if (!m?.hold) {
+      held.set(key, { done: true });
+      return m?.tap ? run(m.tap) : emitState(); // no hold action: tap on press
+    }
+    const h: { done: boolean; timer?: ReturnType<typeof setTimeout> } = { done: false };
+    h.timer = setTimeout(() => {
+      h.done = true;
+      run(m.hold!);
+    }, m.holdMs ?? 500);
+    held.set(key, h);
+  };
+  const release = (channel: number, cc: number) => {
+    const key = `${channel}:${cc}`;
+    const h = held.get(key);
+    if (!h) return; // a release with no press
+    held.delete(key);
+    clearTimeout(h.timer);
+    const tap = findMapping(channel, cc, state.midi.page)?.tap;
+    if (!h.done && tap) run(tap);
+  };
+  const run = (action: ActionRef) => {
+    const p = projects.find((p) => p.id === state.project?.id);
+    if (action.type === "page.next") {
+      state.midi.page = (state.midi.page + 1) % pageCount();
+      return emitState();
+    }
+    if ((action.type === "preset.next" || action.type === "preset.prev") && p?.presets.length) {
+      const at = p.presets.findIndex((x) => x.id === p.currentPresetId);
+      const n = p.presets.length;
+      const next = action.type === "preset.next" ? (at + 1) % n : at <= 0 ? n - 1 : at - 1;
+      return bridge.send({ type: "preset.load", presetId: p.presets[next].id });
+    }
+    if (action.type === "chain.toggleMute") {
+      const c = chain(action.chainId as string);
+      return c ? bridge.send({ type: "chain.setMute", chainId: c.id, muted: !c.muted }) : emitState();
+    }
+    if (action.type === "aby.toggleAB" || action.type === "aby.toggleY") {
+      const aby = findAby(action.blockId as string);
+      if (!aby) return emitState();
+      if (action.type === "aby.toggleY" || aby.mode === "Y") return bridge.send({ type: "aby.setMode", blockId: aby.id, mode: aby.mode === "Y" ? "AB" : "Y" });
+      return bridge.send({ type: "aby.select", blockId: aby.id, path: aby.active === "A" ? "B" : "A" });
+    }
+    if (["block.toggle", "preset.load", "aby.select", "panic.toggle"].includes(action.type)) return bridge.send(action as unknown as Command);
+    error(`The footswitch can't do ${action.type} yet`);
+  };
+
+  const bridge: EngineBridge = {
     send(cmd: Command) {
       switch (cmd.type) {
         case "app.ready":
@@ -156,6 +236,7 @@ export function createMockEngine(): EngineBridge {
             openedAt: Date.now(),
             presets: [],
             currentPresetId: null,
+            mappings: [],
           });
           open(id);
           break;
@@ -204,6 +285,46 @@ export function createMockEngine(): EngineBridge {
           }
           break;
         }
+        case "midi.selectDevice":
+          state.midi.device = cmd.name || null;
+          break;
+        case "footswitch.press":
+          return cmd.down ? press(cmd.channel, cmd.cc) : release(cmd.channel, cmd.cc);
+        case "midi.learn":
+          if (!state.project) return error("No project open");
+          state.midi.learning = { action: cmd.action, gesture: cmd.gesture, page: cmd.page ?? state.midi.page };
+          break;
+        case "midi.forgetSwitch": {
+          const same = (s: { channel: number; cc: number }) => s.channel === cmd.channel && s.cc === cmd.cc;
+          state.midi.switches = state.midi.switches.filter((s) => !same(s));
+          const list = mappings();
+          if (list) list.splice(0, list.length, ...list.filter((m) => !same(m.switch)));
+          break;
+        }
+        case "midi.cancelLearn":
+          state.midi.learning = null;
+          break;
+        case "mapping.set": {
+          if (!mappings()) return error("No project open");
+          const m = findMapping(cmd.channel, cmd.cc, cmd.page) ?? { switch: { channel: cmd.channel, cc: cmd.cc }, page: cmd.page, tap: null, hold: null };
+          if (!mappings()!.includes(m)) mappings()!.push(m);
+          m[cmd.gesture] = cmd.action;
+          break;
+        }
+        case "mapping.clear":
+        case "mapping.setHoldMs": {
+          const m = findMapping(cmd.channel, cmd.cc, cmd.page);
+          if (!m) return error("No mapping for that switch");
+          if (cmd.type === "mapping.setHoldMs") m.holdMs = Math.min(3000, Math.max(100, cmd.holdMs));
+          else {
+            m[cmd.gesture] = null;
+            if (!m.tap && !m.hold) mappings()!.splice(mappings()!.indexOf(m), 1);
+          }
+          break;
+        }
+        case "footswitch.setPage":
+          state.midi.page = Math.min(pageCount(), Math.max(0, cmd.page)); // one past the last: a new, empty page
+          break;
         case "chain.create": {
           const p = projects.find((p) => p.id === state.project?.id);
           if (!p) return error("Open a project first");
@@ -411,4 +532,5 @@ export function createMockEngine(): EngineBridge {
       return () => listeners.delete(fn);
     },
   };
+  return bridge;
 }

@@ -120,10 +120,21 @@ export interface Chain {
 
 export interface PresetSummary { id: string; name: string }
 
+/**
+ * What a footswitch does. Commands: { type: "block.toggle", blockId }, { type: "preset.load", presetId },
+ * { type: "aby.select", blockId, path }, { type: "panic.toggle" }. Footswitch-only: { type: "chain.toggleMute", chainId },
+ * { type: "preset.next" }, { type: "preset.prev" }, { type: "aby.toggleAB", blockId },
+ * { type: "aby.toggleY", blockId }, { type: "page.next" }.
+ */
 export interface ActionRef { type: string; [key: string]: unknown }
 
+/**
+ * A footswitch on a page, in the project: a tap and a hold action. holdMs defaults to 500. A switch
+ * that sends Program Change has cc 128 + program; it can only tap (it never sends a release).
+ */
 export interface Mapping {
-  switch: { device: string; channel: number; cc: number };
+  switch: { channel: number; cc: number };
+  page: number;
   tap: ActionRef | null;
   hold: ActionRef | null;
   holdMs?: number;
@@ -207,5 +218,17 @@ export interface GlitchState {
   songs: Song[];
   transport: TransportState;
   tuneMode: TuneModeState;
-  midi: { device: string | null };
+  midi: {
+    /** The chosen MIDI input, by name; connected says whether it's plugged in and open. */
+    device: string | null;
+    connected: boolean;
+    devices: string[];
+    /** MIDI learn: the next switch pressed gets this action. */
+    learning: { action: ActionRef; gesture: "tap" | "hold"; page: number } | null;
+    page: number;
+    pageCount: number;
+    lastSwitch: { channel: number; cc: number } | null;
+    /** Every switch pressed so far (MIDI doesn't list a controller's switches), kept with the MIDI setup. */
+    switches: { channel: number; cc: number }[];
+  };
 }
