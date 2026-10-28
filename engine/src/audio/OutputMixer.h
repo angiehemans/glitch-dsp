@@ -34,6 +34,9 @@ public:
                 target[source][ch][out].store (gains[ch][out]);
     }
 
+    /** Tune mode: a silenced source fades out (and back in) without its routes changing. */
+    void setSilenced (int source, bool silenced) { quiet[source].store (silenced); }
+
     void prepareToPlay (double sampleRate, int maximumBlockSize) override
     {
         mix.setSize (numOutputs, maximumBlockSize);
@@ -42,7 +45,7 @@ public:
                 for (int out = 0; out < numOutputs; ++out)
                 {
                     gain[s][ch][out].reset (sampleRate, fadeSeconds);
-                    gain[s][ch][out].setCurrentAndTargetValue (target[s][ch][out].load());
+                    gain[s][ch][out].setCurrentAndTargetValue (quiet[s].load() ? 0.0f : target[s][ch][out].load());
                 }
     }
 
@@ -53,13 +56,14 @@ public:
 
         for (int s = 0; s < numSources; ++s)
         {
+            const auto silenced = quiet[s].load (std::memory_order_relaxed);
             for (int ch = 0; ch < 2; ++ch)
             {
                 const auto* in = buffer.getReadPointer (s * 2 + ch);
                 for (int out = 0; out < numOutputs; ++out)
                 {
                     auto& g = gain[s][ch][out];
-                    g.setTargetValue (target[s][ch][out].load (std::memory_order_relaxed));
+                    g.setTargetValue (silenced ? 0.0f : target[s][ch][out].load (std::memory_order_relaxed));
                     if (! g.isSmoothing() && g.getCurrentValue() == 0.0f)
                         continue; // not routed: most crosspoints, most of the time
 
@@ -94,6 +98,7 @@ public:
 
 private:
     std::atomic<float> target[numSources][2][numOutputs] {};
+    std::atomic<bool> quiet[numSources] {};
     juce::SmoothedValue<float> gain[numSources][2][numOutputs]; // audio thread only
     juce::AudioBuffer<float> mix;
 

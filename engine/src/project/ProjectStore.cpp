@@ -177,6 +177,9 @@ juce::var ProjectStore::normaliseProject (const juce::var& project)
     setDefault (*obj, "setlists", juce::Array<juce::var>());
     setDefault (*obj, "songPresets", object());
     setDefault (*obj, "trackMix", object());
+    // Tune mode's settings: the input the tuner hears (1-based), A4 in Hz, and the chain that stays live.
+    if (! project["tuneMode"].isObject())
+        obj->setProperty ("tuneMode", object ({ { "tunerInput", 1 }, { "reference", 440 }, { "vocalChainId", {} } }));
     if (! project["mappings"].isArray())
         obj->setProperty ("mappings", juce::Array<juce::var>());
     if (! project["pluginStates"].isObject())

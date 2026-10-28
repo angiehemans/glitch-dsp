@@ -59,6 +59,9 @@ private:
     bool handleRouteCommand (const juce::String& type, const juce::var& command);
     bool handlePresetCommand (const juce::String& type, const juce::var& command);
     bool handleMidiCommand (const juce::String& type, const juce::var& command);
+    bool handleTuneCommand (const juce::String& type, const juce::var& command);
+    /** Tells the engine tune mode's state and settings (the project's), e.g. after a setting changes. */
+    void applyTuneMode (bool on);
 
     // Footswitch: mappings are the project's, per switch and page, each with a tap and a hold action.
     juce::var findMapping (Footswitch::Switch, int onPage) const;

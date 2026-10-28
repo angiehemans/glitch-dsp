@@ -270,6 +270,13 @@ body {
   width: auto;
 }
 
+/* Tune mode (TunerView): over everything below the top bar, so Panic stays in reach */
+.gl-tuner {
+  position: fixed;
+  inset: 64px 0 0 0;
+  z-index: 200;
+}
+
 /* The footswitch panel on the Rig, above the monitor strip (RigView) */
 .gl-footswitch {
   padding: 0 var(--space-6) var(--space-4);

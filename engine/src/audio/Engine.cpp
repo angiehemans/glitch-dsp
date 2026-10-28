@@ -81,6 +81,7 @@ void Engine::setChains (const std::vector<ChainSpec>& requested, std::function<v
                     break;
                 }
     }
+    applyTuneSilence(); // a chain added while tuning stays quiet
 
     // Fade out every live chain whose wiring changes, or that goes away.
     std::set<juce::String> ids;
@@ -448,6 +449,30 @@ float Engine::takePeakDb (Meter m)
     return juce::Decibels::gainToDecibels (peaks[(size_t) m].exchange (0.0f), silenceDb);
 }
 
+void Engine::setTuneMode (bool on, int tunerInput, const juce::String& keepChainId)
+{
+    tunerChannel = tunerInput;
+    keepChain = keepChainId;
+    tuning = on;
+    if (on)
+        tuner.start (getSampleRate());
+    else
+        tuner.stop();
+    applyTuneSilence();
+}
+
+void Engine::applyTuneSilence()
+{
+    auto* mixer = dynamic_cast<OutputMixer*> (graph.getNodeForId (mixerNode)->getProcessor());
+    for (int slot = 0; slot < maxChains; ++slot)
+    {
+        const auto it = std::find_if (slots.begin(), slots.end(), [slot] (const auto& s) { return s.second == slot; });
+        const auto silenced = tuning.load() && (it == slots.end() || it->first != keepChain);
+        for (int source = 0; source < 2; ++source)
+            mixer->setSilenced (slot * 2 + source, silenced);
+    }
+}
+
 float Engine::takeOutputPeakDb (int channel)
 {
     if (channel < 0 || channel >= maxChannels)
@@ -583,6 +608,10 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
                                                int numSamples,
                                                const juce::AudioIODeviceCallbackContext& context)
 {
+    // The tuner hears its input before any chain, so effects and amps don't sway the reading.
+    if (const auto ch = tunerChannel.load(); tuning.load() && ch < numInputs && inputs[ch] != nullptr)
+        tuner.push (inputs[ch], numSamples);
+
     if (numInputs > 0 && inputs[0] != nullptr)
     {
         const auto range = juce::FloatVectorOperations::findMinAndMax (inputs[0], numSamples);

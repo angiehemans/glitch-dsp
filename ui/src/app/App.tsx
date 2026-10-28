@@ -9,6 +9,7 @@ import { route } from "./router";
 import { HomeView } from "./views/HomeView";
 import { RigView } from "./views/RigView";
 import { RoutingView } from "./views/RoutingView";
+import { TunerView } from "./views/TunerView";
 
 // A signal rendered as text updates that text node in place: reading cpuPercent.value in App would
 // re-render the whole app (every chain) on each meters event.
@@ -75,6 +76,7 @@ export function App() {
             if (d) send({ type: "device.select", deviceType: d.type, name: d.name }); // picking the current one reopens it
           }}
           panic={state?.panic ? "on" : "off"}
+          onTune={() => send({ type: "tune.toggle" })}
           onPanic={() => send({ type: "panic.toggle" })}
         />
         {isMock && (
@@ -92,6 +94,8 @@ export function App() {
           </button>
         </div>
       )}
+      {state?.tuneMode.active && <TunerView state={state} />}
+
       {lastError.value && (
         <div class="gl-banner gl-banner-error" role="alert">
           {lastError.value}

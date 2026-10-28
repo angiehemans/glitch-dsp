@@ -27,6 +27,7 @@ type TopBarProps = {
   onSelectDevice?: (id: string) => void;
   onSelectRate?: (id: string) => void;
   onSelectBuffer?: (id: string) => void;
+  onTune?: () => void;
   onPanic?: () => void;
   onSelectPreset?: (id: string) => void;
   onSavePreset?: () => void;
@@ -79,6 +80,7 @@ export default function TopBar({
   onSelectDevice,
   onSelectRate,
   onSelectBuffer,
+  onTune,
   onPanic,
   onSelectPreset,
   onSavePreset,
@@ -174,6 +176,7 @@ export default function TopBar({
         <div data-scamp-id="midi_led_c7ba" className={styles.midi_led_c7ba} />
         <span data-scamp-id="midi_name_04db" className={styles.midi_name_04db}>{midiDevice}</span>
       </div>
+      <button data-scamp-id="tune_btn_5d0b" className={styles.tune_btn_5d0b} type="button" aria-label="Tune mode: mute all but vocals and open the tuner" onClick={onTune}>TUNE</button>
       <button data-scamp-id="panic_3b9e" className={styles.panic_3b9e} type="button" aria-label="Panic: mute all outputs" aria-pressed={panic === "on"} onClick={onPanic}>
         <span data-scamp-id="panic_label_4caf" className={styles.panic_label_4caf}>PANIC</span>
       </button>
@@ -181,4 +184,4 @@ export default function TopBar({
   );
 }
 
-export const _scamp = { contract: 2, events: ['onAudioClick', 'onSelectDevice', 'onSelectRate', 'onSelectBuffer', 'onPanic', 'onSelectPreset', 'onSavePreset', 'onSaveAsPreset', 'onRenamePreset', 'onDeletePreset'] } as const;
+export const _scamp = { contract: 2, events: ['onAudioClick', 'onSelectDevice', 'onSelectRate', 'onSelectBuffer', 'onTune', 'onPanic', 'onSelectPreset', 'onSavePreset', 'onSaveAsPreset', 'onRenamePreset', 'onDeletePreset'] } as const;
