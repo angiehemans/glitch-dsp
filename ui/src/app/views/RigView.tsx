@@ -377,10 +377,10 @@ export function RigView({ state }: { state: GlitchState }) {
             onRemove={() => send({ type: "chain.remove", chainId: c.id })}
             input={`In ${c.inputs[0].hwChannel}`}
             {...ioOptions(c, inputNames, outputNames)}
-            level={String(Math.round(dbToPosition(c.outputs[0].level) * 100))}
+            level={String(Math.round(dbToPosition(c.level) * 100))}
             muted={c.muted}
             inputMeter={`chain:${c.id}:in`}
-            output={outputLabel(c.outputs[0].hwChannels)}
+            output={c.outputs.length ? outputLabel(c.outputs[0].hwChannels) + (c.outputs.length > 1 ? ` +${c.outputs.length - 1}` : "") : "No output"}
             {...exitOutputs(c)}
             outputMeter={`chain:${c.id}:out`}
             plugins={[ABY_ROW, ...plugins]}

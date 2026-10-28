@@ -53,6 +53,7 @@ private:
     void applyChainParams (const juce::var& chain);
     void applyAbyParams (const juce::var& aby);
     bool handleAbyCommand (const juce::String& type, const juce::var& command);
+    bool handleRouteCommand (const juce::String& type, const juce::var& command);
     /** Copies plugin states into the project, so they save. */
     void captureStates();
     void openEditor (const juce::String& blockId);

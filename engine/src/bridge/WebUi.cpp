@@ -86,16 +86,27 @@ namespace
         return (v.isInt() || v.isInt64()) && (int) v >= 1 && (int) v <= Engine::maxChannels;
     }
 
-    /** An outputs list's first hwChannels, checked; empty when any channel is invalid or repeated. */
-    juce::Array<juce::var> outputChannels (const juce::var& outputs)
+    /** Hardware outputs for a send, checked: one or two valid, distinct channels, else empty. */
+    juce::Array<juce::var> sendChannels (const juce::var& requested)
     {
-        const auto requested = outputs[0]["hwChannels"];
         juce::Array<juce::var> hwChannels;
         if (auto* list = requested.getArray())
             for (const auto& ch : *list)
                 if (isChannel (ch) && ! hwChannels.contains ((int) ch))
                     hwChannels.add ((int) ch);
-        return hwChannels.size() == requested.size() ? hwChannels : juce::Array<juce::var>();
+        return hwChannels.size() == requested.size() && hwChannels.size() <= 2 ? hwChannels : juce::Array<juce::var>();
+    }
+
+    /** An outputs list's first hwChannels, checked like sendChannels. */
+    juce::Array<juce::var> outputChannels (const juce::var& outputs)
+    {
+        return sendChannels (outputs[0]["hwChannels"]);
+    }
+
+    /** A matrix send: hardware outputs (one, or a left/right pair) with a level and mute. */
+    juce::var newSend (const juce::var& hwChannels = juce::Array<juce::var> { 1, 2 })
+    {
+        return object ({ { "hwChannels", hwChannels }, { "level", 0.0 }, { "pan", 0.0 }, { "mute", false } });
     }
 
     /** The chain's last block, when it's an ABY whose paths exit to their own outputs. */
@@ -283,6 +294,11 @@ void WebUi::handleCommand (const juce::var& command)
         if (! handleAbyCommand (type, command))
             return;
     }
+    else if (type.startsWith ("route."))
+    {
+        if (! handleRouteCommand (type, command))
+            return;
+    }
     else if (type == protocol::command::deviceScan)
     {
         engine.rescanDevices();
@@ -357,7 +373,6 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
         sendError ("Unknown chain: " + command["chainId"].toString());
         return false;
     }
-    auto* output = chain["outputs"][0].getDynamicObject();
 
     if (type == protocol::command::chainSetInputs)
     {
@@ -372,14 +387,17 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
     }
     else if (type == protocol::command::chainSetOutputs)
     {
+        // The chain's output chip: a shortcut that edits its first send (or adds one).
         const auto hwChannels = outputChannels (command["outputs"]);
         if (hwChannels.isEmpty())
         {
             sendError ("Invalid output channels");
             return false;
         }
-        output->setProperty ("hwChannels", hwChannels);
-        syncEngine();
+        if (chain["outputs"].size() == 0)
+            chain["outputs"].getArray()->add (newSend());
+        chain["outputs"][0].getDynamicObject()->setProperty ("hwChannels", hwChannels);
+        applyChainParams (chain); // routes are mixer gains: no rewiring
     }
     else if (type == protocol::command::chainRemove)
     {
@@ -398,7 +416,7 @@ bool WebUi::handleChainCommand (const juce::String& type, const juce::var& comma
     }
     else if (type == protocol::command::chainSetLevel)
     {
-        output->setProperty ("level", juce::jlimit (Engine::silenceDb, 10.0f, (float) command["levelDb"]));
+        obj->setProperty ("level", juce::jlimit (Engine::silenceDb, 10.0f, (float) command["levelDb"]));
         applyChainParams (chain); // no rewiring at fader rate
     }
     else if (type == protocol::command::chainSetMute)
@@ -486,7 +504,7 @@ bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command
             return false;
         }
         output.getDynamicObject()->setProperty ("hwChannels", hwChannels);
-        syncEngine();
+        applyChainParams (store.findChainOf (aby["id"].toString()));
     }
     else
     {
@@ -495,6 +513,61 @@ bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command
     }
 
     applyAbyParams (aby); // no rewiring: switching and muting only change the merge's gains
+    store.markDirty();
+    return true;
+}
+
+bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& command)
+{
+    const auto chain = store.findChain (command["chainId"].toString());
+    if (! chain.isObject())
+    {
+        sendError ("Unknown chain: " + command["chainId"].toString());
+        return false;
+    }
+
+    // A chain whose ABY splits to separate outputs routes paths A and B; any other, its own output.
+    const auto path = command["path"].toString();
+    const auto split = splitExit (chain);
+    if (path.isNotEmpty() != split.isObject())
+    {
+        sendError (split.isObject() ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
+        return false;
+    }
+    auto* sends = (split.isObject() ? split["splitOutputs"][path == "B" ? "B" : "A"] : chain["outputs"]).getArray();
+
+    const auto hwChannels = sendChannels (command["hwChannels"]);
+    if (sends == nullptr || hwChannels.isEmpty())
+    {
+        sendError ("Invalid output channels");
+        return false;
+    }
+
+    const auto key = juce::JSON::toString (hwChannels, true);
+    const auto it = std::find_if (sends->begin(), sends->end(), [&] (const auto& s) { return juce::JSON::toString (s["hwChannels"], true) == key; });
+
+    if (type == protocol::command::routeSet)
+    {
+        auto send = it != sends->end() ? *it : newSend (hwChannels);
+        if (it == sends->end())
+            sends->add (send);
+        if (! command["level"].isVoid())
+            send.getDynamicObject()->setProperty ("level", juce::jlimit (Engine::silenceDb, 10.0f, (float) command["level"]));
+        if (! command["mute"].isVoid())
+            send.getDynamicObject()->setProperty ("mute", (bool) command["mute"]);
+    }
+    else if (type == protocol::command::routeRemove)
+    {
+        if (it != sends->end())
+            sends->remove (it);
+    }
+    else
+    {
+        sendError ("Unknown command: " + type);
+        return false;
+    }
+
+    applyChainParams (chain); // mixer gains only: no rewiring
     store.markDirty();
     return true;
 }
@@ -682,9 +755,6 @@ void WebUi::syncEngine()
             Engine::ChainSpec spec;
             spec.id = c["id"].toString();
             spec.input = (int) c["inputs"][0]["hwChannel"] - 1;
-            if (auto* hwChannels = c["outputs"][0]["hwChannels"].getArray())
-                for (const auto& ch : *hwChannels)
-                    spec.outputs.push_back ((int) ch - 1);
 
             if (auto* blocks = c["blocks"].getArray())
             {
@@ -696,14 +766,6 @@ void WebUi::syncEngine()
                         step.id = b["id"].toString();
                         step.split = true;
                         step.exitSplit = b["exit"].toString() == "split" && b["id"] == c["blocks"].getArray()->getLast()["id"];
-                        if (step.exitSplit)
-                        {
-                            spec.outputs.clear();
-                            for (const auto* path : { "A", "B" })
-                                if (auto* hwChannels = b["splitOutputs"][path][0]["hwChannels"].getArray())
-                                    for (const auto& ch : *hwChannels)
-                                        (juce::String (path) == "A" ? spec.outputs : spec.outputsB).push_back ((int) ch - 1);
-                        }
                         step.pathA = preparePath (b["pathA"]);
                         step.pathB = preparePath (b["pathB"]);
                         engine.addSplit (step.id);
@@ -792,7 +854,29 @@ void WebUi::importToLibrary()
 
 void WebUi::applyChainParams (const juce::var& chain)
 {
-    engine.setChainParams (chain["id"].toString(), (float) chain["outputs"][0]["level"], (bool) chain["muted"]);
+    const auto id = chain["id"].toString();
+    engine.setChainParams (id, (float) chain["level"], (bool) chain["muted"]);
+
+    const auto sends = [] (const juce::var& list)
+    {
+        std::vector<Engine::Send> result;
+        if (auto* items = list.getArray())
+            for (const auto& item : *items)
+            {
+                Engine::Send send { {}, (float) item["level"], (bool) item["mute"] };
+                if (auto* hwChannels = item["hwChannels"].getArray())
+                    for (const auto& ch : *hwChannels)
+                        send.outputs.push_back ((int) ch - 1);
+                result.push_back (send);
+            }
+        return result;
+    };
+
+    // A split exit sends paths A and B on their own; otherwise the chain's own sends.
+    if (const auto split = splitExit (chain); split.isObject())
+        engine.setRoutes (id, sends (split["splitOutputs"]["A"]), sends (split["splitOutputs"]["B"]));
+    else
+        engine.setRoutes (id, sends (chain["outputs"]), {});
 }
 
 void WebUi::applyAbyParams (const juce::var& aby)
@@ -1092,11 +1176,9 @@ void WebUi::timerCallback()
        #endif
     }
 
-    const auto levels = object ({
-        { "in:1", engine.takePeakDb (Engine::in1) },
-        { "out:1", engine.takePeakDb (Engine::out1) },
-        { "out:2", engine.takePeakDb (Engine::out2) },
-    });
+    const auto levels = object ({ { "in:1", engine.takePeakDb (Engine::in1) } });
+    for (int ch = 0; ch < Engine::maxChannels; ++ch)
+        levels.getDynamicObject()->setProperty ("out:" + juce::String (ch + 1), engine.takeOutputPeakDb (ch));
 
     for (const auto& id : chainIds)
     {

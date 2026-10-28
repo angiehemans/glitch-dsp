@@ -1,17 +1,20 @@
 import { computed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import TopBar from "@scamp/components/TopBar/TopBar";
+import ViewTabs from "@scamp/components/ViewTabs/ViewTabs";
 import { isMock } from "../bridge/engine";
 import { cpuPercent, glitch, lastError, send } from "../store/glitch";
 import { route } from "./router";
 import { HomeView } from "./views/HomeView";
 import { RigView } from "./views/RigView";
+import { RoutingView } from "./views/RoutingView";
 
 // A signal rendered as text updates that text node in place: reading cpuPercent.value in App would
 // re-render the whole app (every chain) on each meters event.
 const cpuText = computed(() => `${cpuPercent.value}%`);
 
-// Routes match the links Scamp's views use: "/" (projects) and "/rig". The top bar's back arrow goes home.
+// Routes match the links Scamp's views use: "/" (projects), "/rig" and "/routing". The top bar's back
+// arrow goes home; ViewTabs switches between a project's Rig and Routing.
 export function App() {
   const state = glitch.value;
   const device = state?.device;
@@ -27,7 +30,7 @@ export function App() {
     <div class="gl-app">
       <div class="gl-topbar">
         <TopBar
-          variant={path === "/rig" ? "rig" : "home"}
+          variant={path === "/rig" || path === "/routing" ? "rig" : "home"}
           projectName={state?.project?.name ?? "NO PROJECT"}
           projectRenameKey={state?.project ? `project:${state.project.id}` : ""}
           presetName="—"
@@ -82,10 +85,18 @@ export function App() {
         </div>
       )}
 
+      {state?.project && (path === "/rig" || path === "/routing") && (
+        <div class="gl-tabs">
+          <ViewTabs active={path === "/routing" ? "routing" : "rig"} />
+        </div>
+      )}
+
       {!state ? (
         <p class="gl-loading">Connecting to engine…</p>
       ) : path === "/rig" ? (
         <RigView state={state} />
+      ) : path === "/routing" ? (
+        <RoutingView state={state} />
       ) : (
         <HomeView state={state} />
       )}
