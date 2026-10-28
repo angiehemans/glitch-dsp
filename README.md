@@ -182,7 +182,7 @@ env -u GTK_PATH -u GTK_EXE_PREFIX -u GIO_MODULE_DIR -u GTK_IM_MODULE_FILE -u GSE
 
 ### Mac setup (one time)
 
-- Install Xcode 14.2 (or its command line tools), CMake 3.22+ and Node 20 from their official installers. Don't rely on Homebrew on Monterey.
+- Install Xcode 14.2 (or its command line tools), CMake 3.22+ and Node 22 from their official installers (Node 24, which CI uses, needs macOS 13.5). Don't rely on Homebrew on Monterey.
 - Update Safari to 17.6, so the WebView gets the newest engine Monterey allows.
 - Turn on System Preferences > Sharing > Remote Login. Add an SSH key and a `glitch-mac` host alias in `~/.ssh/config` on Linux.
 - The M4 plugs straight into a USB-A port. No hub.
@@ -217,7 +217,7 @@ For live UI on the Mac: run `./scripts/dev.sh` on Linux, then build `dev-remote`
 | vite | 5.4.10 | build target `safari15` |
 | @preact/preset-vite | 2.9.1 | |
 | typescript | 5.6.3 | |
-| Node | 20 | `.nvmrc` |
+| Node | 24 | `.nvmrc` |
 | Dev server port | **5290** | Not 5173: Vite's default port clashes with other local projects (including the Scamp repo). Set in `ui/vite.config.ts` and both dev presets. |
 | CMake | 3.22+ | |
 | C++ | C++20 | Only what Xcode 14.2 supports: no `std::format`, careful with ranges |
