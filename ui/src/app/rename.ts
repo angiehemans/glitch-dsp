@@ -3,7 +3,7 @@ import { glitch, send } from "../store/glitch";
 import { cancelPendingNavigation } from "./router";
 
 /**
- * Double-click any element with data-rename="project:<id>" or "chain:<id>" to edit its text in place
+ * Double-click any element with data-rename="project:<id>", "chain:<id>" or "preset:<id>" to edit its text in place
  * (contenteditable keeps Scamp's styling). Enter or clicking away saves, Escape cancels. The engine
  * is the source of truth: on save the text waits for the state that carries the new name.
  */
@@ -12,9 +12,17 @@ type Done = (how: "enter" | "blur" | "cancel") => void;
 function startRenaming(el: HTMLElement, onDone?: Done) {
   if (el.isContentEditable) return;
   const [kind, id] = (el.dataset.rename ?? "").split(":");
-  if (!id || (kind !== "project" && kind !== "chain")) return;
+  if (!id || (kind !== "project" && kind !== "chain" && kind !== "preset")) return;
 
   const original = el.textContent ?? "";
+  // A name inside a button (the top bar's preset): while editing, a space or a click in the text
+  // would press the button.
+  const host = el.closest("button");
+  const block = (e: Event) => {
+    e.stopPropagation();
+    e.preventDefault();
+  };
+  host?.addEventListener("click", block, true);
   el.contentEditable = "plaintext-only";
   el.focus();
   const range = document.createRange();
@@ -25,12 +33,15 @@ function startRenaming(el: HTMLElement, onDone?: Done) {
   const finish = (how: "enter" | "blur" | "cancel") => {
     el.removeEventListener("keydown", onKey);
     el.removeEventListener("blur", onBlur);
+    host?.removeEventListener("click", block, true);
     el.contentEditable = "false";
     const name = (el.textContent ?? "").replace(/\s+/g, " ").trim();
     if (how === "cancel" || !name || name === original) {
       el.textContent = original;
     } else if (kind === "project") {
       send({ type: "project.rename", projectId: id, name });
+    } else if (kind === "preset") {
+      send({ type: "preset.rename", presetId: id, name });
     } else {
       send({ type: "chain.rename", chainId: id, name });
     }
@@ -66,8 +77,8 @@ export function renameByKey(key: string) {
  * Start renaming the next project or chain to appear (after project.create / chain.create), so new
  * things get a name straight away.
  */
-export function renameWhenCreated(kind: "project" | "chain", onDone?: (id: string, how: "enter" | "blur" | "cancel") => void) {
-  const ids = (s = glitch.value) => (kind === "project" ? s?.projects.map((p) => p.id) : s?.chains.map((c) => c.id)) ?? [];
+export function renameWhenCreated(kind: "project" | "chain" | "preset", onDone?: (id: string, how: "enter" | "blur" | "cancel") => void) {
+  const ids = (s = glitch.value) => (kind === "project" ? s?.projects : kind === "preset" ? s?.presets : s?.chains)?.map((x) => x.id) ?? [];
   const known = new Set(ids());
   const dispose = effect(() => {
     const added = ids(glitch.value).find((id) => !known.has(id));

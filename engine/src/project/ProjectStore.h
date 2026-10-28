@@ -52,6 +52,19 @@ public:
     /** Where a block's plugin-window snapshot is kept: projects/<id>/snapshots/<blockId>.png. */
     static juce::File getSnapshotFile (const juce::String& projectId, const juce::String& blockId);
 
+    /** The open project's presets as summaries ({ id, name }), oldest first, and the one it's on. */
+    juce::var getPresetSummaries() const;
+    juce::String getCurrentPresetId() const { return current["currentPresetId"].toString(); }
+    /** Saves the rig (chains, and their blocks' plugin states: capture them first) as a preset,
+        replacing presetId, or a new one when it's empty, and makes it current. Returns its id. */
+    juce::String savePreset (const juce::String& presetId, const juce::String& name);
+    /** Replaces the rig with the preset's and makes it current. False for an unknown preset. */
+    bool loadPreset (const juce::String& presetId);
+    bool renamePreset (const juce::String& presetId, const juce::String& name);
+    bool deletePreset (const juce::String& presetId);
+    /** The rig differs from its preset's: chains, blocks, routing, levels or plugin states. */
+    bool isPresetModified() const;
+
     /** The audio device setup (AudioDeviceManager XML), kept in settings.json. */
     std::unique_ptr<juce::XmlElement> getDeviceState() const;
     void setDeviceState (const juce::XmlElement&);
@@ -68,10 +81,15 @@ private:
     static juce::var normaliseProject (const juce::var&);
     void forgetBlock (const juce::String& blockId); // its plugin state and snapshot
     static bool save (const juce::var& project);
+    static bool writeJson (const juce::File&, const juce::var&);
+    juce::File getPresetsDir() const;
+    void loadPresets(); // the open project's, from its presets folder
+    juce::var findPreset (const juce::String& presetId) const;
     void saveSettings() const;
 
     juce::Array<juce::var> projects;
     juce::var current;
+    juce::Array<juce::var> presets; // the open project's, whole (with plugin states)
     juce::var settings;
     bool dirty = false;
 

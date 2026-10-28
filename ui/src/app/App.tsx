@@ -4,6 +4,7 @@ import TopBar from "@scamp/components/TopBar/TopBar";
 import ViewTabs from "@scamp/components/ViewTabs/ViewTabs";
 import { isMock } from "../bridge/engine";
 import { cpuPercent, glitch, lastError, send } from "../store/glitch";
+import { renameByKey, renameWhenCreated } from "./rename";
 import { route } from "./router";
 import { HomeView } from "./views/HomeView";
 import { RigView } from "./views/RigView";
@@ -20,6 +21,7 @@ export function App() {
   const device = state?.device;
   const [path, query = ""] = route.value.split("?");
   const projectParam = new URLSearchParams(query).get("project");
+  const preset = state?.presets.find((p) => p.id === state.currentPresetId);
 
   // A project card links to /rig?project=<id>.
   useEffect(() => {
@@ -33,8 +35,22 @@ export function App() {
           variant={path === "/rig" || path === "/routing" ? "rig" : "home"}
           projectName={state?.project?.name ?? "NO PROJECT"}
           projectRenameKey={state?.project ? `project:${state.project.id}` : ""}
-          presetName="—"
-          modified={false}
+          presetName={preset?.name ?? "—"}
+          presetRenameKey={preset ? `preset:${preset.id}` : ""}
+          modified={!!state?.presetModified}
+          presets={(state?.presets ?? []).map((p) => ({ id: p.id, name: p.name, current: p.id === preset?.id }))}
+          noPresets={!state?.presets.length}
+          canSave={!!state?.project && (!preset || !!state.presetModified)}
+          hasPreset={!!preset}
+          deleteLabel={preset ? `Delete “${preset.name}”` : ""}
+          onSelectPreset={(id) => send({ type: "preset.load", presetId: id })}
+          onSavePreset={() => send({ type: "preset.save" })}
+          onSaveAsPreset={() => {
+            renameWhenCreated("preset"); // name it in place, in the top bar
+            send({ type: "preset.saveAs" });
+          }}
+          onRenamePreset={() => preset && renameByKey(`preset:${preset.id}`)}
+          onDeletePreset={() => preset && send({ type: "preset.delete", presetId: preset.id })}
           songName="—"
           cpuLoad={cpuText as unknown as string}
           audioDevice={device ? device.name : "NO AUDIO DEVICE"}

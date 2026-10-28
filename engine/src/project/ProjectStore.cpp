@@ -13,6 +13,14 @@ namespace
         return new juce::DynamicObject();
     }
 
+    juce::var object (std::initializer_list<std::pair<const char*, juce::var>> properties)
+    {
+        auto result = object();
+        for (const auto& [key, value] : properties)
+            result.getDynamicObject()->setProperty (key, value);
+        return result;
+    }
+
     juce::var arrayOf (std::initializer_list<juce::var> items)
     {
         return juce::Array<juce::var> (items);
@@ -269,6 +277,7 @@ bool ProjectStore::open (const juce::String& projectId)
         {
             current = p;
             current.getDynamicObject()->setProperty ("openedAt", now());
+            loadPresets();
             markDirty();
             saveSettings();
             return true;
@@ -299,15 +308,170 @@ void ProjectStore::saveIfDirty()
 
 bool ProjectStore::save (const juce::var& project)
 {
-    const auto file = getDataDir().getChildFile ("projects").getChildFile (project["id"].toString()).getChildFile ("project.json");
+    return writeJson (getDataDir().getChildFile ("projects").getChildFile (project["id"].toString()).getChildFile ("project.json"), project);
+}
+
+bool ProjectStore::writeJson (const juce::File& file, const juce::var& value)
+{
     file.getParentDirectory().createDirectory();
 
-    // Write to a temp file and move it over, so a crash mid-write never leaves a broken project.
+    // Write to a temp file and move it over, so a crash mid-write never leaves a broken file.
     juce::TemporaryFile temp (file);
-    if (temp.getFile().replaceWithText (juce::JSON::toString (project)) && temp.overwriteTargetFileWithTemporary())
+    if (temp.getFile().replaceWithText (juce::JSON::toString (value)) && temp.overwriteTargetFileWithTemporary())
         return true;
 
     DBG ("Failed to save " << file.getFullPathName());
+    return false;
+}
+
+//==============================================================================
+namespace
+{
+    /** Ids of every block in these chains, ABY paths included. */
+    juce::StringArray rigBlockIds (const juce::var& chains)
+    {
+        juce::StringArray ids;
+        if (auto* list = chains.getArray())
+            for (const auto& c : *list)
+                for (auto* blocks : ProjectStore::getBlockLists (c))
+                    for (const auto& b : *blocks)
+                        ids.add (b["id"].toString());
+        return ids;
+    }
+
+    /** The chains as JSON without what the engine fills in as it runs (load errors, notes, snapshots),
+        for comparing a rig with its preset. */
+    juce::String rigJson (const juce::var& chains)
+    {
+        const auto copy = chains.clone();
+        if (auto* list = copy.getArray())
+            for (const auto& c : *list)
+                for (auto* blocks : ProjectStore::getBlockLists (c))
+                    for (const auto& b : *blocks)
+                        if (auto* o = b.getDynamicObject())
+                            for (const auto* key : { "missing", "note", "snapshotAt", "snapshotWidth", "snapshotHeight" })
+                                o->removeProperty (key);
+        return juce::JSON::toString (copy, true);
+    }
+}
+
+juce::File ProjectStore::getPresetsDir() const
+{
+    return getDataDir().getChildFile ("projects").getChildFile (current["id"].toString()).getChildFile ("presets");
+}
+
+void ProjectStore::loadPresets()
+{
+    presets.clear();
+    for (const auto& file : getPresetsDir().findChildFiles (juce::File::findFiles, false, "*.json"))
+    {
+        const auto preset = juce::JSON::parse (file);
+        if (auto* obj = preset.getDynamicObject(); obj != nullptr && preset["id"].toString() == file.getFileNameWithoutExtension())
+        {
+            juce::Array<juce::var> chains;
+            if (auto* loaded = preset["chains"].getArray())
+                for (const auto& c : *loaded)
+                    if (auto chain = normaliseChain (c); ! chain.isVoid())
+                        chains.add (chain);
+            obj->setProperty ("chains", chains);
+            if (! preset["pluginStates"].isObject())
+                obj->setProperty ("pluginStates", object());
+            presets.add (preset);
+        }
+    }
+    std::sort (presets.begin(), presets.end(), [] (const auto& a, const auto& b) { return (juce::int64) a["createdAt"] < (juce::int64) b["createdAt"]; });
+}
+
+juce::var ProjectStore::findPreset (const juce::String& presetId) const
+{
+    for (const auto& p : presets)
+        if (p["id"].toString() == presetId)
+            return p;
+    return {};
+}
+
+juce::var ProjectStore::getPresetSummaries() const
+{
+    juce::Array<juce::var> result;
+    for (const auto& p : presets)
+        result.add (object ({ { "id", p["id"] }, { "name", p["name"] } }));
+    return result;
+}
+
+juce::String ProjectStore::savePreset (const juce::String& presetId, const juce::String& name)
+{
+    auto preset = findPreset (presetId);
+    if (! preset.isObject())
+    {
+        preset = object ({ { "id", newId() }, { "createdAt", now() } });
+        presets.add (preset);
+    }
+
+    auto* obj = preset.getDynamicObject();
+    obj->setProperty ("name", name.isNotEmpty() ? name : preset["name"].toString());
+    obj->setProperty ("chains", current["chains"].clone());
+
+    auto states = object();
+    for (const auto& id : rigBlockIds (current["chains"]))
+        if (const auto state = current["pluginStates"][juce::Identifier (id)]; ! state.isVoid())
+            states.getDynamicObject()->setProperty (id, state);
+    obj->setProperty ("pluginStates", states);
+
+    writeJson (getPresetsDir().getChildFile (preset["id"].toString() + ".json"), preset);
+    current.getDynamicObject()->setProperty ("currentPresetId", preset["id"]);
+    markDirty();
+    return preset["id"].toString();
+}
+
+bool ProjectStore::loadPreset (const juce::String& presetId)
+{
+    const auto preset = findPreset (presetId);
+    if (! preset.isObject())
+        return false;
+
+    // The rig's plugin states become the preset's; blocks that aren't in it are gone.
+    auto* obj = current.getDynamicObject();
+    obj->setProperty ("chains", preset["chains"].clone());
+    obj->setProperty ("pluginStates", preset["pluginStates"].clone());
+    obj->setProperty ("currentPresetId", presetId);
+    markDirty();
+    return true;
+}
+
+bool ProjectStore::renamePreset (const juce::String& presetId, const juce::String& name)
+{
+    const auto preset = findPreset (presetId);
+    if (! preset.isObject())
+        return false;
+    preset.getDynamicObject()->setProperty ("name", name);
+    return writeJson (getPresetsDir().getChildFile (presetId + ".json"), preset);
+}
+
+bool ProjectStore::deletePreset (const juce::String& presetId)
+{
+    const auto preset = findPreset (presetId);
+    if (! preset.isObject())
+        return false;
+    presets.removeAllInstancesOf (preset);
+    getPresetsDir().getChildFile (presetId + ".json").deleteFile();
+    if (getCurrentPresetId() == presetId)
+    {
+        current.getDynamicObject()->removeProperty ("currentPresetId"); // the rig stays, as no preset
+        markDirty();
+    }
+    return true;
+}
+
+bool ProjectStore::isPresetModified() const
+{
+    const auto preset = findPreset (getCurrentPresetId());
+    if (! preset.isObject())
+        return false;
+    if (rigJson (current["chains"]) != rigJson (preset["chains"]))
+        return true;
+    for (const auto& id : rigBlockIds (current["chains"]))
+        if (current["pluginStates"][juce::Identifier (id)] != preset["pluginStates"][juce::Identifier (id)])
+            return true;
     return false;
 }
 

@@ -59,6 +59,14 @@ export type Command =
   // chain's last block can split. It starts with both paths on the chain's outputs.
   | { type: "aby.setExit"; blockId: string; exit: "merge" | "split" }
   | { type: "aby.setOutputs"; blockId: string; path: "A" | "B"; outputs: Pick<OutputRef, "hwChannels">[] }
+  // Presets: a project's whole rig (chains, blocks, plugin states, routing). save overwrites the
+  // current preset (or makes one when there's none); saveAs always makes one. load swaps the rig
+  // in while every chain is faded out; blocks the presets share keep running.
+  | { type: "preset.save"; name?: string }
+  | { type: "preset.saveAs"; name?: string }
+  | { type: "preset.load"; presetId: string }
+  | { type: "preset.rename"; presetId: string; name: string }
+  | { type: "preset.delete"; presetId: string }
   // Stubbed from the plan; not handled until their milestone.
   | { type: "block.setParam"; blockId: string; param: string; value: number }
   | { type: "project.setMainOutput"; outputs: number[] }
@@ -81,7 +89,6 @@ export type Command =
   | { type: "transport.next" }
   | { type: "midi.learn"; action: ActionRef; gesture: "tap" | "hold" }
   | { type: "tune.toggle" }
-  | { type: "tune.setInput"; hwChannel: number }
-  | { type: "preset.load"; presetId: string };
+  | { type: "tune.setInput"; hwChannel: number };
 
 export type CommandType = Command["type"];
