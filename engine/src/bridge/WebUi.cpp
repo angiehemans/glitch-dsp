@@ -234,6 +234,13 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l, ModelLibrary& m)
             sendState();
             return;
         }
+        if (engine.isTuning())
+        {
+            // The plan: tap any switch (or hold again) to leave tune mode, whatever it's mapped to.
+            applyTuneMode (false);
+            sendState();
+            return;
+        }
         if (const auto action = findMapping (sw, page)[hold ? "hold" : "tap"]; action.isObject())
             runAction (action);
         else
@@ -347,6 +354,11 @@ void WebUi::handleCommand (const juce::var& command)
     else if (type.startsWith ("preset."))
     {
         if (! handlePresetCommand (type, command))
+            return;
+    }
+    else if (type.startsWith ("tune."))
+    {
+        if (! handleTuneCommand (type, command))
             return;
     }
     else if (type.startsWith ("midi.") || type.startsWith ("mapping.") || type.startsWith ("footswitch."))
@@ -624,6 +636,60 @@ bool WebUi::handlePresetCommand (const juce::String& type, const juce::var& comm
     return true;
 }
 
+bool WebUi::handleTuneCommand (const juce::String& type, const juce::var& command)
+{
+    auto* settings = store.getCurrent()["tuneMode"].getDynamicObject();
+    if (settings == nullptr)
+    {
+        sendError ("No project open");
+        return false;
+    }
+
+    if (type == protocol::command::tuneToggle)
+    {
+        applyTuneMode (! engine.isTuning());
+        return true;
+    }
+    if (type == protocol::command::tuneSetInput)
+    {
+        if (! isChannel (command["hwChannel"]))
+        {
+            sendError ("Invalid input channel");
+            return false;
+        }
+        settings->setProperty ("tunerInput", (int) command["hwChannel"]);
+    }
+    else if (type == protocol::command::tuneSetReference)
+    {
+        settings->setProperty ("reference", juce::jlimit (415.0, 466.0, (double) command["hz"]));
+    }
+    else if (type == protocol::command::tuneSetVocalChain)
+    {
+        const auto chainId = command["chainId"].toString();
+        if (chainId.isNotEmpty() && ! store.findChain (chainId).isObject())
+        {
+            sendError ("Unknown chain: " + chainId);
+            return false;
+        }
+        settings->setProperty ("vocalChainId", chainId.isNotEmpty() ? juce::var (chainId) : juce::var());
+    }
+    else
+    {
+        sendError ("Unknown command: " + type);
+        return false;
+    }
+    store.markDirty();
+    if (engine.isTuning())
+        applyTuneMode (true); // a new input or live chain takes effect now
+    return true;
+}
+
+void WebUi::applyTuneMode (bool on)
+{
+    const auto settings = store.getCurrent()["tuneMode"];
+    engine.setTuneMode (on, juce::jmax (1, (int) settings["tunerInput"]) - 1, settings["vocalChainId"].toString());
+}
+
 bool WebUi::handleMidiCommand (const juce::String& type, const juce::var& command)
 {
     const auto sw = Footswitch::Switch { (int) command["channel"], (int) command["cc"] };
@@ -781,7 +847,7 @@ void WebUi::runAction (const juce::var& action)
             handleCommand (object ({ { "type", protocol::command::abySelect }, { "blockId", action["blockId"] }, { "path", aby["active"].toString() == "A" ? "B" : "A" } }));
     }
     else if (type == protocol::command::blockToggle || type == protocol::command::presetLoad || type == protocol::command::abySelect
-             || type == protocol::command::panicToggle)
+             || type == protocol::command::panicToggle || type == protocol::command::tuneToggle)
     {
         handleCommand (action);
     }
@@ -1437,8 +1503,11 @@ void WebUi::sendState()
         { "setlists", juce::Array<juce::var>() },
         { "songs", juce::Array<juce::var>() },
         { "transport", object ({ { "playing", false }, { "songId", {} }, { "position", 0 } }) },
-        { "tuneMode", object ({ { "active", false }, { "tunerInput", 1 }, { "reference", 440 },
-                                { "vocalChainId", {} }, { "backingTracks", "pause" } }) },
+        { "tuneMode", object ({ { "active", engine.isTuning() },
+                                { "tunerInput", project.isObject() ? project["tuneMode"]["tunerInput"] : juce::var (1) },
+                                { "reference", project.isObject() ? project["tuneMode"]["reference"] : juce::var (440) },
+                                { "vocalChainId", project.isObject() ? project["tuneMode"]["vocalChainId"] : juce::var() },
+                                { "backingTracks", "pause" } }) },
         { "midi", midi },
     });
 
@@ -1523,6 +1592,21 @@ void WebUi::timerCallback()
     }
 
     emit (object ({ { "type", protocol::event::meters }, { "levels", levels }, { "cpu", engine.getCpuUsage() } }));
+
+    // The tuner's reading, about 15 times a second: the nearest note to A4 = reference, and how far off.
+    if (engine.isTuning() && ticks % 2 == 0)
+    {
+        static const juce::StringArray names { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" }; // ASCII: JUCE reads literals as ASCII
+        const auto hz = engine.getTunerHz();
+        const auto reference = (double) store.getCurrent()["tuneMode"]["reference"];
+        const auto midi = hz > 0 ? 69.0 + 12.0 * std::log2 (hz / (reference > 0 ? reference : 440.0)) : 0.0;
+        const auto nearest = (int) std::lround (midi);
+        emit (object ({ { "type", protocol::event::tuner },
+                        { "hz", hz },
+                        { "note", hz > 0 ? names[((nearest % 12) + 12) % 12] : juce::String() },
+                        { "octave", nearest / 12 - 1 },
+                        { "cents", hz > 0 ? (midi - nearest) * 100.0 : 0.0 } }));
+    }
 }
 
 //==============================================================================

@@ -122,7 +122,7 @@ export interface PresetSummary { id: string; name: string }
 
 /**
  * What a footswitch does. Commands: { type: "block.toggle", blockId }, { type: "preset.load", presetId },
- * { type: "aby.select", blockId, path }, { type: "panic.toggle" }. Footswitch-only: { type: "chain.toggleMute", chainId },
+ * { type: "aby.select", blockId, path }, { type: "panic.toggle" }, { type: "tune.toggle" }. Footswitch-only: { type: "chain.toggleMute", chainId },
  * { type: "preset.next" }, { type: "preset.prev" }, { type: "aby.toggleAB", blockId },
  * { type: "aby.toggleY", blockId }, { type: "page.next" }.
  */
@@ -184,6 +184,8 @@ export interface Project {
 
 export interface TransportState { playing: boolean; songId: string | null; position: number }
 
+/** Tune mode: everything but the vocal chain fades out, and the tuner listens to tunerInput (1-based)
+ * before any chain. Settings belong to the project; active doesn't save. */
 export interface TuneModeState {
   active: boolean;
   tunerInput: number;

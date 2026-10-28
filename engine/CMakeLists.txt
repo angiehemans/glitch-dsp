@@ -58,6 +58,7 @@ target_sources(Glitch PRIVATE
     src/MainComponent.cpp
     src/bridge/WebUi.cpp
     src/audio/Engine.cpp
+    src/audio/Tuner.cpp
     src/blocks/IrBlock.cpp
     src/blocks/ModelLibrary.cpp
     src/blocks/NamBlock.cpp
@@ -124,6 +125,19 @@ target_link_libraries(GlitchBench
         juce::juce_audio_processors
         juce::juce_audio_formats
         juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# TunerTest: checks pitch detection on known pitches. Not built by default:
+# cmake --build --preset dev --target TunerTest
+juce_add_console_app(TunerTest)
+set_target_properties(TunerTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(TunerTest PRIVATE tools/TunerTest.cpp src/audio/Tuner.cpp)
+target_compile_definitions(TunerTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(TunerTest
+    PRIVATE
+        juce::juce_audio_basics
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

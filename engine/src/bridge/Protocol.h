@@ -54,6 +54,10 @@ namespace glitch::protocol
         inline constexpr auto mappingHoldMs  = "mapping.setHoldMs";
         inline constexpr auto footswitchPage = "footswitch.setPage";
         inline constexpr auto footswitchPress = "footswitch.press";
+        inline constexpr auto tuneToggle     = "tune.toggle";
+        inline constexpr auto tuneSetInput   = "tune.setInput";
+        inline constexpr auto tuneSetReference = "tune.setReference";
+        inline constexpr auto tuneSetVocalChain = "tune.setVocalChain";
     }
 
     namespace event

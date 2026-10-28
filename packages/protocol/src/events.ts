@@ -6,7 +6,8 @@ export interface StateEvent { type: "state"; state: GlitchState }
 export interface MetersEvent { type: "meters"; levels: Record<string, number>; cpu: number }
 
 export interface TransportEvent { type: "transport"; position: number; songId: string; playing: boolean }
-export interface TunerEvent { type: "tuner"; note: string; cents: number; hz: number }
+/** ~15 Hz while tune mode is on: the nearest note in ASCII ("C#"; "" for no clear pitch), its octave, and how far off in cents. */
+export interface TunerEvent { type: "tuner"; note: string; octave: number; cents: number; hz: number }
 export interface SwitchEvent { type: "switch"; switchId: string; state: "down" | "held" | "up" }
 export interface ErrorEvent { type: "error"; message: string }
 

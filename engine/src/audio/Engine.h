@@ -4,6 +4,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "Tuner.h"
+
 #include <array>
 #include <atomic>
 #include <map>
@@ -95,6 +97,13 @@ public:
     /** Peaks since the last call, in dBFS. */
     float takePeakDb (Meter m);
     float takeChainPeakDb (const juce::String& chainId, bool output);
+    /** Tune mode: every chain but keepChainId (none: all) fades out of the outputs, and the tuner
+        listens to a hardware input (0-based) before any chain. Off restores everything as it was. */
+    void setTuneMode (bool on, int tunerInput, const juce::String& keepChainId);
+    bool isTuning() const { return tuning.load(); }
+    /** The tuner's latest reading in Hz, 0 for no clear pitch. */
+    float getTunerHz() const { return tuner.getHz(); }
+
     /** A hardware output's peak (0-based), after the master stage. */
     float takeOutputPeakDb (int channel);
 
@@ -157,6 +166,12 @@ private:
     std::atomic<bool> panic { false };
     std::array<std::atomic<float>, numMeters> peaks {};
     std::array<std::atomic<float>, maxChannels> outputPeaks {};
+
+    Tuner tuner;
+    std::atomic<bool> tuning { false };
+    std::atomic<int> tunerChannel { 0 };
+    juce::String keepChain; // tune mode's live chain
+    void applyTuneSilence(); // message thread: silences mixer sources for tune mode
     juce::SmoothedValue<float> master; // audio thread only
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Engine)

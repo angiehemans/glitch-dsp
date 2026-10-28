@@ -102,6 +102,10 @@ export type Command =
   | { type: "transport.stop" }
   | { type: "transport.next" }
   | { type: "tune.toggle" }
-  | { type: "tune.setInput"; hwChannel: number };
+  | { type: "tune.setInput"; hwChannel: number }
+  /** A4 in Hz, 415 to 466. */
+  | { type: "tune.setReference"; hz: number }
+  /** The chain that stays live in tune mode, or null to mute everything. */
+  | { type: "tune.setVocalChain"; chainId: string | null };
 
 export type CommandType = Command["type"];

@@ -22,7 +22,11 @@ function learnable(state: GlitchState): { name: string; action: ActionRef }[] {
     }
     list.push({ name: `Mute ${c.name}`, action: { type: "chain.toggleMute", chainId: c.id } });
   }
-  list.push({ name: "Panic (mute all outputs)", action: { type: "panic.toggle" } }, { name: "Next page", action: { type: "page.next" } });
+  list.push(
+    { name: "Tune mode (mute all but vocals, open the tuner)", action: { type: "tune.toggle" } },
+    { name: "Panic (mute all outputs)", action: { type: "panic.toggle" } },
+    { name: "Next page", action: { type: "page.next" } },
+  );
   return list;
 }
 
@@ -57,6 +61,8 @@ function describe(state: GlitchState, action: ActionRef | null): { label: string
       return { label: "Next page", lit: false };
     case "panic.toggle":
       return { label: "Panic", lit: state.panic };
+    case "tune.toggle":
+      return { label: "Tune mode", lit: state.tuneMode.active };
     default:
       return { label: action.type, lit: false };
   }

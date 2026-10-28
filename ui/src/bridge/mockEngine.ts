@@ -139,6 +139,14 @@ export function createMockEngine(): EngineBridge {
     const master = state.monitor.muted || state.panic ? SILENCE_DB : state.monitor.gainDb;
     outs.forEach((o, i) => (levels[`out:${i + 1}`] = Math.max(SILENCE_DB, o + master)));
     emit({ type: "meters", levels, cpu: 0.08 + Math.random() * 0.04 });
+    // A guitar's low E drifting a few cents either side, with gaps between notes.
+    if (state.tuneMode.active && Math.round(t * 30) % 2 === 0) {
+      const hz = Math.sin(t * 0.8) > -0.6 ? 82.41 * 2 ** ((12 * Math.sin(t * 0.5)) / 1200) * (state.tuneMode.reference / 440) : 0;
+      const midi = hz ? 69 + 12 * Math.log2(hz / state.tuneMode.reference) : 0;
+      const n = Math.round(midi);
+      const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+      emit({ type: "tuner", hz, note: hz ? names[((n % 12) + 12) % 12] : "", octave: Math.floor(n / 12) - 1, cents: hz ? (midi - n) * 100 : 0 });
+    }
   }, 1000 / 30);
 
   // Footswitch, as the engine's Footswitch and WebUi: tap/hold, MIDI learn, pages, actions.
@@ -159,6 +167,12 @@ export function createMockEngine(): EngineBridge {
       m[learn.gesture] = learn.action;
       state.midi.learning = null;
       held.set(key, { done: true }); // the learned press doesn't run anything
+      return emitState();
+    }
+    if (state.tuneMode.active) {
+      // Any switch leaves tune mode, whatever it's mapped to.
+      state.tuneMode.active = false;
+      held.set(key, { done: true });
       return emitState();
     }
     const m = findMapping(channel, cc, state.midi.page);
@@ -204,7 +218,7 @@ export function createMockEngine(): EngineBridge {
       if (action.type === "aby.toggleY" || aby.mode === "Y") return bridge.send({ type: "aby.setMode", blockId: aby.id, mode: aby.mode === "Y" ? "AB" : "Y" });
       return bridge.send({ type: "aby.select", blockId: aby.id, path: aby.active === "A" ? "B" : "A" });
     }
-    if (["block.toggle", "preset.load", "aby.select", "panic.toggle"].includes(action.type)) return bridge.send(action as unknown as Command);
+    if (["block.toggle", "preset.load", "aby.select", "panic.toggle", "tune.toggle"].includes(action.type)) return bridge.send(action as unknown as Command);
     error(`The footswitch can't do ${action.type} yet`);
   };
 
@@ -285,6 +299,19 @@ export function createMockEngine(): EngineBridge {
           }
           break;
         }
+        case "tune.toggle":
+          if (!state.project) return error("No project open");
+          state.tuneMode.active = !state.tuneMode.active;
+          break;
+        case "tune.setInput":
+          state.tuneMode.tunerInput = cmd.hwChannel;
+          break;
+        case "tune.setReference":
+          state.tuneMode.reference = Math.min(466, Math.max(415, cmd.hz));
+          break;
+        case "tune.setVocalChain":
+          state.tuneMode.vocalChainId = cmd.chainId;
+          break;
         case "midi.selectDevice":
           state.midi.device = cmd.name || null;
           break;

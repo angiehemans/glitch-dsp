@@ -177,6 +177,13 @@ int main()
         expect (0, 0.0f);
         expect (1, 0.0f);
         expect (4, 0.375f);
+
+        mixer.setSilenced (3, true); // tune mode: the source fades out, its routes untouched
+        process (16);
+        expect (4, 0.0f);
+        mixer.setSilenced (3, false);
+        process (16);
+        expect (4, 0.375f);
     }
 
     std::printf (failures == 0 ? "fades: ok\n" : "fades: %d failures\n", failures);
