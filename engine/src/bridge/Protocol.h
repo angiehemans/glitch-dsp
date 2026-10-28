@@ -40,6 +40,11 @@ namespace glitch::protocol
         inline constexpr auto blockMove      = "block.move";
         inline constexpr auto routeSet       = "route.set";
         inline constexpr auto routeRemove    = "route.remove";
+        inline constexpr auto presetSave     = "preset.save";
+        inline constexpr auto presetSaveAs   = "preset.saveAs";
+        inline constexpr auto presetLoad     = "preset.load";
+        inline constexpr auto presetRename   = "preset.rename";
+        inline constexpr auto presetDelete   = "preset.delete";
     }
 
     namespace event

@@ -15,6 +15,7 @@ export function emptyState(): GlitchState {
     chains: [],
     presets: [],
     currentPresetId: null,
+    presetModified: false,
     mappings: [],
     setlists: [],
     songs: [],
@@ -34,7 +35,11 @@ const newId = () => Math.random().toString(16).slice(2, 10);
  */
 export function createMockEngine(): EngineBridge {
   const listeners = new Set<(e: EngineEvent) => void>();
-  const projects: (Project & { chains: Chain[]; openedAt: number })[] = [];
+  type MockPreset = { id: string; name: string; chains: Chain[] };
+  const projects: (Project & { chains: Chain[]; openedAt: number; presets: MockPreset[]; currentPresetId: string | null })[] = [];
+  // The rig as saved: without what the engine fills in as it runs (as ProjectStore's rigJson).
+  const rigJson = (chains: Chain[]) =>
+    JSON.stringify(chains, (key, value) => (["missing", "note", "snapshotAt", "snapshotWidth", "snapshotHeight"].includes(key) ? undefined : value));
   const state: GlitchState = {
     ...emptyState(),
     device: {
@@ -60,6 +65,10 @@ export function createMockEngine(): EngineBridge {
     const current = projects.find((p) => p.id === state.project?.id) ?? null;
     state.project = current;
     state.chains = current?.chains ?? [];
+    state.presets = current?.presets.map(({ id, name }) => ({ id, name })) ?? [];
+    state.currentPresetId = current?.currentPresetId ?? null;
+    const preset = current?.presets.find((p) => p.id === current.currentPresetId);
+    state.presetModified = !!preset && rigJson(preset.chains) !== rigJson(current!.chains);
     state.projects = [...projects]
       .sort((a, b) => b.openedAt - a.openedAt)
       .map((p) => ({ id: p.id, name: p.name, color: p.color, chainCount: p.chains.length, openedAt: p.openedAt }));
@@ -145,6 +154,8 @@ export function createMockEngine(): EngineBridge {
             trackMix: {},
             chains: [],
             openedAt: Date.now(),
+            presets: [],
+            currentPresetId: null,
           });
           open(id);
           break;
@@ -158,6 +169,39 @@ export function createMockEngine(): EngineBridge {
           if (!name) return error("A project needs a name");
           if (!p) return error(`Unknown project: ${cmd.projectId}`);
           p.name = name;
+          break;
+        }
+        case "preset.save":
+        case "preset.saveAs":
+        case "preset.load":
+        case "preset.rename":
+        case "preset.delete": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("No project open");
+          const clean = (name?: string) => (name ?? "").replace(/\s+/g, " ").trim().slice(0, 60).trim();
+          if (cmd.type === "preset.save" || cmd.type === "preset.saveAs") {
+            const existing = cmd.type === "preset.save" ? p.presets.find((x) => x.id === p.currentPresetId) : undefined;
+            const preset = existing ?? { id: newId(), name: clean(cmd.name) || `Preset ${p.presets.length + 1}`, chains: [] };
+            if (existing && clean(cmd.name)) existing.name = clean(cmd.name);
+            preset.chains = structuredClone(p.chains);
+            if (!existing) p.presets.push(preset);
+            p.currentPresetId = preset.id;
+            break;
+          }
+          const preset = p.presets.find((x) => x.id === cmd.presetId);
+          if (!preset) return error(`Unknown preset: ${cmd.presetId}`);
+          if (cmd.type === "preset.load") {
+            p.chains = structuredClone(preset.chains);
+            p.currentPresetId = preset.id;
+          }
+          if (cmd.type === "preset.rename") {
+            if (!clean(cmd.name)) return error("A preset needs a name");
+            preset.name = clean(cmd.name);
+          }
+          if (cmd.type === "preset.delete") {
+            p.presets.splice(p.presets.indexOf(preset), 1);
+            if (p.currentPresetId === preset.id) p.currentPresetId = null;
+          }
           break;
         }
         case "chain.create": {

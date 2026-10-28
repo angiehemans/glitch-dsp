@@ -45,7 +45,9 @@ private:
     bool handleBlockCommand (const juce::String& type, const juce::var& command);
 
     /** Open project -> engine: creates and removes plugin nodes, rewires chains, sets parameters. */
-    void syncEngine();
+    /** Loads, unloads and rewires blocks to match the project. After a preset load, blocks that keep
+        running get their state from the store, while their chains are faded out. */
+    void syncEngine (bool presetLoaded = false);
     /** The audio processor for a block (plugin, NAM model or IR), or null with an error. */
     std::unique_ptr<juce::AudioProcessor> createBlock (const juce::var& block, juce::String& error);
     /** Opens a chooser for plugins, folders, .nam models and IRs. */
@@ -54,6 +56,7 @@ private:
     void applyAbyParams (const juce::var& aby);
     bool handleAbyCommand (const juce::String& type, const juce::var& command);
     bool handleRouteCommand (const juce::String& type, const juce::var& command);
+    bool handlePresetCommand (const juce::String& type, const juce::var& command);
     /** Copies plugin states into the project, so they save. */
     void captureStates();
     void openEditor (const juce::String& blockId);
@@ -82,6 +85,7 @@ private:
     std::map<juce::String, std::unique_ptr<PluginWindow>> editors;
     juce::String soundCards; // Linux: /proc/asound/cards, polled for hotplug
     int ticks = 0;
+    bool presetModified = false; // as last sent, so a knob turned in a plugin window updates it
 
     const juce::String devUrl { GLITCH_UI_DEV_URL };
     const juce::File uiRoot;

@@ -299,6 +299,11 @@ void WebUi::handleCommand (const juce::var& command)
         if (! handleRouteCommand (type, command))
             return;
     }
+    else if (type.startsWith ("preset."))
+    {
+        if (! handlePresetCommand (type, command))
+            return;
+    }
     else if (type == protocol::command::deviceScan)
     {
         engine.rescanDevices();
@@ -517,6 +522,58 @@ bool WebUi::handleAbyCommand (const juce::String& type, const juce::var& command
     return true;
 }
 
+bool WebUi::handlePresetCommand (const juce::String& type, const juce::var& command)
+{
+    if (! store.getCurrent().isObject())
+    {
+        sendError ("No project open");
+        return false;
+    }
+
+    const auto presetId = command["presetId"].toString();
+    const auto newName = [this] { return "Preset " + juce::String (store.getPresetSummaries().size() + 1); };
+
+    if (type == protocol::command::presetSave || type == protocol::command::presetSaveAs)
+    {
+        captureStates(); // plugin knobs turned since the last capture
+        const auto overwrite = type == protocol::command::presetSave ? store.getCurrentPresetId() : juce::String();
+        const auto name = cleanName (command["name"]);
+        store.savePreset (overwrite, name.isNotEmpty() ? name : overwrite.isEmpty() ? newName() : juce::String());
+    }
+    else if (type == protocol::command::presetLoad)
+    {
+        if (! store.loadPreset (presetId))
+        {
+            sendError ("Unknown preset: " + presetId);
+            return false;
+        }
+        syncEngine (true);
+    }
+    else if (type == protocol::command::presetRename)
+    {
+        const auto name = cleanName (command["name"]);
+        if (name.isEmpty() || ! store.renamePreset (presetId, name))
+        {
+            sendError (name.isEmpty() ? "A preset needs a name" : "Unknown preset: " + presetId);
+            return false;
+        }
+    }
+    else if (type == protocol::command::presetDelete)
+    {
+        if (! store.deletePreset (presetId))
+        {
+            sendError ("Unknown preset: " + presetId);
+            return false;
+        }
+    }
+    else
+    {
+        sendError ("Unknown command: " + type);
+        return false;
+    }
+    return true;
+}
+
 bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& command)
 {
     const auto chain = store.findChain (command["chainId"].toString());
@@ -680,9 +737,10 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
 }
 
 //==============================================================================
-void WebUi::syncEngine()
+void WebUi::syncEngine (bool presetLoaded)
 {
     const auto* chains = store.getCurrentChains();
+    const auto running = engine.getBlockIds(); // before this sync loads or unloads any
 
     juce::StringArray wantedBlocks, wantedSplits;
     if (chains != nullptr)
@@ -784,7 +842,26 @@ void WebUi::syncEngine()
         }
     }
 
-    engine.setChains (specs);
+    // Blocks the preset shares with the rig before it keep running, with the preset's state.
+    std::function<void()> atSwap;
+    if (presetLoaded)
+    {
+        // Copied now: a capture before the swap would overwrite the store's with the old states.
+        std::vector<std::pair<juce::String, juce::String>> states;
+        for (const auto& id : running)
+            states.emplace_back (id, store.getPluginState (id));
+        atSwap = [this, states]
+        {
+            for (const auto& [id, base64] : states)
+            {
+                juce::MemoryBlock state;
+                auto* processor = engine.getBlockProcessor (id);
+                if (processor != nullptr && state.fromBase64Encoding (base64) && state.getSize() > 0)
+                    processor->setStateInformation (state.getData(), (int) state.getSize());
+            }
+        };
+    }
+    engine.setChains (specs, std::move (atSwap));
 
     if (chains != nullptr)
         for (const auto& c : *chains)
@@ -1098,8 +1175,9 @@ void WebUi::sendState()
         { "project", project },
         { "projects", store.getSummaries() },
         { "chains", project.isObject() ? project["chains"] : juce::var (juce::Array<juce::var>()) },
-        { "presets", juce::Array<juce::var>() },
-        { "currentPresetId", {} },
+        { "presets", store.getPresetSummaries() },
+        { "currentPresetId", store.getCurrentPresetId().isNotEmpty() ? juce::var (store.getCurrentPresetId()) : juce::var() },
+        { "presetModified", presetModified = store.isPresetModified() },
         { "mappings", juce::Array<juce::var>() },
         { "setlists", juce::Array<juce::var>() },
         { "songs", juce::Array<juce::var>() },
@@ -1164,6 +1242,8 @@ void WebUi::timerCallback()
     {
         captureStates();
         store.saveIfDirty();
+        if (store.isPresetModified() != presetModified)
+            sendState(); // a plugin's state changed in its own window
 
        #if JUCE_LINUX
         // ALSA doesn't announce hotplug; the kernel's card list is cheap to read, so rescan when it changes.
