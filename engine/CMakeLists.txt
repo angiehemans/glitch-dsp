@@ -61,6 +61,7 @@ target_sources(Glitch PRIVATE
     src/blocks/IrBlock.cpp
     src/blocks/ModelLibrary.cpp
     src/blocks/NamBlock.cpp
+    src/midi/Footswitch.cpp
     src/plugins/PluginLibrary.cpp
     src/project/ProjectStore.cpp)
 
@@ -123,6 +124,19 @@ target_link_libraries(GlitchBench
         juce::juce_audio_processors
         juce::juce_audio_formats
         juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# FootswitchTest: checks tap/hold detection. Not built by default:
+# cmake --build --preset dev --target FootswitchTest
+juce_add_console_app(FootswitchTest)
+set_target_properties(FootswitchTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(FootswitchTest PRIVATE tools/FootswitchTest.cpp src/midi/Footswitch.cpp)
+target_compile_definitions(FootswitchTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(FootswitchTest
+    PRIVATE
+        juce::juce_audio_devices
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

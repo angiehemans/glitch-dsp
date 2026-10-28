@@ -8,6 +8,7 @@ import Rig from "@scamp/views/Rig/Rig";
 import { send } from "../../store/glitch";
 import { dbToPosition, positionToDb } from "../faderLaw";
 import { renameByKey, renameWhenCreated } from "../rename";
+import { FootswitchView } from "./FootswitchView";
 import { MonitorView } from "./MonitorView";
 
 type ChainColor = "orange" | "cyan" | "pink" | "lime" | "violet";
@@ -411,6 +412,7 @@ export function RigView({ state }: { state: GlitchState }) {
           </ChainStrip>
         ))}
       />
+      <FootswitchView state={state} />
       <MonitorView state={state} />
     </>
   );

@@ -67,6 +67,20 @@ export type Command =
   | { type: "preset.load"; presetId: string }
   | { type: "preset.rename"; presetId: string; name: string }
   | { type: "preset.delete"; presetId: string }
+  // Footswitch. name null = no MIDI input. set maps a switch's tap or hold on a page; learn instead
+  // waits for the next switch pressed and maps that (on page, default the current one); clear removes
+  // one gesture of a switch's mapping. press acts as if
+  // the switch were pressed (down) or released, for on-screen switches and tests.
+  | { type: "midi.selectDevice"; name: string | null }
+  | { type: "midi.learn"; action: ActionRef; gesture: "tap" | "hold"; page?: number }
+  | { type: "midi.cancelLearn" }
+  /** Drops a found switch, and its mappings in the open project. Pressing it again finds it again. */
+  | { type: "midi.forgetSwitch"; channel: number; cc: number }
+  | { type: "mapping.set"; channel: number; cc: number; page: number; gesture: "tap" | "hold"; action: ActionRef }
+  | { type: "mapping.clear"; channel: number; cc: number; page: number; gesture: "tap" | "hold" }
+  | { type: "mapping.setHoldMs"; channel: number; cc: number; page: number; holdMs: number }
+  | { type: "footswitch.setPage"; page: number }
+  | { type: "footswitch.press"; channel: number; cc: number; down: boolean }
   // Stubbed from the plan; not handled until their milestone.
   | { type: "block.setParam"; blockId: string; param: string; value: number }
   | { type: "project.setMainOutput"; outputs: number[] }
@@ -87,7 +101,6 @@ export type Command =
   | { type: "transport.play" }
   | { type: "transport.stop" }
   | { type: "transport.next" }
-  | { type: "midi.learn"; action: ActionRef; gesture: "tap" | "hold" }
   | { type: "tune.toggle" }
   | { type: "tune.setInput"; hwChannel: number };
 

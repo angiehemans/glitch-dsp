@@ -195,6 +195,51 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l, ModelLibrary& m)
 {
     addAndMakeVisible (browser);
     syncEngine();
+
+    footswitch.onPress = [this] (Footswitch::Switch sw)
+    {
+        lastSwitch = object ({ { "channel", sw.channel }, { "cc", sw.cc } });
+        if (store.addMidiSwitch (sw.channel, sw.cc))
+            sendState(); // a switch found: it gets a tile
+        if (! learning.isObject())
+            return;
+
+        // MIDI learn: this switch, on the page being learned, gets the action for the gesture.
+        auto* mappings = store.getCurrent()["mappings"].getArray();
+        if (mappings == nullptr)
+            return;
+        const auto onPage = (int) learning["page"];
+        auto mapping = findMapping (sw, onPage);
+        if (! mapping.isObject())
+        {
+            mapping = object ({ { "switch", lastSwitch.clone() }, { "page", onPage }, { "tap", {} }, { "hold", {} } });
+            mappings->add (mapping);
+        }
+        mapping.getDynamicObject()->setProperty (learning["gesture"].toString() == "hold" ? "hold" : "tap", learning["action"]);
+        learning = juce::var();
+        learnedNow = true;
+        store.markDirty();
+    };
+    footswitch.holdMsFor = [this] (Footswitch::Switch sw)
+    {
+        const auto mapping = findMapping (sw, page);
+        if (learnedNow || ! mapping["hold"].isObject())
+            return 0.0;
+        return mapping["holdMs"].isVoid() ? 500.0 : (double) mapping["holdMs"];
+    };
+    footswitch.onGesture = [this] (Footswitch::Switch sw, bool hold)
+    {
+        if (std::exchange (learnedNow, false))
+        {
+            sendState();
+            return;
+        }
+        if (const auto action = findMapping (sw, page)[hold ? "hold" : "tap"]; action.isObject())
+            runAction (action);
+        else
+            sendState(); // the press still shows on the mapping screen
+    };
+    connectMidi();
     engine.getDeviceManager().addChangeListener (this);
     engine.onDeviceListChanged = [this] { sendState(); };
 
@@ -302,6 +347,11 @@ void WebUi::handleCommand (const juce::var& command)
     else if (type.startsWith ("preset."))
     {
         if (! handlePresetCommand (type, command))
+            return;
+    }
+    else if (type.startsWith ("midi.") || type.startsWith ("mapping.") || type.startsWith ("footswitch."))
+    {
+        if (! handleMidiCommand (type, command))
             return;
     }
     else if (type == protocol::command::deviceScan)
@@ -572,6 +622,196 @@ bool WebUi::handlePresetCommand (const juce::String& type, const juce::var& comm
         return false;
     }
     return true;
+}
+
+bool WebUi::handleMidiCommand (const juce::String& type, const juce::var& command)
+{
+    const auto sw = Footswitch::Switch { (int) command["channel"], (int) command["cc"] };
+
+    if (type == protocol::command::midiSelect)
+    {
+        store.setMidiDevice (command["name"].toString()); // "" = none
+        footswitch.close();
+        connectMidi();
+        return true;
+    }
+    if (type == protocol::command::midiForgetSwitch)
+    {
+        // Gone from the found switches, and its mappings in this project with it (every page).
+        store.removeMidiSwitch (sw.channel, sw.cc);
+        if (auto* mappings = store.getCurrent()["mappings"].getArray())
+        {
+            mappings->removeIf ([&] (const juce::var& m) { return (int) m["switch"]["channel"] == sw.channel && (int) m["switch"]["cc"] == sw.cc; });
+            store.markDirty();
+        }
+        return true;
+    }
+    if (type == protocol::command::footswitchPress)
+    {
+        // A switch pressed on screen (or by a test), as if from MIDI.
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        (bool) command["down"] ? footswitch.press (sw, now) : footswitch.release (sw, now);
+        return true;
+    }
+
+    if (! store.getCurrent().isObject())
+    {
+        sendError ("No project open");
+        return false;
+    }
+
+    if (type == protocol::command::midiLearn)
+    {
+        if (! command["action"].isObject())
+        {
+            sendError ("Nothing to learn");
+            return false;
+        }
+        learning = object ({ { "action", command["action"] }, { "gesture", command["gesture"].toString() == "hold" ? "hold" : "tap" },
+                             { "page", command["page"].isVoid() ? page : (int) command["page"] } });
+    }
+    else if (type == protocol::command::midiCancelLearn)
+    {
+        learning = juce::var();
+    }
+    else if (type == protocol::command::mappingSet)
+    {
+        if (! command["action"].isObject())
+        {
+            sendError ("No action to map");
+            return false;
+        }
+        auto* mappings = store.getCurrent()["mappings"].getArray();
+        const auto onPage = (int) command["page"];
+        auto mapping = findMapping (sw, onPage);
+        if (! mapping.isObject())
+        {
+            mapping = object ({ { "switch", object ({ { "channel", sw.channel }, { "cc", sw.cc } }) }, { "page", onPage }, { "tap", {} }, { "hold", {} } });
+            mappings->add (mapping);
+        }
+        mapping.getDynamicObject()->setProperty (command["gesture"].toString() == "hold" ? "hold" : "tap", command["action"]);
+        store.markDirty();
+    }
+    else if (type == protocol::command::mappingClear || type == protocol::command::mappingHoldMs)
+    {
+        const auto mapping = findMapping (sw, (int) command["page"]);
+        if (! mapping.isObject())
+        {
+            sendError ("No mapping for that switch");
+            return false;
+        }
+        if (type == protocol::command::mappingHoldMs)
+        {
+            mapping.getDynamicObject()->setProperty ("holdMs", juce::jlimit (100, 3000, (int) command["holdMs"]));
+        }
+        else
+        {
+            mapping.getDynamicObject()->setProperty (command["gesture"].toString() == "hold" ? "hold" : "tap", {});
+            if (! mapping["tap"].isObject() && ! mapping["hold"].isObject())
+                store.getCurrent()["mappings"].getArray()->removeAllInstancesOf (mapping);
+        }
+        store.markDirty();
+    }
+    else if (type == protocol::command::footswitchPage)
+    {
+        page = juce::jlimit (0, pageCount(), (int) command["page"]); // one past the last: a new, empty page
+    }
+    else
+    {
+        sendError ("Unknown command: " + type);
+        return false;
+    }
+    return true;
+}
+
+juce::var WebUi::findMapping (Footswitch::Switch sw, int onPage) const
+{
+    if (auto* mappings = store.getCurrent()["mappings"].getArray())
+        for (const auto& m : *mappings)
+            if ((int) m["switch"]["channel"] == sw.channel && (int) m["switch"]["cc"] == sw.cc && (int) m["page"] == onPage)
+                return m;
+    return {};
+}
+
+int WebUi::pageCount() const
+{
+    int count = 1;
+    if (auto* mappings = store.getCurrent()["mappings"].getArray())
+        for (const auto& m : *mappings)
+            count = std::max (count, (int) m["page"] + 1);
+    return count;
+}
+
+void WebUi::runAction (const juce::var& action)
+{
+    const auto type = action["type"].toString();
+    const auto toggled = [] (const juce::var& v) { return ! (bool) v; };
+
+    if (type == "page.next")
+    {
+        page = (page + 1) % pageCount();
+        sendState();
+    }
+    else if (type == "preset.next" || type == "preset.prev")
+    {
+        const auto* presets = store.getPresetSummaries().getArray();
+        if (presets == nullptr || presets->isEmpty())
+            return sendState();
+        int at = -1;
+        for (int i = 0; i < presets->size(); ++i)
+            if ((*presets)[i]["id"].toString() == store.getCurrentPresetId())
+                at = i;
+        const auto n = presets->size();
+        const auto next = type == "preset.next" ? (at + 1) % n : (at <= 0 ? n - 1 : at - 1);
+        handleCommand (object ({ { "type", protocol::command::presetLoad }, { "presetId", (*presets)[next]["id"] } }));
+    }
+    else if (type == "chain.toggleMute")
+    {
+        const auto chain = store.findChain (action["chainId"].toString());
+        handleCommand (object ({ { "type", protocol::command::chainSetMute }, { "chainId", action["chainId"] }, { "muted", toggled (chain["muted"]) } }));
+    }
+    else if (type == "aby.toggleAB" || type == "aby.toggleY")
+    {
+        // A/B picks the other path (from Y, back to AB); Y switches between Y and AB.
+        const auto aby = store.findBlock (action["blockId"].toString());
+        const auto y = aby["mode"].toString() == "Y";
+        if (type == "aby.toggleY" || y)
+            handleCommand (object ({ { "type", protocol::command::abySetMode }, { "blockId", action["blockId"] }, { "mode", y ? "AB" : "Y" } }));
+        else
+            handleCommand (object ({ { "type", protocol::command::abySelect }, { "blockId", action["blockId"] }, { "path", aby["active"].toString() == "A" ? "B" : "A" } }));
+    }
+    else if (type == protocol::command::blockToggle || type == protocol::command::presetLoad || type == protocol::command::abySelect
+             || type == protocol::command::panicToggle)
+    {
+        handleCommand (action);
+    }
+    else
+    {
+        sendError ("The footswitch can't do " + type + " yet");
+    }
+}
+
+void WebUi::connectMidi()
+{
+    const auto wanted = store.getMidiDevice();
+    juce::String identifier;
+    juce::StringArray names;
+    for (const auto& d : juce::MidiInput::getAvailableDevices())
+    {
+        names.add (d.name);
+        if (d.name == wanted)
+            identifier = d.identifier;
+    }
+    const auto listChanged = names != std::exchange (midiNames, names); // plugged in or out: the menu lists it
+
+    const auto wasOpen = footswitch.getOpenIdentifier().isNotEmpty();
+    if (identifier.isEmpty())
+        footswitch.close(); // unplugged, or none chosen
+    else if (identifier != footswitch.getOpenIdentifier() && ! footswitch.open (identifier))
+        sendError ("Couldn't open the MIDI device " + wanted);
+
+    if (listChanged || wasOpen != footswitch.getOpenIdentifier().isNotEmpty())
+        sendState();
 }
 
 bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& command)
@@ -1160,6 +1400,21 @@ void WebUi::sendState()
         project.getDynamicObject()->removeProperty ("pluginStates");
     }
 
+    juce::Array<juce::var> midiDevices;
+    for (const auto& d : juce::MidiInput::getAvailableDevices())
+        midiDevices.add (d.name);
+    const auto midiName = store.getMidiDevice();
+    const auto midi = object ({
+        { "device", midiName.isNotEmpty() ? juce::var (midiName) : juce::var() },
+        { "connected", footswitch.getOpenIdentifier().isNotEmpty() },
+        { "devices", midiDevices },
+        { "learning", learning },
+        { "page", page },
+        { "pageCount", pageCount() },
+        { "lastSwitch", lastSwitch },
+        { "switches", store.getMidiSwitches() },
+    });
+
     // Fields past midi are stubs until their milestone; see packages/protocol/src/model.ts.
     const auto state = object ({
         { "device", device },
@@ -1178,13 +1433,13 @@ void WebUi::sendState()
         { "presets", store.getPresetSummaries() },
         { "currentPresetId", store.getCurrentPresetId().isNotEmpty() ? juce::var (store.getCurrentPresetId()) : juce::var() },
         { "presetModified", presetModified = store.isPresetModified() },
-        { "mappings", juce::Array<juce::var>() },
+        { "mappings", project.isObject() ? project["mappings"] : juce::var (juce::Array<juce::var>()) },
         { "setlists", juce::Array<juce::var>() },
         { "songs", juce::Array<juce::var>() },
         { "transport", object ({ { "playing", false }, { "songId", {} }, { "position", 0 } }) },
         { "tuneMode", object ({ { "active", false }, { "tunerInput", 1 }, { "reference", 440 },
                                 { "vocalChainId", {} }, { "backingTracks", "pause" } }) },
-        { "midi", object ({ { "device", {} } }) },
+        { "midi", midi },
     });
 
     emit (object ({ { "type", protocol::event::state }, { "state", state } }));
@@ -1240,6 +1495,7 @@ void WebUi::timerCallback()
 {
     if (++ticks % 60 == 0)
     {
+        connectMidi(); // plugged in or out
         captureStates();
         store.saveIfDirty();
         if (store.isPresetModified() != presetModified)

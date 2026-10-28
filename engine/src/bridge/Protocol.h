@@ -45,6 +45,15 @@ namespace glitch::protocol
         inline constexpr auto presetLoad     = "preset.load";
         inline constexpr auto presetRename   = "preset.rename";
         inline constexpr auto presetDelete   = "preset.delete";
+        inline constexpr auto midiSelect     = "midi.selectDevice";
+        inline constexpr auto midiLearn      = "midi.learn";
+        inline constexpr auto midiCancelLearn = "midi.cancelLearn";
+        inline constexpr auto midiForgetSwitch = "midi.forgetSwitch";
+        inline constexpr auto mappingSet     = "mapping.set";
+        inline constexpr auto mappingClear   = "mapping.clear";
+        inline constexpr auto mappingHoldMs  = "mapping.setHoldMs";
+        inline constexpr auto footswitchPage = "footswitch.setPage";
+        inline constexpr auto footswitchPress = "footswitch.press";
     }
 
     namespace event

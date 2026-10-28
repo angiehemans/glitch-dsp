@@ -55,7 +55,7 @@ export function App() {
           cpuLoad={cpuText as unknown as string}
           audioDevice={device ? device.name : "NO AUDIO DEVICE"}
           devices={(state?.devices ?? []).map((d, i) => ({ id: String(i), name: d.label || d.name, kind: d.type, current: d.current }))}
-          midiDevice={state?.midi.device ?? "NO MIDI"}
+          midiDevice={!state?.midi.device ? "NO MIDI" : state.midi.connected ? state.midi.device : `${state.midi.device} (OFF)`}
           rates={(device?.sampleRates ?? []).map((r) => ({
             id: String(r),
             label: `${Number((r / 1000).toFixed(1))}k`,

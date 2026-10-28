@@ -65,6 +65,15 @@ public:
     /** The rig differs from its preset's: chains, blocks, routing, levels or plugin states. */
     bool isPresetModified() const;
 
+    /** The footswitch's MIDI input, by name (identifiers change between sessions), in settings.json. */
+    juce::String getMidiDevice() const { return settings["midiDevice"].toString(); }
+    void setMidiDevice (const juce::String& name);
+    /** Footswitches found by being pressed ({ channel, cc }), in settings.json: MIDI doesn't list them. */
+    juce::var getMidiSwitches() const;
+    /** Remembers a switch; false if it was known already. */
+    bool addMidiSwitch (int channel, int cc);
+    void removeMidiSwitch (int channel, int cc);
+
     /** The audio device setup (AudioDeviceManager XML), kept in settings.json. */
     std::unique_ptr<juce::XmlElement> getDeviceState() const;
     void setDeviceState (const juce::XmlElement&);
