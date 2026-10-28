@@ -1,8 +1,9 @@
-// Checks that BlockMix (bypass) and AbyMerge (ABY switching) fade without jumps.
+// Checks that BlockMix (bypass), AbyMerge (ABY switching) and OutputMixer (routing) fade without jumps.
 // Build and run: cmake --build --preset dev --target FadeTest && <artefacts>/FadeTest
 
 #include "../src/audio/AbyMerge.h"
 #include "../src/audio/BlockMix.h"
+#include "../src/audio/OutputMixer.h"
 
 #include <cmath>
 #include <cstdio>
@@ -122,6 +123,60 @@ int main()
         expect (0, 0.0f);
         expect (1, 0.0f);
         expect (3, -0.5f * yGain);
+    }
+
+    {
+        // Output matrix: source 3 is L = 0.5, R = 0.25. A pair sends L to out 1 and R to out 2; a single
+        // output gets half of each. Turning the pair down ramps without a jump.
+        glitch::OutputMixer mixer;
+        glitch::OutputMixer::SourceGains gains {};
+        gains[0][0] = 1.0f;                     // L -> out 1
+        gains[1][1] = 1.0f;                     // R -> out 2
+        gains[0][4] = gains[1][4] = 0.5f;       // both -> out 5
+        mixer.setGains (3, gains);
+        mixer.prepareToPlay (sampleRate, blockSize);
+
+        juce::AudioBuffer<float> buffer (glitch::OutputMixer::numSources * 2, blockSize);
+        juce::MidiBuffer midi;
+        const auto maxStep = 1.5f * 0.5f / (float) (sampleRate * glitch::OutputMixer::fadeSeconds);
+        float last = 0.5f;
+        const auto process = [&] (int numBlocks)
+        {
+            for (int b = 0; b < numBlocks; ++b)
+            {
+                buffer.clear();
+                juce::FloatVectorOperations::fill (buffer.getWritePointer (6), 0.5f, blockSize);
+                juce::FloatVectorOperations::fill (buffer.getWritePointer (7), 0.25f, blockSize);
+                mixer.processBlock (buffer, midi);
+                for (int i = 0; i < blockSize; ++i)
+                {
+                    if (std::abs (buffer.getSample (0, i) - last) > maxStep)
+                        ++failures;
+                    last = buffer.getSample (0, i);
+                }
+            }
+        };
+        const auto expect = [&] (int out, float value)
+        {
+            if (std::abs (buffer.getSample (out, blockSize - 1) - value) > 1.0e-4f)
+            {
+                std::printf ("  mixer output %d ended at %f, expected %f\n", out + 1, buffer.getSample (out, blockSize - 1), value);
+                ++failures;
+            }
+        };
+
+        process (4);
+        expect (0, 0.5f);
+        expect (1, 0.25f);
+        expect (4, 0.375f);
+        expect (2, 0.0f);
+
+        gains[0][0] = gains[1][1] = 0.0f; // unroute the pair
+        mixer.setGains (3, gains);
+        process (16);
+        expect (0, 0.0f);
+        expect (1, 0.0f);
+        expect (4, 0.375f);
     }
 
     std::printf (failures == 0 ? "fades: ok\n" : "fades: %d failures\n", failures);

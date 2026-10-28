@@ -2,6 +2,7 @@
 #include "AbyMerge.h"
 #include "BlockMix.h"
 #include "ChainStage.h"
+#include "OutputMixer.h"
 
 #include <algorithm>
 #include <set>
@@ -20,6 +21,8 @@ Engine::Engine (const juce::XmlElement* savedDeviceState)
 {
     inputNode = graph.addNode (std::make_unique<IO> (IO::audioInputNode))->nodeID;
     outputNode = graph.addNode (std::make_unique<IO> (IO::audioOutputNode))->nodeID;
+    mixerNode = graph.addNode (std::make_unique<OutputMixer>())->nodeID;
+    static_assert (OutputMixer::numSources == 2 * maxChains && OutputMixer::numOutputs == maxChannels);
     player.setProcessor (&graph);
 
     deviceError = deviceManager.initialise (maxChannels, maxChannels, savedDeviceState, true);
@@ -68,6 +71,15 @@ void Engine::setChains (const std::vector<ChainSpec>& requested)
         for (auto* stages : { &chainOut, &chainOutB })
             if (stages->count (c.id) == 0)
                 (*stages)[c.id] = graph.addNode (std::make_unique<ChainStage> (true), {}, Update::none)->nodeID;
+
+        // A mixer slot of its own, kept while the chain exists so its routes stay put.
+        if (slots.count (c.id) == 0)
+            for (int slot = 0; slot < maxChains; ++slot)
+                if (std::none_of (slots.begin(), slots.end(), [slot] (const auto& s) { return s.second == slot; }))
+                {
+                    slots[c.id] = slot;
+                    break;
+                }
     }
 
     // Fade out every live chain whose wiring changes, or that goes away.
@@ -125,10 +137,26 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
         graph.removeNode (node, Update::none);
     nodesToRemove.clear();
 
+    for (auto it = slots.begin(); it != slots.end();)
+    {
+        if (ids.count (it->first) == 0)
+        {
+            setRoutes (it->first, {}, {}); // silent before another chain takes the slot
+            it = slots.erase (it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
     for (const auto& connection : graph.getConnections())
         graph.removeConnection (connection, Update::none);
 
     // Connections to channels the device doesn't have are refused by the graph, which leaves them silent.
+    for (int ch = 0; ch < maxChannels; ++ch)
+        graph.addConnection ({ { mixerNode, ch }, { outputNode, ch } }, Update::none);
+
     for (const auto& c : chains)
     {
         const auto in = chainIn[c.id], out = chainOut[c.id];
@@ -158,12 +186,15 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
                 const auto outB = chainOutB[c.id];
                 for (int ch = 0; ch < 2; ++ch)
                     graph.addConnection ({ { merge, ch + 2 }, { outB, ch } }, Update::none);
-                connectOutputs (outB, c.outputsB);
                 break; // a split exit ends the chain
             }
         }
         connect (previous, out); // a split's outputs 0-1 are path A, or the merged sum
-        connectOutputs (out, c.outputs);
+
+        // Both output stages always feed the mixer; path B's is silent unless the chain splits.
+        const auto slot = slots[c.id];
+        connect (out, mixerNode, slot * 4, 2);
+        connect (chainOutB[c.id], mixerNode, slot * 4 + 2, 2);
     }
 
     graph.rebuild();
@@ -173,17 +204,35 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
         appliedChains[c.id] = c;
 }
 
-void Engine::connectOutputs (NodeID stage, const std::vector<int>& outputs)
+void Engine::setRoutes (const juce::String& chainId, const std::vector<Send>& main, const std::vector<Send>& pathB)
 {
-    if (outputs.size() >= 2)
+    const auto it = slots.find (chainId);
+    auto* mixer = dynamic_cast<OutputMixer*> (graph.getNodeForId (mixerNode)->getProcessor());
+    if (it == slots.end() || mixer == nullptr)
+        return;
+
+    for (int source = 0; source < 2; ++source)
     {
-        graph.addConnection ({ { stage, 0 }, { outputNode, outputs[0] } }, Update::none);
-        graph.addConnection ({ { stage, 1 }, { outputNode, outputs[1] } }, Update::none);
-    }
-    else if (outputs.size() == 1)
-    {
-        for (int ch = 0; ch < 2; ++ch)
-            graph.addConnection ({ { stage, ch }, { outputNode, outputs[0] } }, Update::none);
+        OutputMixer::SourceGains gains {};
+        for (const auto& send : source == 0 ? main : pathB)
+        {
+            if (send.muted || send.levelDb <= silenceDb || send.outputs.empty())
+                continue;
+            const auto g = juce::Decibels::decibelsToGain (send.levelDb);
+            const auto valid = [] (int out) { return out >= 0 && out < maxChannels; };
+
+            if (send.outputs.size() >= 2)
+            {
+                if (valid (send.outputs[0])) gains[0][(size_t) send.outputs[0]] += g;
+                if (valid (send.outputs[1])) gains[1][(size_t) send.outputs[1]] += g;
+            }
+            else if (valid (send.outputs[0]))
+            {
+                gains[0][(size_t) send.outputs[0]] += 0.5f * g;
+                gains[1][(size_t) send.outputs[0]] += 0.5f * g;
+            }
+        }
+        mixer->setGains (it->second * 2 + source, gains);
     }
 }
 
@@ -391,6 +440,13 @@ float Engine::takePeakDb (Meter m)
     return juce::Decibels::gainToDecibels (peaks[(size_t) m].exchange (0.0f), silenceDb);
 }
 
+float Engine::takeOutputPeakDb (int channel)
+{
+    if (channel < 0 || channel >= maxChannels)
+        return silenceDb;
+    return juce::Decibels::gainToDecibels (outputPeaks[(size_t) channel].exchange (0.0f), silenceDb);
+}
+
 float Engine::takeChainPeakDb (const juce::String& chainId, bool output)
 {
     // A split exit's output meter shows the louder of its two paths.
@@ -530,24 +586,23 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
     const auto db = gainDb.load();
     master.setTargetValue (muted.load() || panic.load() || db <= silenceDb ? 0.0f : juce::Decibels::decibelsToGain (db));
 
-    std::array<float, 2> outPeaks {};
+    std::array<float, maxChannels> outPeaks {};
     for (int i = 0; i < numSamples; ++i)
     {
         const auto m = master.getNextValue();
 
-        for (int ch = 0; ch < numOutputs; ++ch)
+        for (int ch = 0; ch < std::min (numOutputs, maxChannels); ++ch)
         {
             if (outputs[ch] == nullptr)
                 continue;
 
             outputs[ch][i] *= m;
-            if (ch < 2)
-                outPeaks[(size_t) ch] = std::max (outPeaks[(size_t) ch], std::abs (outputs[ch][i]));
+            outPeaks[(size_t) ch] = std::max (outPeaks[(size_t) ch], std::abs (outputs[ch][i]));
         }
     }
 
-    storePeak (peaks[out1], outPeaks[0]);
-    storePeak (peaks[out2], outPeaks[1]);
+    for (int ch = 0; ch < maxChannels; ++ch)
+        storePeak (outputPeaks[(size_t) ch], outPeaks[(size_t) ch]);
 }
 
 } // namespace glitch

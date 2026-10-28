@@ -58,7 +58,11 @@ export interface MonitorState {
 }
 
 export interface InputRef { hwChannel: number; gain: number }
-export interface OutputRef { hwChannels: number[]; level: number; pan: number }
+/**
+ * A send to hardware outputs: a left/right pair, or one output that gets left and right at half each.
+ * For a chain it's a crosspoint of the output matrix, with its own level and mute.
+ */
+export interface OutputRef { hwChannels: number[]; level: number; pan: number; mute?: boolean }
 
 export type BlockType = "nam" | "ir" | "plugin" | "utility" | "aby";
 
@@ -106,6 +110,9 @@ export interface Chain {
   inputs: InputRef[];
   mode: "mono" | "stereo";
   blocks: Block[];
+  /** The chain's fader, in dB. */
+  level: number;
+  /** Its sends in the output matrix; a split exit's ABY has its own (splitOutputs). */
   outputs: OutputRef[];
   bypassed: boolean;
   muted: boolean;

@@ -38,6 +38,8 @@ namespace glitch::protocol
         inline constexpr auto blockToggle    = "block.toggle";
         inline constexpr auto blockOpenEditor = "block.openEditor";
         inline constexpr auto blockMove      = "block.move";
+        inline constexpr auto routeSet       = "route.set";
+        inline constexpr auto routeRemove    = "route.remove";
     }
 
     namespace event

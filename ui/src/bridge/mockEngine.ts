@@ -44,7 +44,7 @@ export function createMockEngine(): EngineBridge {
       bufferSize: 128,
       latencyMs: 5.3,
       inputs: ["Input 1", "Input 2"],
-      outputs: ["Output 1", "Output 2"],
+      outputs: ["Output 1", "Output 2", "Output 3", "Output 4"], // like the M4
       sampleRates: [44100, 48000, 96000],
       bufferSizes: [32, 64, 128, 256, 512, 1024],
     },
@@ -105,16 +105,17 @@ export function createMockEngine(): EngineBridge {
     const env = Math.abs(Math.sin(t * 1.3)) ** 3;
     const signal = -50 + 52 * env + Math.random() * 3; // the same fake signal on every input
     const levels: Record<string, number> = { "in:1": signal };
-    const outs = [SILENCE_DB, SILENCE_DB];
+    const outs = state.device!.outputs.map(() => SILENCE_DB);
     for (const c of state.chains) {
-      const out = c.muted ? SILENCE_DB : Math.max(SILENCE_DB, signal + c.outputs[0].level);
+      const out = c.muted ? SILENCE_DB : Math.max(SILENCE_DB, signal + c.level);
       levels[`chain:${c.id}:in`] = signal;
       levels[`chain:${c.id}:out`] = out;
-      for (const ch of c.outputs[0].hwChannels) if (ch <= 2) outs[ch - 1] = Math.max(outs[ch - 1], out);
+      const split = endsInSplit(c) ? (c.blocks[c.blocks.length - 1] as AbyBlock).splitOutputs : undefined;
+      for (const send of split ? [...split.A, ...split.B] : c.outputs)
+        if (!send.mute) for (const ch of send.hwChannels) if (ch <= outs.length) outs[ch - 1] = Math.max(outs[ch - 1], out + send.level);
     }
     const master = state.monitor.muted || state.panic ? SILENCE_DB : state.monitor.gainDb;
-    levels["out:1"] = Math.max(SILENCE_DB, outs[0] + master);
-    levels["out:2"] = Math.max(SILENCE_DB, outs[1] + master);
+    outs.forEach((o, i) => (levels[`out:${i + 1}`] = Math.max(SILENCE_DB, o + master)));
     emit({ type: "meters", levels, cpu: 0.08 + Math.random() * 0.04 });
   }, 1000 / 30);
 
@@ -170,7 +171,8 @@ export function createMockEngine(): EngineBridge {
             inputs: [{ hwChannel: 1, gain: 0 }],
             mode: "mono",
             blocks: [],
-            outputs: [{ hwChannels: [1, 2], level: 0, pan: 0 }],
+            level: 0,
+            outputs: [{ hwChannels: [1, 2], level: 0, pan: 0, mute: false }],
             bypassed: false,
             muted: false,
           });
@@ -198,8 +200,11 @@ export function createMockEngine(): EngineBridge {
           const c = chain(cmd.chainId);
           if (!c) return error(`Unknown chain: ${cmd.chainId}`);
           if (cmd.type === "chain.setInputs") c.inputs[0].hwChannel = cmd.inputs[0].hwChannel;
-          if (cmd.type === "chain.setOutputs") c.outputs[0].hwChannels = cmd.outputs[0].hwChannels;
-          if (cmd.type === "chain.setLevel") c.outputs[0].level = Math.min(10, Math.max(SILENCE_DB, cmd.levelDb));
+          if (cmd.type === "chain.setOutputs") {
+            if (!c.outputs.length) c.outputs.push({ hwChannels: [], level: 0, pan: 0, mute: false });
+            c.outputs[0].hwChannels = cmd.outputs[0].hwChannels;
+          }
+          if (cmd.type === "chain.setLevel") c.level = Math.min(10, Math.max(SILENCE_DB, cmd.levelDb));
           if (cmd.type === "chain.setMute") c.muted = cmd.muted;
           break;
         }
@@ -298,6 +303,27 @@ export function createMockEngine(): EngineBridge {
             if (!out || !cmd.outputs[0]?.hwChannels.length) return error("Invalid output channels");
             out.hwChannels = [...cmd.outputs[0].hwChannels];
           }
+          break;
+        }
+        case "route.set":
+        case "route.remove": {
+          const c = chain(cmd.chainId);
+          if (!c) return error(`Unknown chain: ${cmd.chainId}`);
+          const split = endsInSplit(c) ? (c.blocks[c.blocks.length - 1] as AbyBlock).splitOutputs : undefined;
+          if (!!cmd.path !== !!split)
+            return error(split ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
+          const sends = split ? split[cmd.path!] : c.outputs;
+          const n = state.device?.outputs.length ?? 0;
+          if (!cmd.hwChannels.length || cmd.hwChannels.length > 2 || new Set(cmd.hwChannels).size !== cmd.hwChannels.length || cmd.hwChannels.some((ch) => ch < 1 || ch > Math.max(n, 8)))
+            return error("Invalid output channels");
+          const i = sends.findIndex((s) => s.hwChannels.join() === cmd.hwChannels.join());
+          if (cmd.type === "route.remove") {
+            if (i >= 0) sends.splice(i, 1);
+            break;
+          }
+          const send = i >= 0 ? sends[i] : sends[sends.push({ hwChannels: [...cmd.hwChannels], level: 0, pan: 0, mute: false }) - 1];
+          if (cmd.level !== undefined) send.level = Math.min(10, Math.max(SILENCE_DB, cmd.level));
+          if (cmd.mute !== undefined) send.mute = cmd.mute;
           break;
         }
         case "block.move": {

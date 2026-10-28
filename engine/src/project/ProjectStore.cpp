@@ -91,6 +91,17 @@ namespace
     }
 
     /** Fills missing fields, so older or hand-edited files load. */
+    juce::var newOutput (const juce::var& hwChannels)
+    {
+        auto output = object();
+        auto* o = output.getDynamicObject();
+        o->setProperty ("hwChannels", hwChannels);
+        o->setProperty ("level", 0.0);
+        o->setProperty ("pan", 0.0);
+        o->setProperty ("mute", false);
+        return output;
+    }
+
     juce::var normaliseChain (const juce::var& chain)
     {
         auto* obj = chain.getDynamicObject();
@@ -114,14 +125,32 @@ namespace
             obj->setProperty ("inputs", arrayOf ({ input }));
         }
 
-        if (! chain["outputs"].isArray() || chain["outputs"].size() == 0)
+        if (! chain["outputs"].isArray())
+            obj->setProperty ("outputs", arrayOf ({ newOutput (arrayOf ({ 1, 2 })) }));
+
+        // The chain's fader used to be its first output's level; now outputs are matrix sends.
+        if (! chain.hasProperty ("level"))
         {
-            auto output = object();
-            output.getDynamicObject()->setProperty ("hwChannels", arrayOf ({ 1, 2 }));
-            output.getDynamicObject()->setProperty ("level", 0.0);
-            output.getDynamicObject()->setProperty ("pan", 0.0);
-            obj->setProperty ("outputs", arrayOf ({ output }));
+            obj->setProperty ("level", chain["outputs"][0].hasProperty ("level") ? (double) chain["outputs"][0]["level"] : 0.0);
+            for (const auto& output : *chain["outputs"].getArray())
+                if (auto* o = output.getDynamicObject())
+                    o->setProperty ("level", 0.0);
         }
+
+        // Every send (the chain's, and a split ABY's) has a level, pan and mute.
+        juce::Array<juce::var> sendLists { chain["outputs"] };
+        for (const auto& b : *chain["blocks"].getArray())
+            for (const auto* path : { "A", "B" })
+                sendLists.add (b["splitOutputs"][path]);
+        for (const auto& list : sendLists)
+            if (auto* sends = list.getArray())
+                for (const auto& send : *sends)
+                    if (auto* o = send.getDynamicObject())
+                    {
+                        setDefault (*o, "level", 0.0);
+                        setDefault (*o, "pan", 0.0);
+                        setDefault (*o, "mute", false);
+                    }
 
         return chain;
     }

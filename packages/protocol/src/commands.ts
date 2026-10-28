@@ -15,6 +15,7 @@ export type Command =
   | { type: "chain.rename"; chainId: string; name: string }
   | { type: "chain.remove"; chainId: string }
   | { type: "chain.setInputs"; chainId: string; inputs: Pick<InputRef, "hwChannel">[] }
+  /** The output chip's shortcut: sets the chain's first send to these outputs (adding one if it has none). */
   | { type: "chain.setOutputs"; chainId: string; outputs: Pick<OutputRef, "hwChannels">[] }
   | { type: "chain.setLevel"; chainId: string; levelDb: number }
   | { type: "chain.setMute"; chainId: string; muted: boolean }
@@ -43,6 +44,11 @@ export type Command =
    * abyId. The index counts the block in its old place. A split exit has to stay its chain's last block.
    */
   | { type: "block.move"; blockId: string; chainId: string; index: number; abyId?: string; path?: "A" | "B" }
+  // Output matrix: a chain's send to hwChannels (one output, or a left/right pair). set adds it at
+  // 0 dB if it's missing, then applies level and mute; remove drops it. A chain that splits to
+  // separate outputs routes path A and B (path); any other routes the chain (no path).
+  | { type: "route.set"; chainId: string; path?: "A" | "B"; hwChannels: number[]; level?: number; mute?: boolean }
+  | { type: "route.remove"; chainId: string; path?: "A" | "B"; hwChannels: number[] }
   // ABY: splitAt inserts one at index (default: the end), moving the blocks after it into path A.
   // block.remove on an ABY keeps path A in the chain and deletes path B.
   | { type: "chain.splitAt"; chainId: string; index?: number }

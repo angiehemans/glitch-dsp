@@ -270,6 +270,12 @@ body {
   width: auto;
 }
 
+/* Rig / Routing switch under the top bar (App) */
+.gl-tabs {
+  display: flex;
+  padding: var(--space-3) var(--space-6) 0;
+}
+
 /* A chain's blocks, or an ABY path's (RigView): a drop target for blocks dragged by their grip */
 .gl-lane {
   display: flex;
