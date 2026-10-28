@@ -1,8 +1,14 @@
 name: build
 
+# Pull requests, main, and release tags. Not every branch push too: a branch with a PR would build
+# twice, and macOS runners are scarce enough that queued jobs get cancelled. To build any branch
+# (e.g. a Mac app to test): gh workflow run build --ref <branch>
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
 
 jobs:
   ui:
