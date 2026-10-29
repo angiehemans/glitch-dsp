@@ -151,7 +151,8 @@ export interface Track {
 }
 
 /** A library song: its tracks play together, sample-locked. length is in seconds (the longest track). */
-export interface Song { id: string; title: string; length: number; bpm?: number; notes?: string; tracks: Track[] }
+/** waveform: the song's outline for the Perform view, peaks 0-100 over its length (computed by the engine). */
+export interface Song { id: string; title: string; length: number; bpm?: number; notes?: string; tracks: Track[]; waveform?: number[] }
 
 export interface Setlist {
   id: string;
@@ -225,6 +226,8 @@ export interface GlitchState {
   presetModified: boolean;
   mappings: Mapping[];
   setlists: Setlist[];
+  /** The library's standalone setlists (owner "library"), outside any project. */
+  librarySetlists: Setlist[];
   songs: Song[];
   transport: TransportState;
   tuneMode: TuneModeState;

@@ -14,14 +14,16 @@ type ChainStripProps = {
   inputs?: Array<{ id: string; label: string; detail: string; current: boolean }>;
   muted?: boolean;
   level?: string;
+  levelText?: string;
   name?: string;
   inputMeter?: string;
+  stereo?: boolean;
+  inputMeterR?: string;
   renameKey?: string;
   removeLabel?: string;
   output?: string;
   outputA?: string;
   outputB?: string;
-  outputMeter?: string;
   outputs?: Array<{ id: string; label: string; detail: string; current: boolean }>;
   outputsB?: Array<{ id: string; label: string; detail: string; current: boolean }>;
   plugins?: Array<{ id: string; name: string; kind: string; image: string }>;
@@ -37,7 +39,6 @@ type ChainStripProps = {
   onAddPlugin?: (id: string) => void;
   onScanPlugins?: () => void;
   onImportPlugin?: () => void;
-  icon?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
 };
@@ -58,8 +59,11 @@ export default function ChainStrip({
   ],
   muted = false,
   level = "75",
+  levelText = "0.0 dB",
   name = "Guitar",
   inputMeter = "",
+  stereo = false,
+  inputMeterR = "",
   renameKey = "",
   removeLabel = "Remove “Guitar” and its plugins",
   output = "Out 1/2 · FOH",
@@ -72,7 +76,6 @@ export default function ChainStrip({
   outputsB = [
     { id: "B:3-4", label: "B · Out 3/4", detail: "Line 3 / Line 4", current: true },
   ],
-  outputMeter = "",
   plugins = [
     { id: "compressor", name: "Compressor", kind: "Dynamics", image: "/assets/compression-pedal.webp" },
     { id: "fuzz", name: "The Big Fuzz", kind: "Drive", image: "/assets/fuzz-pedal.webp" },
@@ -96,21 +99,28 @@ export default function ChainStrip({
   onAddPlugin,
   onScanPlugins,
   onImportPlugin,
-  icon,
   children,
   className,
 }: ChainStripProps) {
   return (
     <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} data-scamp-outside="menu:open=closed inmenu:open=closed outmenu:open=closed outmenub:open=closed options:open=closed,confirm=closed" data-scamp-escape="menu:open=closed inmenu:open=closed outmenu:open=closed outmenub:open=closed options:open=closed,confirm=closed" data-color={color} data-state={state} data-menu={menu} data-inmenu={inmenu} data-outmenu={outmenu} data-outmenub={outmenub} data-options={options} data-exit={exit}>
       <div data-scamp-id="header_7a1b" className={styles.header_7a1b}>
+        <div data-scamp-id="title_row_1c2d" className={styles.title_row_1c2d}>
+          <span data-scamp-id="icon_9c3d" className={styles.icon_9c3d} aria-hidden="true" />
+          <h3 data-scamp-id="name_023e" className={styles.name_023e} data-rename={renameKey}>{name}</h3>
+          <div data-scamp-id="chain_opts_f12a" className={styles.chain_opts_f12a} data-scamp-click="options:closed=open,open=closed,confirm=closed menu:open=closed inmenu:open=closed outmenu:open=closed outmenub:open=closed">
+            <Button data-scamp-instance-id="inst_d39a" className={styles.inst_d39a} variant="icon" ariaLabel="Chain options" label="⋯" />
+            <div data-scamp-id="chain_menu_0b3c" className={styles.chain_menu_0b3c} role="menu" aria-label="Chain options">
+              <button data-scamp-id="rename_1c4d" className={styles.rename_1c4d} type="button" role="menuitem" data-scamp-click="options:open=closed" onClick={onRename}>Rename</button>
+              <button data-scamp-id="remove_2d5e" className={styles.remove_2d5e} type="button" role="menuitem" data-scamp-click="options:open=confirm">Remove chain…</button>
+              <button data-scamp-id="confirm_3e6f" className={styles.confirm_3e6f} type="button" role="menuitem" data-scamp-click="options:confirm=closed" onClick={onRemove}>{removeLabel}</button>
+            </div>
+          </div>
+        </div>
         <div data-scamp-id="in_section_2b57" className={styles.in_section_2b57}>
           <div data-scamp-id="in_controls_8252" className={styles.in_controls_8252}>
             <div data-scamp-id="source_picker_42f0" className={styles.source_picker_42f0}>
-              <svg data-scamp-id="mono_svg_b592" className={styles.mono_svg_b592} viewBox="0 0 24 24">
-	
-	<path xmlns="http://www.w3.org/2000/svg" d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>
-</svg>
-              <button data-scamp-id="source_47e8" className={styles.source_47e8} type="button" aria-haspopup="menu" data-scamp-click="inmenu:closed=open,open=closed menu:open=closed outmenu:open=closed outmenub:open=closed options:open=closed,confirm=closed">{input}</button>
+              <button data-scamp-id="source_47e8" className={styles.source_47e8} type="button" aria-haspopup="menu" data-scamp-click="inmenu:closed=open,open=closed menu:open=closed outmenu:open=closed outmenub:open=closed options:open=closed,confirm=closed">{input} ▾</button>
               <div data-scamp-id="in_menu_1a9b" className={styles.in_menu_1a9b} role="menu" aria-label="Input">
                 <p data-scamp-id="in_title_2bac" className={styles.in_title_2bac}>INPUT</p>
                 <ul data-scamp-id="in_list_3cbd" className={styles.in_list_3cbd}>
@@ -125,52 +135,54 @@ export default function ChainStrip({
                 </ul>
               </div>
             </div>
-            <div data-scamp-id="mute_solo_3e4f" className={styles.mute_solo_3e4f}>
-              <label data-scamp-id="mute_8394" className={styles.mute_8394}>
-                <input data-scamp-id="mute_input_94a5" className={styles.mute_input_94a5} type="checkbox" checked={muted} onChange={onMuteToggle} />
-                <span data-scamp-id="mute_text_a5b6" className={styles.mute_text_a5b6}>M</span>
-              </label>
-              <label data-scamp-id="solo_fac9" className={styles.solo_fac9}>
-                <input data-scamp-id="solo_input_63d7" className={styles.solo_input_63d7} type="checkbox" />
-                <span data-scamp-id="solo_text_e74c" className={styles.solo_text_e74c}>S</span>
-              </label>
-            </div>
           </div>
           <div data-scamp-id="level_cd1c" className={styles.level_cd1c}>
-            <div data-scamp-id="fader_5061" className={styles.fader_5061}>
-              <input data-scamp-id="fader_range_7283" className={styles.fader_range_7283} type="range" min="0" max="100" onInput={(e) => onLevelChange?.(e.currentTarget.value)} value={level} aria-label={name} />
+            <div data-scamp-id="level_row_e507" className={styles.level_row_e507}>
+              <div data-scamp-id="scale_f618" className={styles.scale_f618} aria-hidden="true">
+                <span data-scamp-id="mark_10_0a29" className={styles.mark_10_0a29}>+10</span>
+                <span data-scamp-id="mark_0_1b3a" className={styles.mark_0_1b3a}>0</span>
+                <span data-scamp-id="mark_m10_2c4b" className={styles.mark_m10_2c4b}>-10</span>
+                <span data-scamp-id="mark_m30_3d5c" className={styles.mark_m30_3d5c}>-30</span>
+                <span data-scamp-id="mark_inf_4e6d" className={styles.mark_inf_4e6d}>-∞</span>
+              </div>
+              <div data-scamp-id="fader_5061" className={styles.fader_5061}>
+                <input data-scamp-id="fader_range_7283" className={styles.fader_range_7283} type="range" min="0" max="100" onInput={(e) => onLevelChange?.(e.currentTarget.value)} value={level} aria-label={name} />
+              </div>
+              <div data-scamp-id="meter_in_274e" className={styles.meter_in_274e} data-meter={inputMeter} title="Input">
+                <div data-scamp-id="meter_in_fill_8e60" className={styles.meter_in_fill_8e60} />
+              </div>
+              {stereo && (
+                <div data-scamp-id="meter_in_r_5c1f" className={styles.meter_in_r_5c1f} data-meter={inputMeterR} title="Input, right">
+                  <div data-scamp-id="meter_in_r_fill_6d20" className={styles.meter_in_r_fill_6d20} />
+                </div>
+              )}
             </div>
-            <div data-scamp-id="meter_in_274e" className={styles.meter_in_274e} data-meter={inputMeter}>
-              <div data-scamp-id="meter_in_fill_8e60" className={styles.meter_in_fill_8e60} />
-            </div>
+            <span data-scamp-id="readout_5f7e" className={styles.readout_5f7e}>{muted ? "Muted" : levelText}</span>
+          </div>
+          <div data-scamp-id="mute_solo_3e4f" className={styles.mute_solo_3e4f}>
+            <label data-scamp-id="mute_8394" className={styles.mute_8394}>
+              <input data-scamp-id="mute_input_94a5" className={styles.mute_input_94a5} type="checkbox" aria-label={`Mute ${name}`} checked={muted} onChange={onMuteToggle} />
+              <span data-scamp-id="mute_text_a5b6" className={styles.mute_text_a5b6}>M</span>
+            </label>
           </div>
         </div>
-        <div data-scamp-id="title_row_1c2d" className={styles.title_row_1c2d}>
-          <div data-scamp-id="icon_9c3d" className={styles.icon_9c3d}>{icon}</div>
-          <h3 data-scamp-id="name_023e" className={styles.name_023e} data-rename={renameKey}>{name}</h3>
-          <div data-scamp-id="chain_opts_f12a" className={styles.chain_opts_f12a} data-scamp-click="options:closed=open,open=closed,confirm=closed menu:open=closed inmenu:open=closed outmenu:open=closed outmenub:open=closed">
-            <Button data-scamp-instance-id="inst_d39a" className={styles.inst_d39a} variant="icon" ariaLabel="Chain options" label="⋯" />
-            <div data-scamp-id="chain_menu_0b3c" className={styles.chain_menu_0b3c} role="menu" aria-label="Chain options">
-              <button data-scamp-id="rename_1c4d" className={styles.rename_1c4d} type="button" role="menuitem" data-scamp-click="options:open=closed" onClick={onRename}>Rename</button>
-              <button data-scamp-id="remove_2d5e" className={styles.remove_2d5e} type="button" role="menuitem" data-scamp-click="options:open=confirm">Remove chain…</button>
-              <button data-scamp-id="confirm_3e6f" className={styles.confirm_3e6f} type="button" role="menuitem" data-scamp-click="options:confirm=closed" onClick={onRemove}>{removeLabel}</button>
-            </div>
-          </div>
-        </div>
-        <div data-scamp-id="out_panel_b3e7" className={styles.out_panel_b3e7}>
-          <div data-scamp-id="meter_out_8b2d" className={styles.meter_out_8b2d} data-meter={outputMeter}>
-            <div data-scamp-id="meter_out_fill_9c3e" className={styles.meter_out_fill_9c3e} />
-          </div>
+      </div>
+      <div data-scamp-id="body_14b5" className={styles.body_14b5}>
+        <span data-scamp-id="in_pill_6a8f" className={styles.in_pill_6a8f}>In</span>
+        <div data-scamp-id="lane_58f9" className={styles.lane_58f9}>{children}</div>
+        <button data-scamp-id="add_btn_690a" className={styles.add_btn_690a} type="button" aria-label="Add block" data-scamp-click="menu:closed=open,open=closed inmenu:open=closed outmenu:open=closed outmenub:open=closed options:open=closed,confirm=closed">+</button>
+      </div>
+        <div data-scamp-id="out_end_4a7c" className={styles.out_end_4a7c}>
           <div data-scamp-id="out_controls_3fa1" className={styles.out_controls_3fa1}>
-            <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button" aria-haspopup="menu" data-scamp-click="outmenu:closed=open,open=closed outmenub:open=closed menu:open=closed inmenu:open=closed options:open=closed,confirm=closed">{output}</button>
+            <button data-scamp-id="out_chip_7a1c" className={styles.out_chip_7a1c} type="button" aria-haspopup="menu" data-scamp-click="outmenu:closed=open,open=closed outmenub:open=closed menu:open=closed inmenu:open=closed options:open=closed,confirm=closed">{output} ▾</button>
             <div data-scamp-id="out_split_c1d2" className={styles.out_split_c1d2}>
               <button data-scamp-id="out_a_d2e3" className={styles.out_a_d2e3} type="button" aria-haspopup="menu" data-scamp-click="outmenu:closed=open,open=closed outmenub:open=closed menu:open=closed inmenu:open=closed options:open=closed,confirm=closed">
                 <span data-scamp-id="out_a_tag_e3f4" className={styles.out_a_tag_e3f4}>A</span>
-                <span data-scamp-id="out_a_text_f405" className={styles.out_a_text_f405}>{outputA}</span>
+                <span data-scamp-id="out_a_text_f405" className={styles.out_a_text_f405}>{outputA} ▾</span>
               </button>
               <button data-scamp-id="out_b_0516" className={styles.out_b_0516} type="button" aria-haspopup="menu" data-scamp-click="outmenub:closed=open,open=closed outmenu:open=closed menu:open=closed inmenu:open=closed options:open=closed,confirm=closed">
                 <span data-scamp-id="out_b_tag_1627" className={styles.out_b_tag_1627}>B</span>
-                <span data-scamp-id="out_b_text_2738" className={styles.out_b_text_2738}>{outputB}</span>
+                <span data-scamp-id="out_b_text_2738" className={styles.out_b_text_2738}>{outputB} ▾</span>
               </button>
             </div>
           </div>
@@ -200,7 +212,8 @@ export default function ChainStrip({
               ))}
             </ul>
           </div>
-          <div data-scamp-id="menu_5d1a" className={styles.menu_5d1a} role="menu" aria-label="Add a block">
+        </div>
+      <div data-scamp-id="menu_5d1a" className={styles.menu_5d1a} role="menu" aria-label="Add a block">
             <p data-scamp-id="menu_title_6e2b" className={styles.menu_title_6e2b}>ADD A BLOCK</p>
             <ul data-scamp-id="menu_list_7f3c" className={styles.menu_list_7f3c}>
               {plugins.map((plugin) => (
@@ -221,12 +234,6 @@ export default function ChainStrip({
               <button data-scamp-id="menu_import_e014" className={styles.menu_import_e014} type="button" data-scamp-click="menu:open=closed" disabled={scanning} onClick={onImportPlugin}>Add file…</button>
             </div>
           </div>
-        </div>
-      </div>
-      <div data-scamp-id="body_14b5" className={styles.body_14b5}>
-        <div data-scamp-id="lane_58f9" className={styles.lane_58f9}>{children}</div>
-        <button data-scamp-id="add_btn_690a" className={styles.add_btn_690a} type="button" aria-label="Add block" data-scamp-click="menu:closed=open,open=closed inmenu:open=closed outmenu:open=closed outmenub:open=closed options:open=closed,confirm=closed">+</button>
-      </div>
     </section>
   );
 }

@@ -55,6 +55,7 @@ namespace glitch::protocol
         inline constexpr auto songImport     = "song.import";
         inline constexpr auto songSelect     = "song.select";
         inline constexpr auto songRename     = "song.rename";
+        inline constexpr auto songAddTracks  = "song.addTracks";
         inline constexpr auto songSetPreset  = "song.setPreset";
         inline constexpr auto songDelete     = "song.delete";
         inline constexpr auto trackMixSet    = "trackMix.set";
@@ -65,6 +66,8 @@ namespace glitch::protocol
         inline constexpr auto transportPrev  = "transport.prev";
         inline constexpr auto setlistCreate  = "setlist.create";
         inline constexpr auto setlistSelect  = "setlist.select";
+        inline constexpr auto setlistAppend = "setlist.append";
+        inline constexpr auto setlistSaveToLibrary = "setlist.saveToLibrary";
         inline constexpr auto setlistRename  = "setlist.rename";
         inline constexpr auto setlistDelete  = "setlist.delete";
         inline constexpr auto setlistAddSong = "setlist.addSong";

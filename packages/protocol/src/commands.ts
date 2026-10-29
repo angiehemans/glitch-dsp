@@ -52,7 +52,10 @@ export type Command =
   | { type: "route.remove"; chainId?: string; trackId?: string; path?: "A" | "B"; hwChannels: number[] }
   // Backing tracks. import opens a file chooser: the chosen WAV/AIFF files become one song (a track
   // each), copied into the library, and the current song. select puts a song in the player (null: none).
-  | { type: "song.import" }
+  /** into: "project" (the open project's set, as its current song), a library setlist's id, or omitted (library only). */
+  | { type: "song.import"; into?: string }
+  /** A file chooser: the chosen WAV/AIFF files become more tracks of the song. */
+  | { type: "song.addTracks"; songId: string }
   | { type: "song.select"; songId: string | null }
   | { type: "song.rename"; songId: string; title: string }
   | { type: "song.delete"; songId: string }
@@ -69,11 +72,17 @@ export type Command =
   | { type: "transport.prev" }
   // Setlists: the project's own. create makes one (named, or "Setlist N") and makes it current;
   // select makes one current (null: none), which next/prev and the preload follow.
-  | { type: "setlist.create"; name?: string }
+  /** library: a standalone setlist in the library, outside any project; else the open project's own. */
+  | { type: "setlist.create"; name?: string; library?: boolean }
+  /** Adds a saved setlist's songs after this one's; no setlistId: the open project's set (made if needed). */
+  | { type: "setlist.append"; fromId: string; setlistId?: string }
+  /** Copies the open project's set into the library, for other projects to add. */
+  | { type: "setlist.saveToLibrary"; name?: string }
   | { type: "setlist.select"; setlistId: string | null }
   | { type: "setlist.rename"; setlistId: string; name: string }
   | { type: "setlist.delete"; setlistId: string }
-  | { type: "setlist.addSong"; setlistId: string; songId: string; index?: number }
+  /** No setlistId: the open project's set, made if it has none yet. */
+  | { type: "setlist.addSong"; setlistId?: string; songId: string; index?: number }
   | { type: "setlist.removeSong"; setlistId: string; index: number }
   | { type: "setlist.moveSong"; setlistId: string; index: number; to: number }
   /** Play the next song when one ends. */

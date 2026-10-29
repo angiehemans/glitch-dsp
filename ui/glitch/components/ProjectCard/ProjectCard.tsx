@@ -37,7 +37,7 @@ export default function ProjectCard({
       <div data-scamp-id="body_2d4f" className={styles.body_2d4f}>
         <div data-scamp-id="head_3e5a" className={styles.head_3e5a}>
           <a data-scamp-id="name_4f6b" className={styles.name_4f6b} href={href} data-rename={renameKey}>{name}</a>
-          <span data-scamp-id="badge_open_5a7c" className={styles.badge_open_5a7c}>OPEN</span>
+          <span data-scamp-id="badge_open_5a7c" className={styles.badge_open_5a7c}>Open</span>
           <div data-scamp-id="options_wrap_7a2b" className={styles.options_wrap_7a2b} data-scamp-click="menu:closed=open,open=closed">
             <Button data-scamp-instance-id="inst_7f0c" variant="icon" ariaLabel="Project options" label="⋯" />
             <div data-scamp-id="options_menu_8b3c" className={styles.options_menu_8b3c} role="menu" aria-label="Project options">
@@ -49,15 +49,15 @@ export default function ProjectCard({
         <div data-scamp-id="stats_8daf" className={styles.stats_8daf}>
           <div data-scamp-id="stat_9eb0" className={styles.stat_9eb0}>
             <span data-scamp-id="stat_value_a0c1" className={styles.stat_value_a0c1}>{chainCount}</span>
-            <span data-scamp-id="stat_label_b1d2" className={styles.stat_label_b1d2}>CHAINS</span>
+            <span data-scamp-id="stat_label_b1d2" className={styles.stat_label_b1d2}>Chains</span>
           </div>
           <div data-scamp-id="stat_c2e3" className={styles.stat_c2e3}>
             <span data-scamp-id="stat_value_d3f4" className={styles.stat_value_d3f4}>{presetCount}</span>
-            <span data-scamp-id="stat_label_e405" className={styles.stat_label_e405}>PRESETS</span>
+            <span data-scamp-id="stat_label_e405" className={styles.stat_label_e405}>Presets</span>
           </div>
           <div data-scamp-id="stat_f516" className={styles.stat_f516}>
             <span data-scamp-id="stat_value_0627" className={styles.stat_value_0627}>{setlistCount}</span>
-            <span data-scamp-id="stat_label_1738" className={styles.stat_label_1738}>SETLISTS</span>
+            <span data-scamp-id="stat_label_1738" className={styles.stat_label_1738}>Setlists</span>
           </div>
         </div>
         <div data-scamp-id="footer_2849" className={styles.footer_2849}>

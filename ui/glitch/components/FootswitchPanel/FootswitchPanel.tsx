@@ -74,7 +74,7 @@ export default function FootswitchPanel({
   return (
     <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} aria-label="Footswitch" data-devicemenu={devicemenu} data-editing={editing} data-scamp-outside="devicemenu:open=closed" data-scamp-escape="devicemenu:open=closed">
       <div data-scamp-id="header_1c0a" className={styles.header_1c0a}>
-        <h2 data-scamp-id="title_2d1b" className={styles.title_2d1b}>FOOTSWITCH</h2>
+        <h2 data-scamp-id="title_2d1b" className={styles.title_2d1b}>Footswitch</h2>
         <div data-scamp-id="device_wrap_3e2c" className={styles.device_wrap_3e2c}>
           <button data-scamp-id="device_btn_4f3d" className={styles.device_btn_4f3d} type="button" aria-haspopup="menu" data-scamp-click="devicemenu:closed=open,open=closed">
             <span data-scamp-id="device_led_504e" className={styles.device_led_504e} data-on={connected} />
@@ -102,13 +102,12 @@ export default function FootswitchPanel({
           <li data-scamp-id="tile_row_45c6" className={styles.tile_row_45c6} key={sw.id}>
             <button data-scamp-id="tile_ead7" className={styles.tile_ead7} type="button" data-lit={sw.lit} data-editing={sw.editing} aria-label={sw.label} onClick={() => onEditSwitch?.(sw.id)}>
               <span data-scamp-id="tile_name_fbe8" className={styles.tile_name_fbe8}>{sw.name}</span>
-              <span data-scamp-id="tap_row_0cf9" className={styles.tap_row_0cf9}>
-                <span data-scamp-id="tap_tag_1e0a" className={styles.tap_tag_1e0a}>TAP</span>
+              <span data-scamp-id="tile_text_7d1e" className={styles.tile_text_7d1e}>
                 <span data-scamp-id="tap_label_2f1b" className={styles.tap_label_2f1b}>{sw.tap}</span>
-              </span>
-              <span data-scamp-id="hold_row_413d" className={styles.hold_row_413d}>
-                <span data-scamp-id="hold_tag_524e" className={styles.hold_tag_524e}>HOLD</span>
-                <span data-scamp-id="hold_label_635f" className={styles.hold_label_635f}>{sw.hold}</span>
+                <span data-scamp-id="hold_row_413d" className={styles.hold_row_413d}>
+                  <span data-scamp-id="hold_tag_524e" className={styles.hold_tag_524e}>Hold ·</span>
+                  <span data-scamp-id="hold_label_635f" className={styles.hold_label_635f}>{sw.hold}</span>
+                </span>
               </span>
             </button>
           </li>

@@ -1,10 +1,13 @@
 import styles from './TopBar.module.css';
+import ViewTabs from '@/components/ViewTabs/ViewTabs';
 
 type TopBarProps = {
   variant?: "rig" | "home";
   panic?: "off" | "on";
   audiomenu?: "closed" | "open";
   presetmenu?: "closed" | "open" | "confirm";
+  showTabs?: boolean;
+  view?: "rig" | "routing" | "songs" | "perform";
   projectName?: string;
   projectRenameKey?: string;
   presetName?: string;
@@ -42,23 +45,25 @@ export default function TopBar({
   panic = "off",
   audiomenu = "closed",
   presetmenu = "closed",
-  projectName = "FULL BAND, IEMS",
+  showTabs = true,
+  view = "rig",
+  projectName = "Full band · IEM",
   projectRenameKey = "",
-  presetName = "CLEAN VERSE",
+  presetName = "Main tone",
   presetRenameKey = "",
   modified = true,
   presets = [
-    { id: "1", name: "CLEAN VERSE", current: true },
-    { id: "2", name: "CRUNCH CHORUS", current: false },
-    { id: "3", name: "LEAD", current: false },
+    { id: "1", name: "Main tone", current: true },
+    { id: "2", name: "Crunch chorus", current: false },
+    { id: "3", name: "Lead", current: false },
   ],
   noPresets = false,
   canSave = true,
   hasPreset = true,
-  deleteLabel = "Delete “CLEAN VERSE”",
-  songName = "03. MIDNIGHT CITY",
-  cpuLoad = "34%",
-  audioDevice = "Scarlett 4i4",
+  deleteLabel = "Delete “Main tone”",
+  songName = "Midnight City",
+  cpuLoad = "31%",
+  audioDevice = "Scarlett 4i4 · 48 kHz · 128",
   devices = [
     { id: "1", name: "Scarlett 4i4", kind: "CoreAudio", current: true },
     { id: "2", name: "MacBook Pro Speakers", kind: "CoreAudio", current: false },
@@ -95,22 +100,25 @@ export default function TopBar({
         <a data-scamp-id="back_7e21" className={styles.back_7e21} href="/" aria-label="Back to projects">
           <svg data-scamp-id="back_icon_8f32" className={styles.back_icon_8f32} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l14 0" /><path d="M5 12l6 6" /><path d="M5 12l6 -6" /></svg>
         </a>
-        <span data-scamp-id="brand_a3f1" className={styles.brand_a3f1}>GLITCH</span>
+        <div data-scamp-id="brand_a3f1" className={styles.brand_a3f1}>
+          <span data-scamp-id="brand_word_9c2d" className={styles.brand_word_9c2d}>Glitch</span>
+          <span data-scamp-id="brand_dot_4b6e" className={styles.brand_dot_4b6e}>.</span>
+        </div>
+        {showTabs && (
+          <ViewTabs data-scamp-instance-id="inst_5e7a" className={styles.inst_5e7a} active={view} />
+        )}
         <div data-scamp-id="lcd_c4e9" className={styles.lcd_c4e9}>
-          <div data-scamp-id="project_dot_d1a7" className={styles.project_dot_d1a7} />
           <span data-scamp-id="project_name_e2b8" className={styles.project_name_e2b8} data-rename={projectRenameKey}>{projectName}</span>
-          <span data-scamp-id="sep_f3c9" className={styles.sep_f3c9}>//</span>
-          <span data-scamp-id="preset_label_04da" className={styles.preset_label_04da}>PRESET</span>
           <div data-scamp-id="preset_wrap_5d1e" className={styles.preset_wrap_5d1e}>
             <button data-scamp-id="preset_btn_6e2f" className={styles.preset_btn_6e2f} type="button" aria-haspopup="menu" aria-label="Presets" data-scamp-click="presetmenu:closed=open,open=closed,confirm=closed audiomenu:open=closed">
               <span data-scamp-id="preset_name_15eb" className={styles.preset_name_15eb} data-rename={presetRenameKey}>{presetName}</span>
               {modified && (
-                <span data-scamp-id="modified_dot_26fc" className={styles.modified_dot_26fc}>● MOD</span>
+                <span data-scamp-id="modified_dot_26fc" className={styles.modified_dot_26fc}>· unsaved changes</span>
               )}
               <svg data-scamp-id="preset_caret_7f30" className={styles.preset_caret_7f30} viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6" /></svg>
             </button>
             <div data-scamp-id="preset_menu_8041" className={styles.preset_menu_8041} role="menu" aria-label="Presets">
-              <p data-scamp-id="preset_title_3e8a" className={styles.preset_title_3e8a}>PRESETS</p>
+              <p data-scamp-id="preset_title_3e8a" className={styles.preset_title_3e8a}>Presets</p>
               <ul data-scamp-id="preset_list_9152" className={styles.preset_list_9152}>
                 {presets.map((preset) => (
                   <li data-scamp-id="preset_row_a263" className={styles.preset_row_a263} key={preset.id}>
@@ -129,10 +137,13 @@ export default function TopBar({
                 <button data-scamp-id="preset_confirm_2aeb" className={styles.preset_confirm_2aeb} type="button" role="menuitem" data-scamp-click="presetmenu:confirm=closed" onClick={onDeletePreset}>{deleteLabel}</button>
               </div>
             </div>
+            {songName && (
+              <span data-scamp-id="sep_370d" className={styles.sep_370d}>·</span>
+            )}
+            {songName && (
+              <span data-scamp-id="song_name_592f" className={styles.song_name_592f}>{songName}</span>
+            )}
           </div>
-          <span data-scamp-id="sep_370d" className={styles.sep_370d}>//</span>
-          <span data-scamp-id="song_label_481e" className={styles.song_label_481e}>SONG</span>
-          <span data-scamp-id="song_name_592f" className={styles.song_name_592f}>{songName}</span>
         </div>
       </div>
       <div data-scamp-id="tools_row_9f20" className={styles.tools_row_9f20}>
@@ -149,7 +160,7 @@ export default function TopBar({
             <span data-scamp-id="audio_name_d73a" className={styles.audio_name_d73a}>{audioDevice}</span>
           </button>
           <div data-scamp-id="audio_menu_0236" className={styles.audio_menu_0236} role="menu" aria-label="Audio devices">
-            <p data-scamp-id="audio_menu_title_1347" className={styles.audio_menu_title_1347}>AUDIO DEVICE</p>
+            <p data-scamp-id="audio_menu_title_1347" className={styles.audio_menu_title_1347}>Audio device</p>
             <ul data-scamp-id="audio_list_2458" className={styles.audio_list_2458}>
               {devices.map((device) => (
                 <li data-scamp-id="audio_row_3569" className={styles.audio_row_3569} key={device.id}>
@@ -160,13 +171,13 @@ export default function TopBar({
                 </li>
               ))}
             </ul>
-            <p data-scamp-id="rate_title_7a8b" className={styles.rate_title_7a8b}>SAMPLE RATE</p>
+            <p data-scamp-id="rate_title_7a8b" className={styles.rate_title_7a8b}>Sample rate</p>
             <div data-scamp-id="rates_8b9c" className={styles.rates_8b9c} role="group" aria-label="Sample rate">
               {rates.map((rate) => (
                 <button data-scamp-id="rate_9cad" className={styles.rate_9cad} type="button" role="menuitemradio" aria-checked={rate.current} key={rate.id} onClick={() => onSelectRate?.(rate.id)}>{rate.label}</button>
               ))}
             </div>
-            <p data-scamp-id="buffer_title_adbe" className={styles.buffer_title_adbe}>BUFFER SIZE</p>
+            <p data-scamp-id="buffer_title_adbe" className={styles.buffer_title_adbe}>Buffer size</p>
             <div data-scamp-id="buffers_becf" className={styles.buffers_becf} role="group" aria-label="Buffer size">
               {buffers.map((buffer) => (
                 <button data-scamp-id="buffer_cfd0" className={styles.buffer_cfd0} type="button" role="menuitemradio" aria-checked={buffer.current} key={buffer.id} onClick={() => onSelectBuffer?.(buffer.id)}>{buffer.label}</button>
@@ -179,10 +190,9 @@ export default function TopBar({
           <div data-scamp-id="midi_led_c7ba" className={styles.midi_led_c7ba} />
           <span data-scamp-id="midi_name_04db" className={styles.midi_name_04db}>{midiDevice}</span>
         </div>
-        <div data-scamp-id="tools_spacer_a031" className={styles.tools_spacer_a031} />
-        <button data-scamp-id="tune_btn_5d0b" className={styles.tune_btn_5d0b} type="button" aria-label="Tune mode: mute all but vocals and open the tuner" onClick={onTune}>TUNE</button>
+        <button data-scamp-id="tune_btn_5d0b" className={styles.tune_btn_5d0b} type="button" aria-label="Tune mode: mute all but vocals and open the tuner" onClick={onTune}>Tune</button>
         <button data-scamp-id="panic_3b9e" className={styles.panic_3b9e} type="button" aria-label="Panic: mute all outputs" aria-pressed={panic === "on"} onClick={onPanic}>
-          <span data-scamp-id="panic_label_4caf" className={styles.panic_label_4caf}>PANIC</span>
+          <span data-scamp-id="panic_label_4caf" className={styles.panic_label_4caf}>Panic</span>
         </button>
       </div>
     </header>

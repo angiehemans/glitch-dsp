@@ -84,7 +84,7 @@ export function renameByKey(key: string) {
  * things get a name straight away.
  */
 export function renameWhenCreated(kind: "project" | "chain" | "preset" | "setlist", onDone?: (id: string, how: "enter" | "blur" | "cancel") => void) {
-  const lists = { project: (s: GlitchState) => s.projects, preset: (s: GlitchState) => s.presets, setlist: (s: GlitchState) => s.setlists, chain: (s: GlitchState) => s.chains };
+  const lists = { project: (s: GlitchState) => s.projects, preset: (s: GlitchState) => s.presets, setlist: (s: GlitchState) => [...s.setlists, ...s.librarySetlists], chain: (s: GlitchState) => s.chains };
   const ids = (s = glitch.value) => (s ? lists[kind](s) : []).map((x) => x.id);
   const known = new Set(ids());
   const dispose = effect(() => {

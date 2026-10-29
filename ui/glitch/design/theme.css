@@ -1,6 +1,6 @@
 /* scamp: font imports — managed by Project Settings → Fonts */
 
-@import url("https://fonts.googleapis.com/css2?family=Google+Sans:wght@400..700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@400;500;700;800&family=Google+Sans+Code:wght@400;700&display=swap");
 
 :root {
   /* Primitives — brand */
@@ -64,31 +64,75 @@
   --color-success-900: #14532d;
 
   /* Primitives — bg */
-  --color-bg-0: #101113;
-  --color-bg-1: #1a1b1e;
-  --color-bg-2: #26282c;
-  --color-bg-3: #34363b;
+  --color-bg-0: #0d0f12;
+  --color-bg-1: #14171c;
+  --color-bg-2: #1a1e24;
+  --color-bg-3: #222730;
 
   /* The image under a chain's pedals (ChainStrip's body). The ABY hides the chain's centre line with
      patches of the same image, fixed to the window like the body's so they match: change both together. */
   --chain-floor: url("/assets/carpet3.webp");
 
   /* Semantic */
-  --color-line: #2e3035;
-  --color-line-strong: #4a4d53;
-  --color-text-hi: #d6d9de;
-  --color-text-lo: #8a8f98;
-  --color-text-dim: #5b5f66;
-  --color-accent: var(--color-brand-500);
-  --color-accent-soft: rgba(59, 130, 246, 0.12);
+  --color-line: #2e3440;
+  --color-line-strong: #444c5a;
+  --color-text-hi: #eef1f5;
+  --color-text-lo: #8a93a3;
+  --color-text-dim: #5f6878;
+  /* Redesign (glitch-scalloped mockup): flat panels, scalloped knobs and fader caps, grain pedal finishes */
+  --mixer-selected: #1f1c14;
+  --color-text-mid: #d5dae2;
+  --color-panic-line: #7f2a20;
+  --color-panic-text: #ff8a7a;
+  --setlist-playing-bg: #3a1714;
+  --setlist-amber-bg: #2a2418;
+  --setlist-teal-bg: #11302c;
+  --setlist-teal-ink: #5eead4;
+  --setlist-muted-row: #121418;
+  --setlist-mute-ink: #b3bac6;
+  --shell-cpu-fill: #b3bac6;
+  --shell-menu-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --radius-xl: 16px;
+  --knob-scalloped: url("/assets/knob-scalloped.svg");
+  --fader-handle-scalloped: url("/assets/fader-handle-scalloped.svg");
+  --knob-shadow: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+  --grain: url("/assets/grain.png");
+  --pedal-sheen: radial-gradient(ellipse at 30% 12%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 55%);
+  --pedal-orange: var(--grain) 0 0 / 256px 256px, var(--pedal-sheen), linear-gradient(180deg, #e3772d, #c9601d);
+  --pedal-red: var(--grain) 0 0 / 256px 256px, var(--pedal-sheen), linear-gradient(180deg, #c4301f, #a5261a);
+  --pedal-blue: var(--grain) 0 0 / 256px 256px, var(--pedal-sheen), linear-gradient(180deg, #2f62ad, #24508f);
+  --pedal-green: var(--grain) 0 0 / 256px 256px, var(--pedal-sheen), linear-gradient(180deg, #24624b, #1a4c3a);
+  --pedal-hammer: var(--grain) 0 0 / 256px 256px, var(--pedal-sheen), linear-gradient(180deg, #8f949b, #6e737a);
+  --pedal-black: var(--grain) 0 0 / 256px 256px, radial-gradient(ellipse at 30% 12%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, #2a2b2e, #1c1d20);
+  --pedal-cream: var(--grain) 0 0 / 256px 256px, radial-gradient(ellipse at 30% 12%, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, #f0efe9, #e3e2da);
+  --pedal-purple: var(--grain) 0 0 / 256px 256px, var(--pedal-sheen), linear-gradient(180deg, #6f4bb8, #58389a);
+  --pedal-blend: soft-light, normal, normal;
+  --pedal-ink-light: #ffffff;
+  --pedal-ink-dark: #1f1f22;
+  --pedal-led: #ff3b2f;
+  /* Rig (pedals, stomp switches, chain strip fader) */
+  --rig-pedal-shadow: 0 8px 14px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --rig-pedal-selected: 0 0 0 2px #f2c230, 0 0 20px rgba(242, 194, 48, 0.4);
+  --rig-pedal-face: rgba(0, 0, 0, 0.28);
+  --rig-led-off: #3b1a17;
+  --rig-switch-lit: #2a2418;
+  --rig-stomp-ring: radial-gradient(circle closest-side, transparent 0 66%, #1a1b1e 69% 75%, transparent 78%), conic-gradient(from 0deg, #5c6067, #9ea3ab, #50545a, #8c9199, #4a4d53, #a3a8b0, #5c6067);
+  --rig-stomp-ring-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 5px 8px -2px rgba(0, 0, 0, 0.7);
+  --rig-stomp-cap: radial-gradient(circle at 38% 32%, #f2f4f7 0%, #b7bcc4 30%, #6b7078 70%, #3d4045 100%);
+  --rig-stomp-cap-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.6);
+  /* the scalloped cap turned a quarter, for the chain strip's range input (rotated upright) */
+  --rig-fader-cap: url("/assets/fader-handle-scalloped-v.svg");
+
+  --color-accent: #f0503c;
+  --color-accent-soft: rgba(240, 80, 60, 0.14);
   --color-lcd-bg: #050506;
   --color-lcd-text: var(--color-brand-400);
   --color-lcd-dim: #3a3c40;
-  --color-signal: #4ade80;
-  --color-hot: #fbbf24;
-  --color-clip: #ef4444;
-  --color-clip-soft: rgba(239, 68, 68, 0.15);
-  --color-hot-soft: rgba(251, 191, 36, 0.15);
+  --color-signal: #34d399;
+  --color-hot: #f5b82e;
+  --color-clip: #ff3b2f;
+  --color-clip-soft: rgba(255, 59, 47, 0.15);
+  --color-hot-soft: rgba(245, 184, 46, 0.15);
   --color-primary: var(--color-accent);
   --color-secondary: var(--color-text-lo);
   --color-background: var(--color-bg-0);
@@ -102,8 +146,8 @@
 
   /* Typography */
   --font-display: var(--font-sans);
-  --font-sans: "Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: "Google Sans Flex", "Google Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Google Sans Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -126,9 +170,9 @@
   --space-8: 32px;
 
   /* Radius */
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-full: 999px;
 
   /* Shadows */
@@ -137,10 +181,10 @@
   --color-scrim: rgba(0, 0, 0, 0.7);
 
   /* Other */
-  --chain-orange: #fb923c;
-  --chain-cyan: #22d3ee;
-  --chain-pink: #f472b6;
-  --chain-lime: #a3e635;
+  --chain-orange: #f5b82e;
+  --chain-cyan: #5aa9ff;
+  --chain-pink: #ff6b5b;
+  --chain-lime: #2dd4bf;
   --chain-violet: #a78bfa;
   --card-color: var(--chain-orange);
   --strip-color: var(--chain-orange);

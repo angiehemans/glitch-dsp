@@ -1,20 +1,19 @@
 .root {
   width: fit-content;
-  height: 44px;
+  height: 36px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0px var(--space-5);
-  background: var(--color-accent);
+  padding: 0px var(--space-4);
+  background: var(--color-text-hi);
   border-radius: var(--radius-md);
-  box-shadow: var(--bevel-button);
   cursor: pointer;
   transition: background 120ms ease;
 }
 
 .root:hover {
-  background: var(--color-text-hi);
+  background: var(--color-text-mid);
 }
 
 .label_b7c2 {
@@ -22,36 +21,28 @@
   height: fit-content;
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-bg-0);
 }
 
 .root[data-variant="secondary"] {
-  background: var(--button-face);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--divider-dark);
+  background: var(--color-bg-3);
 }
 
 .root[data-variant="secondary"]:hover {
-  background: var(--button-face-hover);
+  background: var(--color-line);
 }
 
 .root[data-variant="secondary"] .label_b7c2 {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--color-text-hi);
 }
 
 .root[data-variant="ghost"] {
   background: transparent;
-  box-shadow: none;
 }
 
 .root[data-variant="ghost"]:hover {
-  background: var(--button-face-hover);
+  background: var(--color-bg-3);
 }
 
 .root[data-variant="ghost"] .label_b7c2 {
@@ -63,42 +54,33 @@
 }
 
 .root[data-variant="danger"] {
-  background: var(--color-clip-soft);
-  border-width: 2px;
+  background: transparent;
+  border-width: 1px;
   border-style: solid;
-  border-color: var(--color-clip);
-  box-shadow: none;
+  border-color: var(--color-panic-line);
 }
 
 .root[data-variant="danger"]:hover {
-  background: var(--color-clip);
+  background: var(--color-accent-soft);
 }
 
 .root[data-variant="danger"] .label_b7c2 {
   font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--color-clip);
-}
-
-.root[data-variant="danger"]:hover .label_b7c2 {
-  color: var(--color-bg-0);
+  color: var(--color-panic-text);
 }
 
 .root[data-variant="dashed"] {
   background: transparent;
-  border-width: 2px;
+  border-width: 1px;
   border-style: dashed;
-  border-color: var(--color-line);
-  box-shadow: none;
+  border-color: var(--color-line-strong);
 }
 
 .root[data-variant="dashed"]:hover {
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent);
+  background: var(--color-bg-2);
 }
 
 .root[data-variant="dashed"] .label_b7c2 {
-  font-size: 15px;
   color: var(--color-text-lo);
 }
 
@@ -107,19 +89,18 @@
 }
 
 .root[data-variant="icon"] {
-  width: 44px;
+  width: 36px;
   flex-shrink: 0;
   padding: 0px;
   background: transparent;
-  box-shadow: none;
 }
 
 .root[data-variant="icon"]:hover {
-  background: var(--button-face-hover);
+  background: var(--color-bg-3);
 }
 
 .root[data-variant="icon"] .label_b7c2 {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 400;
   color: var(--color-text-lo);
 }

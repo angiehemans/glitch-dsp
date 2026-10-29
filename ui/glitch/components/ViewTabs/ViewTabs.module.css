@@ -1,20 +1,17 @@
 .root {
   width: fit-content;
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--color-bg-0);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--bevel-inset);
+  flex-wrap: wrap;
+  gap: var(--space-1);
   position: relative;
 }
 
 .tab_rig_5a1c {
-  padding: var(--space-1) var(--space-4);
+  padding: var(--space-2) 14px;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-text-lo);
   text-decoration: none;
 }
@@ -24,11 +21,11 @@
 }
 
 .tab_routing_6b2d {
-  padding: var(--space-1) var(--space-4);
+  padding: var(--space-2) 14px;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-text-lo);
   text-decoration: none;
 }
@@ -38,11 +35,11 @@
 }
 
 .tab_songs_7c3e {
-  padding: var(--space-1) var(--space-4);
+  padding: var(--space-2) 14px;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--color-text-lo);
   text-decoration: none;
 }
@@ -51,20 +48,36 @@
   color: var(--color-text-hi);
 }
 
+.tab_perform_8d4f {
+  padding: var(--space-2) 14px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-lo);
+  text-decoration: none;
+}
+
+.tab_perform_8d4f:hover {
+  color: var(--color-text-hi);
+}
+
 .root[data-active="rig"] .tab_rig_5a1c {
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   color: var(--color-text-hi);
 }
 
 .root[data-active="routing"] .tab_routing_6b2d {
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   color: var(--color-text-hi);
 }
 
 .root[data-active="songs"] .tab_songs_7c3e {
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
+  color: var(--color-text-hi);
+}
+
+.root[data-active="perform"] .tab_perform_8d4f {
+  background: var(--color-bg-3);
   color: var(--color-text-hi);
 }
