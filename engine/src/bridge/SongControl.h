@@ -18,6 +18,7 @@ public:
 
     std::function<void (const juce::String&)> onError;
     std::function<void()> onChanged; // after an import finishes, so the state is sent
+    std::function<void (const juce::String&)> onLoadPreset; // a song's linked preset, when it's selected
 
     /** song.*, transport.*, trackMix.set and setlist.* commands. False after an error. */
     bool handleCommand (const juce::String& type, const juce::var& command);
@@ -36,7 +37,8 @@ private:
     bool handleSetlistCommand (const juce::String& type, const juce::var& command);
     bool handleSongCommand (const juce::String& type, const juce::var& command);
     void importSong(); // a file chooser, then the files as a new song, made current
-    void selectSong (const juce::String& songId); // made current and loaded ("" for none)
+    /** Made current and loaded ("" for none), with its linked preset unless that's already the rig's. */
+    void selectSong (const juce::String& songId);
     void preloadNext(); // the setlist's next song, read ahead; never touches the current one
     juce::var currentSetlist() const;
     /** The current setlist's song step places from the current one (1 next, -1 previous), or "". */

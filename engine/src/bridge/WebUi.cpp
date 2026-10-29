@@ -160,6 +160,10 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l, ModelLibrary& m)
 
     songControl.onError = footswitchControl.onError = [this] (const juce::String& message) { sendError (message); };
     songControl.onChanged = footswitchControl.onChanged = [this] { sendState(); };
+    songControl.onLoadPreset = [this] (const juce::String& presetId)
+    {
+        handlePresetCommand (protocol::command::presetLoad, object ({ { "presetId", presetId } }));
+    };
     footswitchControl.onCommand = [this] (const juce::var& command) { handleCommand (command); };
     footswitchControl.connectMidi();
     engine.getDeviceManager().addChangeListener (this);

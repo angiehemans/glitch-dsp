@@ -68,6 +68,14 @@ int main()
         check (store.loadPreset (presetId) && ! store.isPresetModified(), "loading it back undoes that");
         check (std::abs ((double) store.findChain ("c1")["level"] + 6.0) < 1.0e-9, "with the saved fader level");
 
+        // A song linked to a deleted preset recalls nothing; other links stay.
+        const auto other = store.savePreset ({}, "Lead");
+        auto* links = store.getCurrent()["songPresets"].getDynamicObject();
+        links->setProperty ("song1", presetId);
+        links->setProperty ("song2", other);
+        check (store.deletePreset (presetId), "a preset deletes");
+        check (! links->hasProperty ("song1") && links->getProperty ("song2").toString() == other, "and only its song links go");
+
         store.setMidiDevice ("SINCO MIDI 1");
     } // saves on the way out
 

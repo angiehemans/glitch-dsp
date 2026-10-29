@@ -15,6 +15,7 @@ export function SongsView({ state }: { state: GlitchState }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [routing, setRouting] = useState<string | null>(null); // the track whose output menu is open
   const [deletingList, setDeletingList] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false); // the song's preset menu is open
   if (!state.project) {
     return (
       <p class="gl-empty">
@@ -33,14 +34,21 @@ export function SongsView({ state }: { state: GlitchState }) {
   const t = transport.value;
   const position = t.songId === song?.id ? t.position : 0;
   const playing = t.playing && t.songId === song?.id;
+  const linked = song && state.presets.find((p) => p.id === state.project!.songPresets[song.id]);
 
   return (
     <div
       class="gl-songs"
       style={{ "--progress": song?.length ? (position / song.length).toFixed(4) : "0" }}
-      onKeyDown={(e) => e.key === "Escape" && setRouting(null)}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") return;
+        setRouting(null);
+        setPicking(false);
+      }}
       onPointerDown={(e) => {
-        if (!(e.target as Element).closest('[data-scamp-id="route_wrap_c6d8"]')) setRouting(null); // a click elsewhere closes it
+        // A click elsewhere closes the open menu.
+        if (!(e.target as Element).closest('[data-scamp-id="route_wrap_c6d8"]')) setRouting(null);
+        if (!(e.target as Element).closest('[data-scamp-id="preset_wrap_9c3d"]')) setPicking(false);
       }}
       onInput={(e) => {
         // Track faders: Scamp keeps the input's binding, the app listens (same law as chain faders).
@@ -108,6 +116,16 @@ export function SongsView({ state }: { state: GlitchState }) {
         playLabel={playing ? "STOP" : "PLAY"}
         playing={playing ? "on" : "off"}
         timeLabel={song ? `${clock(position)} / ${clock(song.length)}` : ""}
+        presetOpen={picking ? "on" : "off"}
+        presetLabel={`Preset for this song: ${linked?.name ?? "none"}`}
+        presetName={linked?.name ?? "None"}
+        presets={[{ id: "", name: "None (keep the rig)" }, ...state.presets].map((p) => ({ id: p.id, name: p.name, current: p.id === (linked?.id ?? "") }))}
+        presetHint={!state.presets.length ? "Save a preset to link it to this song" : linked ? "Loads when the song is selected" : ""}
+        onOpenPreset={() => setPicking(!picking)}
+        onPickPreset={(id) => {
+          if (song) send({ type: "song.setPreset", songId: song.id, presetId: id || null });
+          setPicking(false);
+        }}
         tracks={(song?.tracks ?? []).map((track) => {
           const entry = mix[track.id];
           const level = entry?.level ?? track.defaultLevel;

@@ -133,6 +133,12 @@ void SongControl::selectSong (const juce::String& songId)
     store.getCurrent().getDynamicObject()->setProperty ("songId", songId.isNotEmpty() ? juce::var (songId) : juce::var());
     store.markDirty();
     loadSong();
+    // The preset already loaded stays as it is, tweaks and all.
+    if (songId.isEmpty())
+        return;
+    const auto presetId = store.getCurrent()["songPresets"][juce::Identifier (songId)].toString();
+    if (presetId.isNotEmpty() && presetId != store.getCurrentPresetId() && onLoadPreset)
+        onLoadPreset (presetId);
 }
 
 bool SongControl::handleSetlistCommand (const juce::String& type, const juce::var& command)
@@ -300,6 +306,28 @@ bool SongControl::handleSongCommand (const juce::String& type, const juce::var& 
             sendError (title.isEmpty() ? "A song needs a title" : "Unknown song: " + songId);
             return false;
         }
+    }
+    else if (type == protocol::command::songSetPreset)
+    {
+        auto* links = store.getCurrent()["songPresets"].getDynamicObject();
+        const auto presetId = command["presetId"].toString();
+        if (links == nullptr || ! songs.find (songId).isObject())
+        {
+            sendError (links == nullptr ? "Open a project first" : "Unknown song: " + songId);
+            return false;
+        }
+        const auto* presets = store.getPresetSummaries().getArray();
+        if (presetId.isNotEmpty()
+            && std::none_of (presets->begin(), presets->end(), [&] (const juce::var& p) { return p["id"].toString() == presetId; }))
+        {
+            sendError ("Unknown preset: " + presetId);
+            return false;
+        }
+        if (presetId.isEmpty())
+            links->removeProperty (songId);
+        else
+            links->setProperty (songId, presetId);
+        store.markDirty();
     }
     else if (type == protocol::command::songDelete)
     {

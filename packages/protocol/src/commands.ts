@@ -56,6 +56,8 @@ export type Command =
   | { type: "song.select"; songId: string | null }
   | { type: "song.rename"; songId: string; title: string }
   | { type: "song.delete"; songId: string }
+  /** Links a song to one of the project's presets (null: none), loaded whenever the song is selected. */
+  | { type: "song.setPreset"; songId: string; presetId: string | null }
   /** A track of the current song in this project's track mix: its level or mute, or outputs, which
    * (like chain.setOutputs) sets its first send. */
   | { type: "trackMix.set"; trackId: string; outputs?: Pick<OutputRef, "hwChannels">[]; level?: number; mute?: boolean }

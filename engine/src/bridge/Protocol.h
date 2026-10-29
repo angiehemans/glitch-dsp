@@ -55,6 +55,7 @@ namespace glitch::protocol
         inline constexpr auto songImport     = "song.import";
         inline constexpr auto songSelect     = "song.select";
         inline constexpr auto songRename     = "song.rename";
+        inline constexpr auto songSetPreset  = "song.setPreset";
         inline constexpr auto songDelete     = "song.delete";
         inline constexpr auto trackMixSet    = "trackMix.set";
         inline constexpr auto transportPlay  = "transport.play";

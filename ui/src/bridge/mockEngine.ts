@@ -182,6 +182,9 @@ export function createMockEngine(): EngineBridge {
     const p = projects.find((p) => p.id === state.project?.id);
     if (p) p.songId = songId;
     state.transport = { playing: false, songId, position: 0 };
+    // Its linked preset, unless that's already the rig's (as WebUi).
+    const presetId = songId && p?.songPresets[songId];
+    if (presetId && presetId !== p.currentPresetId) bridge.send({ type: "preset.load", presetId });
   };
 
   // Backing tracks, as WebUi: the project's current song, and its track mix (default: main output).
@@ -338,6 +341,7 @@ export function createMockEngine(): EngineBridge {
           if (cmd.type === "preset.delete") {
             p.presets.splice(p.presets.indexOf(preset), 1);
             if (p.currentPresetId === preset.id) p.currentPresetId = null;
+            for (const [songId, linked] of Object.entries(p.songPresets)) if (linked === preset.id) delete p.songPresets[songId];
           }
           break;
         }
@@ -369,6 +373,15 @@ export function createMockEngine(): EngineBridge {
           if (!state.project) return error("Open a project first");
           if (cmd.songId && !state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);
           selectSong(cmd.songId);
+          break;
+        }
+        case "song.setPreset": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("Open a project first");
+          if (!state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);
+          if (cmd.presetId && !p.presets.some((x) => x.id === cmd.presetId)) return error(`Unknown preset: ${cmd.presetId}`);
+          if (cmd.presetId) p.songPresets[cmd.songId] = cmd.presetId;
+          else delete p.songPresets[cmd.songId];
           break;
         }
         case "song.rename":

@@ -20,6 +20,11 @@ type SongsProps = {
   playLabel?: string;
   playing?: string;
   timeLabel?: string;
+  presetOpen?: string;
+  presetLabel?: string;
+  presetName?: string;
+  presets?: Array<{ id: string; name: string; current: boolean }>;
+  presetHint?: string;
   tracks?: Array<{
     id: string;
     name: string;
@@ -50,6 +55,8 @@ type SongsProps = {
   onRestart?: () => void;
   onPlay?: () => void;
   onNext?: () => void;
+  onOpenPreset?: () => void;
+  onPickPreset?: (id: string) => void;
   onOpenRoute?: (id: string) => void;
   onPickOutput?: (id: string) => void;
   onMuteTrack?: (id: string) => void;
@@ -85,6 +92,15 @@ export default function Songs({
   playLabel = "PLAY",
   playing = "off",
   timeLabel = "1:12 / 4:03",
+  presetOpen = "off",
+  presetLabel = "Preset for this song: Clean",
+  presetName = "Clean",
+  presets = [
+    { id: "", name: "None (keep the rig)", current: false },
+    { id: "1", name: "Clean", current: true },
+    { id: "2", name: "Lead", current: false },
+  ],
+  presetHint = "Loads when the song is selected",
   tracks = [
     {
       id: "1", name: "Backing", role: "BACKING", open: "off", route: "Main · Out 1/2", routeLabel: "Backing output: Out 1/2",
@@ -130,6 +146,8 @@ export default function Songs({
   onRestart,
   onPlay,
   onNext,
+  onOpenPreset,
+  onPickPreset,
   onOpenRoute,
   onPickOutput,
   onMuteTrack,
@@ -199,6 +217,25 @@ export default function Songs({
           <span data-scamp-id="time_2b1d" className={styles.time_2b1d}>{timeLabel}</span>
           <div data-scamp-id="progress_3c2e" className={styles.progress_3c2e} aria-hidden="true" />
         </div>
+        <div data-scamp-id="preset_row_7a1b" className={styles.preset_row_7a1b} data-open={presetOpen}>
+          <span data-scamp-id="preset_title_8b2c" className={styles.preset_title_8b2c}>PRESET</span>
+          <div data-scamp-id="preset_wrap_9c3d" className={styles.preset_wrap_9c3d}>
+            <button data-scamp-id="preset_btn_ad4e" className={styles.preset_btn_ad4e} type="button" aria-haspopup="menu" aria-label={presetLabel} onClick={onOpenPreset}>
+              <span data-scamp-id="preset_text_be5f" className={styles.preset_text_be5f}>{presetName}</span>
+              <svg data-scamp-id="preset_caret_cf60" className={styles.preset_caret_cf60} viewBox="0 0 24 24"><path d="M6 9l6 6l6 -6" /></svg>
+            </button>
+            <div data-scamp-id="preset_menu_d071" className={styles.preset_menu_d071} role="menu" aria-label={presetLabel}>
+              <ul data-scamp-id="preset_list_e182" className={styles.preset_list_e182}>
+                {presets.map((preset) => (
+                  <li data-scamp-id="preset_choice_row_f293" className={styles.preset_choice_row_f293} key={preset.id}>
+                    <button data-scamp-id="preset_choice_03a4" className={styles.preset_choice_03a4} type="button" role="menuitemradio" aria-checked={preset.current} onClick={() => onPickPreset?.(preset.id)}>{preset.name}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <span data-scamp-id="preset_hint_14b5" className={styles.preset_hint_14b5}>{presetHint}</span>
+        </div>
         <h2 data-scamp-id="tracks_title_4d3f" className={styles.tracks_title_4d3f}>TRACKS</h2>
         <ul data-scamp-id="track_list_5e40" className={styles.track_list_5e40}>
           {tracks.map((track) => (
@@ -238,4 +275,4 @@ export default function Songs({
   );
 }
 
-export const _scamp = { contract: 2, events: ['onNewSetlist', 'onSelectSetlist', 'onToggleAuto', 'onDeleteSetlist', 'onPickEntry', 'onEntryUp', 'onEntryDown', 'onEntryRemove', 'onImport', 'onAddToSetlist', 'onSelectSong', 'onDelete', 'onPrev', 'onRestart', 'onPlay', 'onNext', 'onOpenRoute', 'onPickOutput', 'onMuteTrack'] } as const;
+export const _scamp = { contract: 2, events: ['onNewSetlist', 'onSelectSetlist', 'onToggleAuto', 'onDeleteSetlist', 'onPickEntry', 'onEntryUp', 'onEntryDown', 'onEntryRemove', 'onImport', 'onAddToSetlist', 'onSelectSong', 'onDelete', 'onPrev', 'onRestart', 'onPlay', 'onNext', 'onOpenPreset', 'onPickPreset', 'onOpenRoute', 'onPickOutput', 'onMuteTrack'] } as const;
