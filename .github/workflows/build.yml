@@ -44,7 +44,9 @@ jobs:
       - run: test -f build/release/engine/Glitch_artefacts/Release/ui/index.html
 
   macos:
-    runs-on: macos-14
+    # Intel: the Apple Silicon runners have been too busy to start (jobs cancelled after waiting), and
+    # the show Mac is Intel. The build is still universal.
+    runs-on: macos-15-intel
     permissions:
       contents: write # to publish releases on tags
     steps:
@@ -54,7 +56,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # Runners are Apple Silicon; the show Mac is Intel, so build universal.
+      # Universal, so the same app runs on Intel and Apple Silicon Macs.
       - run: cmake --preset release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
       - run: cmake --build --preset release -j4
       - run: test -f build/release/engine/Glitch_artefacts/Release/Glitch.app/Contents/Resources/ui/index.html
