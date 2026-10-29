@@ -126,6 +126,24 @@ let insertAt: { chainId: string; abyId?: string; path?: "A" | "B"; index: number
 // The real + buttons add at the end: a click on one by hand (not ours, which isn't trusted) forgets the spot.
 document.addEventListener("click", (e) => e.isTrusted && (e.target as Element).closest?.('[data-scamp-id^="add_"]') && (insertAt = null), true);
 
+/** Opens a chain's add menu under what was clicked (a + between pedals, or the one at the end), kept inside the chain. */
+function placeAddMenu(chain: HTMLElement, anchor: Element) {
+  const box = chain.getBoundingClientRect();
+  const at = anchor.getBoundingClientRect();
+  chain.style.setProperty("--menu-left", `${Math.max(8, Math.min(at.left - box.left, box.width - 288))}px`);
+  chain.style.setProperty("--menu-right", "auto");
+  chain.style.setProperty("--menu-top", `${at.bottom - box.top + 4}px`);
+}
+document.addEventListener(
+  "click",
+  (e) => {
+    const add = e.isTrusted && (e.target as Element).closest?.('[data-scamp-id="add_btn_690a"]');
+    const chain = add && add.closest<HTMLElement>("section");
+    if (chain) placeAddMenu(chain, add);
+  },
+  true,
+);
+
 /** Blocks in a chain, counting those inside ABY paths but not the ABY itself. */
 const blockCount = (c: Chain) =>
   c.blocks.reduce((n, b) => n + (b.type === "aby" ? (b as AbyBlock).pathA.blocks.length + (b as AbyBlock).pathB.blocks.length : 1), 0);
@@ -237,6 +255,7 @@ function Lane({ chainId, abyId, path, children }: { chainId: string; abyId?: str
           insertAt = { chainId, abyId, path, index: Number(lane.dataset.gap) };
           // Open the lane's own + menu: the chain's, or the A/B box's.
           const box = path ? lane.closest(`[data-scamp-id^="lane_${path.toLowerCase()}_"]`) : lane.closest("section");
+          if (!path && box) placeAddMenu(box as HTMLElement, e.currentTarget);
           box?.querySelector<HTMLElement>(path ? `[data-scamp-id^="add_${path.toLowerCase()}_"]` : '[data-scamp-id="add_btn_690a"]')?.click();
         }}
       >

@@ -569,6 +569,7 @@
   color: var(--color-text-hi);
 }
 
+/* RigView sets --menu-left/--menu-top to open it under the + that was clicked */
 .menu_5d1a {
   width: 280px;
   display: flex;
@@ -583,10 +584,11 @@
   border-color: var(--color-line-strong);
   visibility: hidden;
   position: absolute;
-  top: var(--space-3);
+  top: var(--menu-top, var(--space-3));
   box-shadow: var(--shadow-panel);
   max-height: 380px;
-  right: var(--space-3);
+  left: var(--menu-left, auto);
+  right: var(--menu-right, var(--space-3));
   z-index: 20;
 }
 

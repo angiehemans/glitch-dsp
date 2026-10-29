@@ -1,6 +1,6 @@
 import { SILENCE_DB, type GlitchState, type OutputRef } from "@glitch/protocol";
 import Songs from "@scamp/views/Songs/Songs";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { send, transport } from "../../store/glitch";
 import { dbToPosition, formatDb, positionToDb } from "../faderLaw";
 import { navigate } from "../router";
@@ -23,6 +23,17 @@ export function SongsView({ state, libraryId }: { state: GlitchState; libraryId?
   const [menu, setMenu] = useState<"song" | "setlist" | null>(null); // the open Add menu
   const [viewing, setViewing] = useState<string | null>(null); // library: the song whose tracks are shown
   const [saved, setSaved] = useState(false);
+  // A press anywhere outside the open menu closes it, the top bar included.
+  useEffect(() => {
+    const close = (e: PointerEvent) => {
+      const outside = (id: string) => !(e.target as Element).closest?.(`[data-scamp-id="${id}"]`);
+      if (outside("route_wrap_c6d8")) setRouting(null);
+      if (outside("preset_wrap_9c3d")) setPicking(false);
+      if (outside("addsong_wrap_a04c") && outside("libadd_wrap_e1f2")) setMenu(null);
+    };
+    document.addEventListener("pointerdown", close, true);
+    return () => document.removeEventListener("pointerdown", close, true);
+  }, []);
   const project = state.project;
   const library = libraryId !== undefined;
   // As the engine's projectList: the project's current setlist, else its first.
@@ -61,13 +72,6 @@ export function SongsView({ state, libraryId }: { state: GlitchState; libraryId?
         setRouting(null);
         setPicking(false);
         setMenu(null);
-      }}
-      onPointerDown={(e) => {
-        // A click elsewhere closes the open menu.
-        const outside = (id: string) => !(e.target as Element).closest(`[data-scamp-id="${id}"]`);
-        if (outside("route_wrap_c6d8")) setRouting(null);
-        if (outside("preset_wrap_9c3d")) setPicking(false);
-        if (outside("addsong_wrap_a04c") && outside("libadd_wrap_e1f2")) setMenu(null);
       }}
       onInput={(e) => {
         // Track faders: Scamp keeps the input's binding, the app listens (same law as chain faders).
