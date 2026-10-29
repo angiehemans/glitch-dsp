@@ -463,6 +463,16 @@ bool ProjectStore::deletePreset (const juce::String& presetId)
         return false;
     presets.removeAllInstancesOf (preset);
     getPresetsDir().getChildFile (presetId + ".json").deleteFile();
+    if (auto* links = current["songPresets"].getDynamicObject()) // songs linked to it recall nothing now
+    {
+        juce::StringArray linked;
+        for (const auto& [songId, linkedId] : links->getProperties())
+            if (linkedId.toString() == presetId)
+                linked.add (songId.toString());
+        for (const auto& songId : linked)
+            links->removeProperty (songId);
+        markDirty();
+    }
     if (getCurrentPresetId() == presetId)
     {
         current.getDynamicObject()->removeProperty ("currentPresetId"); // the rig stays, as no preset

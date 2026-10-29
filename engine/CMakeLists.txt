@@ -100,21 +100,21 @@ target_link_libraries(Glitch
 # juce_add_binary_data, because Vite's hashed filenames would force a re-configure on every UI build.
 if(GLITCH_BUILD_UI AND GLITCH_UI_DEV_URL STREQUAL "")
     find_program(NPM npm REQUIRED)
-    add_custom_target(GlitchUi ALL
-        COMMAND ${NPM} run build -w ui
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-        USES_TERMINAL)
-    add_dependencies(Glitch GlitchUi)
-
     if(APPLE)
         set(GLITCH_UI_DEST "$<TARGET_BUNDLE_CONTENT_DIR:Glitch>/Resources/ui")
     else()
         set(GLITCH_UI_DEST "$<TARGET_FILE_DIR:Glitch>/ui")
     endif()
 
-    add_custom_command(TARGET Glitch POST_BUILD
+    # The copy is part of this target, not a POST_BUILD of Glitch: that only runs when the app relinks,
+    # so a UI-only change would never reach it.
+    add_custom_target(GlitchUi ALL
+        COMMAND ${NPM} run build -w ui
         COMMAND ${CMAKE_COMMAND} -E rm -rf "${GLITCH_UI_DEST}"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/ui/dist" "${GLITCH_UI_DEST}")
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/ui/dist" "${GLITCH_UI_DEST}"
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        USES_TERMINAL)
+    add_dependencies(Glitch GlitchUi)
 endif()
 
 # GlitchBench: the CPU cost of a NAM model or IR at 64/128/256 samples, using the app's blocks.

@@ -30,6 +30,7 @@ export function emptyState(): GlitchState {
     presetModified: false,
     mappings: [],
     setlists: [],
+    librarySetlists: [],
     songs: [],
     transport: { playing: false, songId: null, position: 0 },
     tuneMode: { active: false, tunerInput: 1, reference: 440, vocalChainId: null, backingTracks: "pause" },
@@ -128,7 +129,7 @@ export function createMockEngine(): EngineBridge {
     // A strummed-guitar-ish envelope, occasionally peaking over 0 dBFS so clip shows up.
     const env = Math.abs(Math.sin(t * 1.3)) ** 3;
     const signal = -50 + 52 * env + Math.random() * 3; // the same fake signal on every input
-    const levels: Record<string, number> = { "in:1": signal };
+    const levels: Record<string, number> = Object.fromEntries((state.device?.inputs ?? []).map((_, i) => [`in:${i + 1}`, signal]));
     const outs = state.device!.outputs.map(() => SILENCE_DB);
     for (const c of state.chains) {
       const out = c.muted ? SILENCE_DB : Math.max(SILENCE_DB, signal + c.level);
@@ -178,10 +179,24 @@ export function createMockEngine(): EngineBridge {
     if (at < 0) return step > 0 ? ids[0] : undefined;
     return ids[at + step];
   };
+  /** The project's set: its current setlist (or first), made when create and it has none (as WebUi). */
+  const projectList = (p: (typeof projects)[number], create: boolean) => {
+    let list = p.setlists.find((x) => x.id === p.setlistId) ?? p.setlists[0];
+    if (!list && create) {
+      list = { id: newId(), name: p.name, owner: p.id, songs: [], autoAdvance: false };
+      p.setlists.push(list);
+    }
+    if (list) p.setlistId = list.id;
+    return list;
+  };
+
   const selectSong = (songId: string | null) => {
     const p = projects.find((p) => p.id === state.project?.id);
     if (p) p.songId = songId;
     state.transport = { playing: false, songId, position: 0 };
+    // Its linked preset, unless that's already the rig's (as WebUi).
+    const presetId = songId && p?.songPresets[songId];
+    if (presetId && presetId !== p.currentPresetId) bridge.send({ type: "preset.load", presetId });
   };
 
   // Backing tracks, as WebUi: the project's current song, and its track mix (default: main output).
@@ -277,6 +292,7 @@ export function createMockEngine(): EngineBridge {
           break;
         case "panic.toggle":
           state.panic = !state.panic;
+          if (state.panic) state.transport = { ...state.transport, playing: false }; // as WebUi: the song stops
           break;
         case "project.create": {
           const id = newId();
@@ -338,6 +354,7 @@ export function createMockEngine(): EngineBridge {
           if (cmd.type === "preset.delete") {
             p.presets.splice(p.presets.indexOf(preset), 1);
             if (p.currentPresetId === preset.id) p.currentPresetId = null;
+            for (const [songId, linked] of Object.entries(p.songPresets)) if (linked === preset.id) delete p.songPresets[songId];
           }
           break;
         }
@@ -348,7 +365,6 @@ export function createMockEngine(): EngineBridge {
           break;
         case "song.import": {
           const p = projects.find((p) => p.id === state.project?.id);
-          if (!p) return error("Open a project first");
           // A browser can't open the engine's file chooser: a sample song stands in.
           const id = newId();
           state.songs.push({
@@ -361,14 +377,33 @@ export function createMockEngine(): EngineBridge {
               { id: newId(), name: "Guitar 2", file: "gtr2.wav", channels: 2, role: "stem", defaultLevel: 0 },
             ],
           });
-          p.songId = id;
-          state.transport = { playing: false, songId: id, position: 0 };
+          // Into the project's set as its current song, or a library setlist (as WebUi).
+          if (cmd.into === "project" && p) {
+            projectList(p, true)!.songs.push(id);
+            p.songId = id;
+            state.transport = { playing: false, songId: id, position: 0 };
+          } else state.librarySetlists.find((l) => l.id === cmd.into)?.songs.push(id);
+          break;
+        }
+        case "song.addTracks": {
+          const song = state.songs.find((s) => s.id === cmd.songId);
+          if (!song) return error(`Unknown song: ${cmd.songId}`);
+          song.tracks.push({ id: newId(), name: "Drums", file: "drums.wav", channels: 2, role: "stem", defaultLevel: 0 });
           break;
         }
         case "song.select": {
           if (!state.project) return error("Open a project first");
           if (cmd.songId && !state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);
           selectSong(cmd.songId);
+          break;
+        }
+        case "song.setPreset": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("Open a project first");
+          if (!state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);
+          if (cmd.presetId && !p.presets.some((x) => x.id === cmd.presetId)) return error(`Unknown preset: ${cmd.presetId}`);
+          if (cmd.presetId) p.songPresets[cmd.songId] = cmd.presetId;
+          else delete p.songPresets[cmd.songId];
           break;
         }
         case "song.rename":
@@ -415,12 +450,25 @@ export function createMockEngine(): EngineBridge {
         }
         case "setlist.create": {
           const p = projects.find((p) => p.id === state.project?.id);
+          if (cmd.library) {
+            const n = state.librarySetlists.length + 1;
+            state.librarySetlists.push({ id: newId(), name: cmd.name?.trim() || `Setlist ${n}`, owner: "library", songs: [], autoAdvance: false });
+            break;
+          }
           if (!p) return error("Open a project first");
           const setlist = { id: newId(), name: cmd.name?.trim() || `Setlist ${p.setlists.length + 1}`, owner: p.id, songs: [], autoAdvance: false };
           p.setlists.push(setlist);
           p.setlistId = setlist.id;
           break;
         }
+        case "setlist.saveToLibrary": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          const set = p && projectList(p, false);
+          if (!set?.songs.length) return error(p ? "Add songs before saving them as a setlist" : "Open a project first");
+          state.librarySetlists.push({ id: newId(), name: cmd.name?.trim() || set.name, owner: "library", songs: [...set.songs], autoAdvance: false });
+          break;
+        }
+        case "setlist.append":
         case "setlist.select":
         case "setlist.rename":
         case "setlist.delete":
@@ -429,9 +477,23 @@ export function createMockEngine(): EngineBridge {
         case "setlist.moveSong":
         case "setlist.setAutoAdvance": {
           const p = projects.find((p) => p.id === state.project?.id);
-          if (!p) return error("Open a project first");
-          const l = p.setlists.find((x) => x.id === cmd.setlistId);
+          const library = state.librarySetlists.find((x) => x.id === cmd.setlistId);
+          if (!p && !library) return error("Open a project first");
+          // No setlistId: the project's set, as WebUi (made when a song or setlist is added).
+          const l =
+            library ??
+            (cmd.setlistId === undefined && cmd.type !== "setlist.select"
+              ? projectList(p!, cmd.type === "setlist.addSong" || cmd.type === "setlist.append")
+              : p?.setlists.find((x) => x.id === cmd.setlistId));
+          if (cmd.type === "setlist.append") {
+            const from = [...state.librarySetlists, ...(p?.setlists ?? [])].find((x) => x.id === cmd.fromId);
+            if (!l || !from) return error(`Unknown setlist: ${cmd.fromId}`);
+            l.songs.push(...from.songs);
+            break;
+          }
           if (cmd.type === "setlist.select") {
+            if (!p) return error("Open a project first");
+            if (library) return error("Add that setlist to the project to play it");
             if (cmd.setlistId && !l) return error(`Unknown setlist: ${cmd.setlistId}`);
             p.setlistId = cmd.setlistId;
             break;
@@ -439,8 +501,9 @@ export function createMockEngine(): EngineBridge {
           if (!l) return error(`Unknown setlist: ${cmd.setlistId}`);
           if (cmd.type === "setlist.rename") l.name = cmd.name.trim() || l.name;
           if (cmd.type === "setlist.delete") {
-            p.setlists.splice(p.setlists.indexOf(l), 1);
-            if (p.setlistId === l.id) p.setlistId = null;
+            const lists = library ? state.librarySetlists : p!.setlists;
+            lists.splice(lists.indexOf(l), 1);
+            if (p?.setlistId === l.id) p.setlistId = null;
           }
           if (cmd.type === "setlist.addSong") {
             if (!state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);

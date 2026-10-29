@@ -7,7 +7,10 @@ namespace glitch
 
 using namespace vars;
 
-SongControl::SongControl (Engine& e, ProjectStore& s) : engine (e), store (s) {}
+SongControl::SongControl (Engine& e, ProjectStore& s) : engine (e), store (s)
+{
+    songs.fillWaveforms ([this] { if (onChanged) onChanged(); }); // each one shows as it's ready
+}
 
 bool SongControl::handleCommand (const juce::String& type, const juce::var& command)
 {
@@ -133,37 +136,108 @@ void SongControl::selectSong (const juce::String& songId)
     store.getCurrent().getDynamicObject()->setProperty ("songId", songId.isNotEmpty() ? juce::var (songId) : juce::var());
     store.markDirty();
     loadSong();
+    // The preset already loaded stays as it is, tweaks and all.
+    if (songId.isEmpty())
+        return;
+    const auto presetId = store.getCurrent()["songPresets"][juce::Identifier (songId)].toString();
+    if (presetId.isNotEmpty() && presetId != store.getCurrentPresetId() && onLoadPreset)
+        onLoadPreset (presetId);
+}
+
+juce::var SongControl::projectList (bool create)
+{
+    // The project's set: its current setlist, else its first (made current), else a new one.
+    auto* lists = store.getCurrent()["setlists"].getArray();
+    if (lists == nullptr)
+        return {};
+    auto list = currentSetlist();
+    if (! list.isObject() && ! lists->isEmpty())
+        list = lists->getFirst();
+    if (! list.isObject() && create)
+    {
+        list = newSetlist (store.getCurrent()["name"].toString(), store.getCurrent()["id"]);
+        lists->add (list);
+    }
+    if (list.isObject() && store.getCurrent()["setlistId"] != list["id"])
+    {
+        store.getCurrent().getDynamicObject()->setProperty ("setlistId", list["id"]);
+        store.markDirty();
+    }
+    return list;
+}
+
+juce::var SongControl::newSetlist (const juce::String& name, const juce::var& owner)
+{
+    return object ({ { "id", juce::Uuid().toDashedString().substring (0, 8) }, { "name", name }, { "owner", owner },
+                     { "songs", juce::Array<juce::var>() }, { "autoAdvance", false } });
 }
 
 bool SongControl::handleSetlistCommand (const juce::String& type, const juce::var& command)
 {
-    auto* lists = store.getCurrent()["setlists"].getArray();
-    if (lists == nullptr)
+    // A project's set, and the library's standalone setlists (ids are unique across both).
+    auto* projectLists = store.getCurrent()["setlists"].getArray();
+    auto* libraryLists = songs.getSetlists().getArray();
+    const auto findList = [&] (const juce::var& id) -> std::pair<juce::var, juce::Array<juce::var>*>
     {
-        sendError ("Open a project first");
-        return false;
-    }
+        for (auto* lists : { projectLists, libraryLists })
+            if (lists != nullptr)
+                for (const auto& l : *lists)
+                    if (l["id"].toString() == id.toString())
+                        return { l, lists };
+        return { {}, nullptr };
+    };
 
     if (type == protocol::command::setlistCreate)
     {
+        const auto library = (bool) command["library"];
+        auto* lists = library ? libraryLists : projectLists;
+        if (lists == nullptr)
+        {
+            sendError ("Open a project first");
+            return false;
+        }
         const auto name = cleanName (command["name"]);
-        const auto setlist = object ({ { "id", juce::Uuid().toDashedString().substring (0, 8) },
-                                       { "name", name.isNotEmpty() ? name : "Setlist " + juce::String (lists->size() + 1) },
-                                       { "owner", store.getCurrent()["id"] }, { "songs", juce::Array<juce::var>() },
-                                       { "autoAdvance", false } });
+        const auto setlist = newSetlist (name.isNotEmpty() ? name : "Setlist " + juce::String (lists->size() + 1),
+                                         library ? juce::var ("library") : store.getCurrent()["id"]);
         lists->add (setlist);
-        store.getCurrent().getDynamicObject()->setProperty ("setlistId", setlist["id"]);
-        store.markDirty();
+        if (library)
+            songs.saveSetlists();
+        else
+        {
+            store.getCurrent().getDynamicObject()->setProperty ("setlistId", setlist["id"]);
+            store.markDirty();
+        }
+        return true;
+    }
+    if (type == protocol::command::setlistSaveToLibrary)
+    {
+        // The project's set, copied into the library for other projects to add.
+        const auto list = projectList (false);
+        if (! list.isObject() || list["songs"].size() == 0)
+        {
+            sendError (projectLists == nullptr ? "Open a project first" : "Add songs before saving them as a setlist");
+            return false;
+        }
+        auto copy = newSetlist (cleanName (command["name"]).isNotEmpty() ? cleanName (command["name"]) : list["name"].toString(), "library");
+        copy.getDynamicObject()->setProperty ("songs", list["songs"].clone());
+        libraryLists->add (copy);
+        songs.saveSetlists();
         return true;
     }
 
-    juce::var setlist;
-    for (const auto& l : *lists)
-        if (l["id"].toString() == command["setlistId"].toString())
-            setlist = l;
+    // No setlistId: the open project's set, made when it's first needed (adding a song or a setlist to it).
+    const auto toProject = command["setlistId"].isVoid() && type != protocol::command::setlistSelect;
+    auto [setlist, lists] = toProject ? std::pair { projectList (type == protocol::command::setlistAddSong || type == protocol::command::setlistAppend), projectLists }
+                                      : findList (command["setlistId"]);
+    const auto inLibrary = lists != nullptr && lists == libraryLists;
     if (! setlist.isObject() && ! (type == protocol::command::setlistSelect && command["setlistId"].isVoid()))
     {
-        sendError ("Unknown setlist: " + command["setlistId"].toString());
+        sendError (toProject ? (projectLists == nullptr ? "Open a project first" : "This project has no songs yet") : "Unknown setlist: " + command["setlistId"].toString());
+        return false;
+    }
+    if (type == protocol::command::setlistSelect && projectLists == nullptr)
+    {
+        sendError ("Open a project first");
         return false;
     }
     auto* songIds = setlist["songs"].getArray();
@@ -171,7 +245,25 @@ bool SongControl::handleSetlistCommand (const juce::String& type, const juce::va
 
     if (type == protocol::command::setlistSelect)
     {
+        if (inLibrary)
+        {
+            sendError ("Add that setlist to the project to play it");
+            return false;
+        }
         store.getCurrent().getDynamicObject()->setProperty ("setlistId", setlist.isObject() ? setlist["id"] : juce::var());
+        preloadNext();
+    }
+    else if (type == protocol::command::setlistAppend)
+    {
+        // A saved setlist's songs, added after this one's (songs are referenced, never copied).
+        const auto from = findList (command["fromId"]).first;
+        if (! from.isObject())
+        {
+            sendError ("Unknown setlist: " + command["fromId"].toString());
+            return false;
+        }
+        for (const auto& id : *from["songs"].getArray())
+            songIds->add (id);
         preloadNext();
     }
     else if (type == protocol::command::setlistRename)
@@ -223,38 +315,79 @@ bool SongControl::handleSetlistCommand (const juce::String& type, const juce::va
         sendError ("Unknown command: " + type);
         return false;
     }
-    store.markDirty();
+    if (inLibrary)
+        songs.saveSetlists();
+    else
+        store.markDirty();
     return true;
 }
 
-void SongControl::importSong()
+void SongControl::chooseAudio (const juce::String& title, std::function<void (const juce::Array<juce::File>&)> then)
 {
     if (chooser != nullptr)
         return; // already open
-    chooser = std::make_unique<juce::FileChooser> ("Choose a song's audio files (WAV or AIFF): one track each",
-                                                   juce::File::getSpecialLocation (juce::File::userMusicDirectory), "*.wav;*.aif;*.aiff");
+    chooser = std::make_unique<juce::FileChooser> (title, juce::File::getSpecialLocation (juce::File::userMusicDirectory), "*.wav;*.aif;*.aiff");
     chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                               | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this] (const juce::FileChooser& fc) // the chooser, and its callback, go with this
+                          [this, then] (const juce::FileChooser& fc) // the chooser, and its callback, go with this
                           {
                               const auto files = fc.getResults();
                               chooser = nullptr;
                               if (files.isEmpty())
                                   return;
-
-                              juce::StringArray failed;
-                              const auto song = songs.import (files, failed);
-                              if (! failed.isEmpty())
-                                  sendError ("Couldn't import " + failed.joinIntoString (", "));
-                              if (song.isObject() && store.getCurrent().isObject())
-                              {
-                                  store.getCurrent().getDynamicObject()->setProperty ("songId", song["id"]);
-                                  store.markDirty();
-                                  loadSong();
-                              }
+                              then (files);
                               if (onChanged)
                                   onChanged();
                           });
+}
+
+void SongControl::importSong (const juce::String& into)
+{
+    chooseAudio ("Choose a song's audio files (WAV or AIFF): one track each", [this, into] (const juce::Array<juce::File>& files)
+    {
+        juce::StringArray failed;
+        const auto song = songs.import (files, failed);
+        if (! failed.isEmpty())
+            sendError ("Couldn't import " + failed.joinIntoString (", "));
+        if (! song.isObject())
+            return;
+
+        // Into the project's set, as its current song; or into a library setlist, leaving the project be.
+        const auto setlist = into == "project" ? projectList (true) : juce::var();
+        if (setlist.isObject())
+        {
+            setlist["songs"].getArray()->add (song["id"]);
+            store.getCurrent().getDynamicObject()->setProperty ("songId", song["id"]);
+            store.markDirty();
+            loadSong();
+        }
+        else if (into.isNotEmpty())
+        {
+            if (auto* lists = songs.getSetlists().getArray())
+                for (const auto& l : *lists)
+                    if (l["id"].toString() == into)
+                    {
+                        l["songs"].getArray()->add (song["id"]);
+                        songs.saveSetlists();
+                    }
+        }
+    });
+}
+
+void SongControl::addTracks (const juce::String& songId)
+{
+    chooseAudio ("Choose audio files (WAV or AIFF) to add to the song: one track each", [this, songId] (const juce::Array<juce::File>& files)
+    {
+        juce::StringArray failed;
+        songs.addTracks (songId, files, failed);
+        if (! failed.isEmpty())
+            sendError ("Couldn't add " + failed.joinIntoString (", "));
+        // In the player, or read ahead as the next song: its new tracks have to be opened.
+        if (store.getCurrent()["songId"].toString() == songId)
+            loadSong();
+        else if (store.getCurrent().isObject())
+            preloadNext();
+    });
 }
 
 bool SongControl::handleSongCommand (const juce::String& type, const juce::var& command)
@@ -264,12 +397,16 @@ bool SongControl::handleSongCommand (const juce::String& type, const juce::var& 
 
     if (type == protocol::command::songImport)
     {
-        if (! store.getCurrent().isObject())
+        importSong (command["into"].toString()); // into the library, and into the project's set or a library setlist
+    }
+    else if (type == protocol::command::songAddTracks)
+    {
+        if (! songs.find (songId).isObject())
         {
-            sendError ("Open a project first");
+            sendError ("Unknown song: " + songId);
             return false;
         }
-        importSong();
+        addTracks (songId);
     }
     else if (type == protocol::command::songSelect)
     {
@@ -300,6 +437,28 @@ bool SongControl::handleSongCommand (const juce::String& type, const juce::var& 
             sendError (title.isEmpty() ? "A song needs a title" : "Unknown song: " + songId);
             return false;
         }
+    }
+    else if (type == protocol::command::songSetPreset)
+    {
+        auto* links = store.getCurrent()["songPresets"].getDynamicObject();
+        const auto presetId = command["presetId"].toString();
+        if (links == nullptr || ! songs.find (songId).isObject())
+        {
+            sendError (links == nullptr ? "Open a project first" : "Unknown song: " + songId);
+            return false;
+        }
+        const auto* presets = store.getPresetSummaries().getArray();
+        if (presetId.isNotEmpty()
+            && std::none_of (presets->begin(), presets->end(), [&] (const juce::var& p) { return p["id"].toString() == presetId; }))
+        {
+            sendError ("Unknown preset: " + presetId);
+            return false;
+        }
+        if (presetId.isEmpty())
+            links->removeProperty (songId);
+        else
+            links->setProperty (songId, presetId);
+        store.markDirty();
     }
     else if (type == protocol::command::songDelete)
     {

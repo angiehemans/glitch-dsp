@@ -1,57 +1,119 @@
+/* a pedal: grain finish, name and type, LED, the plugin's picture on its face, stomp switch to bypass */
 .root {
-  width: fit-content;
+  width: 116px;
   height: 200px;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-1);
-  border-radius: var(--radius-md);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--color-line-strong);
-  position: relative;
-  min-width: 110px;
-  cursor: pointer;
-}
-
-.root:hover {
-  background: var(--color-bg-2);
-}
-
-.art_1f20 {
-  width: 100%;
-  /* fixed px so images can size their width from it: 200px tile - 2px border - 2 x 6px gap - 20px header */
-  height: 166px;
-  display: flex;
-  justify-content: center;
+  gap: var(--space-2);
   flex-shrink: 0;
-  background: var(--color-bg-2);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background-image: var(--placeholder-x);
+  padding: 10px 8px 8px;
+  border-radius: 10px;
+  background: var(--pedal-black);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-light);
+  box-shadow: var(--rig-pedal-shadow);
+  position: relative;
+  transition: opacity 120ms ease;
 }
 
 .head_3a7c {
   width: 100%;
-  flex: 1;
   display: flex;
+  flex-direction: column;
   gap: 2px;
+  padding-right: 14px;
+}
+
+.name_d4f5 {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kind_2a6b {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* lit while the block is on */
+.led_3b7c {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--pedal-led);
+  box-shadow: 0 0 8px var(--pedal-led);
+  position: absolute;
+  top: 12px;
+  right: 10px;
+}
+
+/* the face: opens the plugin's own window */
+.art_btn_d71e {
+  width: 100%;
+  min-height: 0;
+  flex-grow: 1;
+  display: flex;
+  padding: 0px;
+  border-radius: var(--radius-sm);
+  cursor: zoom-in;
+}
+
+.art_btn_d71e:hover {
+  background: var(--rig-pedal-face);
+}
+
+.art_btn_d71e:focus-visible {
+  outline: 2px solid var(--color-hot);
+  outline-offset: 1px;
+}
+
+.art_1f20 {
+  width: 100%;
+  height: 100%;
+  display: flex;
   align-items: center;
-  padding: 0px 2px;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* grip, stomp switch, remove */
+.foot_4c8d {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .grip_7e8f {
-  width: 14px;
+  width: 20px;
   height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--color-text-lo);
+  opacity: 0.5;
   cursor: grab;
 }
 
 .grip_7e8f:hover {
-  color: var(--color-text-hi);
+  opacity: 1;
 }
 
 .grip_svg_8f90 {
@@ -60,29 +122,36 @@
   fill: currentColor;
 }
 
+/* chrome stomp switch: bypasses the block */
 .bypass_4b8d {
-  width: 20px;
-  height: 20px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--color-accent);
+  padding: 0px;
+  border-radius: var(--radius-full);
+  background: var(--rig-stomp-ring);
+  box-shadow: var(--rig-stomp-ring-shadow);
   cursor: pointer;
 }
 
-.bypass_4b8d:hover {
-  color: var(--color-text-hi);
+.bypass_4b8d:active {
+  transform: translateY(1px);
 }
 
-.power_svg_5c9e {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2px;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.bypass_4b8d:focus-visible {
+  outline: 2px solid var(--color-hot);
+  outline-offset: 2px;
+}
+
+.stomp_cap_5d9e {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--rig-stomp-cap);
+  box-shadow: var(--rig-stomp-cap-shadow);
 }
 
 .remove_6daf {
@@ -92,48 +161,29 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  padding: 0px;
   font-family: var(--font-sans);
   font-size: 12px;
-  color: var(--color-text-lo);
+  color: inherit;
+  opacity: 0.5;
   cursor: pointer;
 }
 
 .remove_6daf:hover {
-  color: var(--color-text-hi);
-}
-
-.root[data-state="bypassed"] .bypass_4b8d {
-  color: var(--color-text-lo);
-}
-
-.art_btn_d71e {
-  width: 100%;
-  display: flex;
-  flex-shrink: 0;
-  cursor: zoom-in;
-}
-
-.name_d4f5 {
-  flex-grow: 1;
-  min-width: 0px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-hi);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  width: 100%;
-  height: fit-content;
+  opacity: 1;
 }
 
 .loading_f617 {
   display: none;
   font-family: var(--font-display);
   font-size: 12px;
-  color: var(--color-text-lo);
-  width: fit-content;
-  height: fit-content;
+  color: inherit;
+  text-align: center;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  pointer-events: none;
 }
 
 .error_0728 {
@@ -141,9 +191,13 @@
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-text-hi);
-  width: fit-content;
-  height: fit-content;
+  color: inherit;
+  text-align: center;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  pointer-events: none;
 }
 
 .backdrop_7a1b {
@@ -218,16 +272,65 @@
   justify-content: center;
 }
 
-.root[data-state="bypassed"] {
-  opacity: 0.45;
+.root[data-finish="orange"] {
+  background: var(--pedal-orange);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-dark);
 }
 
-.root[data-state="bypassed"] .art_1f20 {
-  filter: grayscale(1);
+.root[data-finish="red"] {
+  background: var(--pedal-red);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-light);
+}
+
+.root[data-finish="blue"] {
+  background: var(--pedal-blue);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-light);
+}
+
+.root[data-finish="green"] {
+  background: var(--pedal-green);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-light);
+}
+
+.root[data-finish="hammer"] {
+  background: var(--pedal-hammer);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-dark);
+}
+
+.root[data-finish="black"] {
+  background: var(--pedal-black);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-light);
+}
+
+.root[data-finish="cream"] {
+  background: var(--pedal-cream);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-dark);
+}
+
+.root[data-finish="purple"] {
+  background: var(--pedal-purple);
+  background-blend-mode: var(--pedal-blend);
+  color: var(--pedal-ink-light);
+}
+
+.root[data-state="bypassed"] {
+  opacity: 0.6;
+}
+
+.root[data-state="bypassed"] .led_3b7c {
+  background: var(--rig-led-off);
+  box-shadow: none;
 }
 
 .root[data-state="selected"] {
-  box-shadow: var(--glow-accent);
+  box-shadow: var(--rig-pedal-shadow), var(--rig-pedal-selected);
 }
 
 .root[data-state="loading"] .loading_f617 {
@@ -238,10 +341,19 @@
   opacity: 0.3;
 }
 
+.root[data-state="loading"] .led_3b7c {
+  background: var(--rig-led-off);
+  box-shadow: none;
+}
+
 .root[data-state="error"] {
-  border-width: 2px;
-  border-style: dashed;
-  border-color: var(--color-line-strong);
+  outline: 2px dashed var(--color-clip);
+  outline-offset: 2px;
+}
+
+.root[data-state="error"] .led_3b7c {
+  background: var(--rig-led-off);
+  box-shadow: none;
 }
 
 .root[data-state="error"] .error_0728 {
@@ -260,17 +372,43 @@
   height: fit-content;
 }
 
-.root[data-art="hug"] .art_1f20 {
-  height: fit-content;
-}
-
+/* inside an ABY path: a slim pedal, name and face on the left, switches stacked on the right */
 .root[data-size="small"] {
-  height: 110px;
-  min-width: 60px;
+  width: 168px;
+  height: 96px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px 8px;
+  padding: 9px 10px;
 }
 
-.root[data-size="small"] .art_1f20 {
-  /* 110px tile - 2px border - 2 x 6px gap - 20px header */
-  height: 76px;
+.root[data-size="small"] .art_btn_d71e {
+  grid-column: 1;
+  grid-row: 2;
 }
 
+.root[data-size="small"] .foot_4c8d {
+  width: 28px;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0px;
+}
+
+.root[data-size="small"] .bypass_4b8d {
+  width: 28px;
+  height: 28px;
+}
+
+.root[data-size="small"] .stomp_cap_5d9e {
+  width: 15px;
+  height: 15px;
+}
+
+.root[data-size="small"] .led_3b7c {
+  top: 10px;
+  width: 7px;
+  height: 7px;
+}

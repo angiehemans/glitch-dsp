@@ -5,12 +5,11 @@
   gap: 14px;
   align-items: center;
   padding: 22px 10px 18px;
-  background: linear-gradient(180deg, var(--fader-panel-top), var(--fader-panel-bottom));
-  color: var(--fader-label);
+  background: var(--color-bg-1);
+  color: var(--color-text-lo);
   position: relative;
-  box-shadow: var(--fader-divider-hi);
   --fader-accent: var(--fader-green);
-  border-right: 1px solid var(--fader-divider);
+  border-right: 1px solid var(--color-line);
 }
 
 .name_a3f1 {
@@ -249,7 +248,7 @@
   height: fit-content;
   flex-shrink: 0;
   padding: 7px 0px;
-  background: var(--fader-mute-bg);
+  background: var(--color-bg-3);
   border-radius: 5px;
   font-family: var(--font-sans);
   font-size: 10px;
@@ -257,7 +256,6 @@
   color: var(--fader-label);
   text-align: center;
   letter-spacing: 0.14em;
-  box-shadow: var(--fader-mute-shadow);
 }
 
 .name_a3f1::before {

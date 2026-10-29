@@ -36,8 +36,6 @@ public:
     static constexpr int maxChannels = 8; // hardware inputs/outputs opened
     static constexpr float silenceDb = -100.0f; // mirrors SILENCE_DB in packages/protocol
 
-    enum Meter { in1, numMeters };
-
     struct ChainSpec
     {
         juce::String id;
@@ -100,8 +98,8 @@ public:
     struct SplitParams { bool both = false, activeB = false; bool muted[2] { false, false }; };
     void setSplitParams (const juce::String& abyId, const SplitParams&);
 
-    /** Peaks since the last call, in dBFS. */
-    float takePeakDb (Meter m);
+    /** Peaks since the last call, in dBFS: a hardware input's (0-based), before any chain. */
+    float takeInputPeakDb (int channel);
     float takeChainPeakDb (const juce::String& chainId, bool output);
     /** Tune mode: every chain but keepChainId (none: all) fades out of the outputs, and the tuner
         listens to a hardware input (0-based) before any chain. Off restores everything as it was. */
@@ -171,7 +169,7 @@ private:
     std::atomic<float> gainDb { 0.0f };
     std::atomic<bool> muted { false };
     std::atomic<bool> panic { false };
-    std::array<std::atomic<float>, numMeters> peaks {};
+    std::array<std::atomic<float>, maxChannels> inputPeaks {};
     std::array<std::atomic<float>, maxChannels> outputPeaks {};
 
     Tuner tuner;

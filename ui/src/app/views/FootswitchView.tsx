@@ -35,7 +35,7 @@ function assignable(state: GlitchState): { name: string; action: ActionRef }[] {
 }
 
 /** What an action is called on a switch, and whether its target is on (lit). */
-function describe(state: GlitchState, action: ActionRef | null): { label: string; lit: boolean } {
+export function describe(state: GlitchState, action: ActionRef | null): { label: string; lit: boolean } {
   if (!action) return { label: "—", lit: false };
   const blocks = state.chains.flatMap((c) =>
     c.blocks.flatMap((b) => (b.type === "aby" ? [b, ...(b as AbyBlock).pathA.blocks, ...(b as AbyBlock).pathB.blocks] : [b])),
@@ -81,10 +81,21 @@ function describe(state: GlitchState, action: ActionRef | null): { label: string
 }
 
 const sameAction = (a: ActionRef | null | undefined, b: ActionRef) => !!a && JSON.stringify(a) === JSON.stringify(b);
-const parseSwitch = (id: string) => {
+export const parseSwitch = (id: string) => {
   const [channel, cc] = id.split(":").map(Number);
   return { channel, cc };
 };
+/** Switches found, plus any mapped in a project from elsewhere, sorted; named A, B, C… by CC. */
+export function listSwitches({ midi, mappings }: GlitchState) {
+  const ids = [...new Set([...midi.switches, ...mappings.map((m) => m.switch)].map((s) => `${s.channel}:${s.cc}`))].sort(
+    (a, b) => parseSwitch(a).channel - parseSwitch(b).channel || parseSwitch(a).cc - parseSwitch(b).cc,
+  );
+  const name = (id: string) => (ids.indexOf(id) < 26 ? String.fromCharCode(65 + ids.indexOf(id)) : `CC ${parseSwitch(id).cc}`);
+  const mappingOf = (id: string) => mappings.find((m) => `${m.switch.channel}:${m.switch.cc}` === id && m.page === midi.page);
+  // On the page past the last one, which is where a new page starts, it counts too.
+  return { ids, name, mappingOf, pages: Math.max(midi.pageCount, midi.page + 1) };
+}
+
 /** It sends Program Change (cc past 127, see Footswitch.h): a press with no release, so it can't hold. */
 const tapOnly = (id: string) => parseSwitch(id).cc >= 128;
 
@@ -93,19 +104,12 @@ const tapOnly = (id: string) => parseSwitch(id).cc >= 128;
  * once, since MIDI doesn't list them). Clicking a tile opens its menu: what its tap and hold do.
  */
 export function FootswitchView({ state }: { state: GlitchState }) {
-  const { midi, mappings } = state;
+  const { midi } = state;
   const [editing, setEditing] = useState<string | null>(null);
   const [forgetting, setForgetting] = useState<string | null>(null); // the switch whose Forget was clicked once
   const actions = assignable(state);
-  // Switches found, plus any mapped in a project from elsewhere; named A, B, C… by CC.
-  const ids = [...new Set([...midi.switches, ...mappings.map((m) => m.switch)].map((s) => `${s.channel}:${s.cc}`))].sort(
-    (a, b) => parseSwitch(a).channel - parseSwitch(b).channel || parseSwitch(a).cc - parseSwitch(b).cc,
-  );
-  const name = (id: string) => (ids.indexOf(id) < 26 ? String.fromCharCode(65 + ids.indexOf(id)) : `CC ${parseSwitch(id).cc}`);
-  const mappingOf = (id: string) => mappings.find((m) => `${m.switch.channel}:${m.switch.cc}` === id && m.page === midi.page);
+  const { ids, name, mappingOf, pages } = listSwitches(state);
   const open = editing && ids.includes(editing) ? editing : null;
-  // On the page past the last one, which is where a new page starts, it counts too.
-  const pages = Math.max(midi.pageCount, midi.page + 1);
   const current = open ? mappingOf(open) : undefined;
   const set = (gesture: "tap" | "hold") => (id: string) => {
     const action = actions[Number(id)]?.action;

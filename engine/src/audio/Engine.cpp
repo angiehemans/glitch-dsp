@@ -468,9 +468,11 @@ juce::AudioProcessor* Engine::getBlockProcessor (const juce::String& blockId) co
 }
 
 //==============================================================================
-float Engine::takePeakDb (Meter m)
+float Engine::takeInputPeakDb (int channel)
 {
-    return juce::Decibels::gainToDecibels (peaks[(size_t) m].exchange (0.0f), silenceDb);
+    if (channel < 0 || channel >= maxChannels)
+        return silenceDb;
+    return juce::Decibels::gainToDecibels (inputPeaks[(size_t) channel].exchange (0.0f), silenceDb);
 }
 
 void Engine::setTuneMode (bool on, int tunerInput, const juce::String& keepChainId)
@@ -641,11 +643,12 @@ void Engine::audioDeviceIOCallbackWithContext (const float* const* inputs, int n
     if (const auto ch = tunerChannel.load(); tuning.load() && ch < numInputs && inputs[ch] != nullptr)
         tuner.push (inputs[ch], numSamples);
 
-    if (numInputs > 0 && inputs[0] != nullptr)
-    {
-        const auto range = juce::FloatVectorOperations::findMinAndMax (inputs[0], numSamples);
-        storePeak (peaks[in1], std::max (range.getEnd(), -range.getStart()));
-    }
+    for (int ch = 0; ch < std::min (numInputs, maxChannels); ++ch)
+        if (inputs[ch] != nullptr)
+        {
+            const auto range = juce::FloatVectorOperations::findMinAndMax (inputs[ch], numSamples);
+            storePeak (inputPeaks[(size_t) ch], std::max (range.getEnd(), -range.getStart()));
+        }
 
     player.audioDeviceIOCallbackWithContext (inputs, numInputs, outputs, numOutputs, numSamples, context);
 

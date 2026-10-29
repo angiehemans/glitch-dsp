@@ -4,6 +4,7 @@ import Home from "@scamp/views/Home/Home";
 import { send } from "../../store/glitch";
 import { renameByKey, renameWhenCreated } from "../rename";
 import { navigate } from "../router";
+import { clock } from "./SongsView";
 
 type ProjectColor = "orange" | "cyan" | "pink" | "lime" | "violet";
 
@@ -29,6 +30,27 @@ export function HomeView({ state }: { state: GlitchState }) {
         // Name it in place on its card; Enter names it and opens its rig.
         renameWhenCreated("project", (id, how) => how === "enter" && navigate(`/rig?project=${encodeURIComponent(id)}`));
         send({ type: "project.create" });
+      }}
+      setlistsSub={
+        state.librarySetlists.length
+          ? "Not tied to a project · add one to any project from its Setlists tab"
+          : "None yet. A setlist made here can be added to any project."
+      }
+      setlists={state.librarySetlists.map((l) => {
+        const songs = l.songs.map((id) => state.songs.find((s) => s.id === id)).filter((s) => s !== undefined);
+        const total = songs.reduce((sum, s) => sum + s.length, 0);
+        return {
+          id: l.id,
+          name: l.name,
+          meta: `${songs.length} song${songs.length === 1 ? "" : "s"} · ${clock(total)}`,
+          href: `/setlist?id=${encodeURIComponent(l.id)}`,
+          renameKey: `setlist:${l.id}`,
+        };
+      })}
+      onNewSetlist={() => {
+        // Name it in place on its card, then open it to add songs.
+        renameWhenCreated("setlist", (id, how) => how === "enter" && navigate(`/setlist?id=${encodeURIComponent(id)}`));
+        send({ type: "setlist.create", library: true });
       }}
       projects={state.projects.map((p) => (
         <ProjectCard

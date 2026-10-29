@@ -3,13 +3,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--panel-gradient);
-  border-radius: var(--radius-lg);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--color-line);
-  box-shadow: var(--shadow-panel);
   position: relative;
 }
 
@@ -24,9 +17,8 @@
   height: fit-content;
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--color-text-dim);
+  font-weight: 500;
+  color: var(--color-text-lo);
 }
 
 .device_wrap_3e2c {
@@ -35,20 +27,18 @@
 }
 
 .device_btn_4f3d {
+  height: 32px;
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  padding: var(--space-1) var(--space-3);
-  background: var(--color-bg-2);
+  padding: 0px var(--space-3);
+  background: var(--color-bg-3);
   border-radius: var(--radius-md);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--color-line);
   cursor: pointer;
 }
 
 .device_btn_4f3d:hover {
-  border-color: var(--color-line-strong);
+  background: var(--color-line);
 }
 
 .device_led_504e {
@@ -68,9 +58,9 @@
   width: fit-content;
   height: fit-content;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--color-text-hi);
+  color: var(--color-text-mid);
   white-space: nowrap;
 }
 
@@ -162,13 +152,15 @@
 }
 
 .page_prev_e9d7 {
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 16px;
   color: var(--color-text-lo);
   cursor: pointer;
 }
@@ -180,21 +172,21 @@
 .page_label_fae8 {
   width: fit-content;
   height: fit-content;
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
   color: var(--color-text-lo);
 }
 
 .page_next_0bf9 {
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 16px;
   color: var(--color-text-lo);
   cursor: pointer;
 }
@@ -205,108 +197,107 @@
 
 .tiles_d9c6 {
   display: flex;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-4);
   list-style: none;
 }
 
 .tile_row_45c6 {
+  min-width: 0;
+  flex: 1 1 200px;
   display: flex;
 }
 
 .tile_ead7 {
-  width: 220px;
-  text-align: left;
+  width: 100%;
+  height: 104px;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--color-bg-0);
-  border-radius: var(--radius-md);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--color-line);
-  box-shadow: var(--bevel-inset);
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-bg-1);
+  border-radius: var(--radius-xl);
+  text-align: left;
   cursor: pointer;
   user-select: none;
   touch-action: none;
 }
 
 .tile_ead7:hover {
-  border-color: var(--color-line-strong);
+  background: var(--color-bg-2);
 }
 
 /* the switch's target is on: a pedal enabled, a chain muted, the preset loaded */
 .tile_ead7[data-lit="on"] {
-  border-color: var(--color-accent);
-  box-shadow: var(--bevel-inset), 0px 0px 12px var(--color-accent-soft);
+  background: var(--rig-switch-lit);
 }
 
 /* its menu is open */
+.tile_ead7[data-lit="on"] .tile_name_fbe8 {
+  background: var(--color-hot);
+  color: var(--color-bg-0);
+}
+
 .tile_ead7[data-editing="on"] {
-  border-color: var(--color-text-hi);
+  outline: 2px solid var(--color-text-hi);
+  outline-offset: -2px;
 }
 
 .tile_name_fbe8 {
-  width: fit-content;
-  height: fit-content;
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--color-text-dim);
-}
-
-.tap_row_0cf9 {
+  width: 44px;
+  height: 44px;
   display: flex;
-  gap: var(--space-2);
   align-items: center;
-}
-
-.tap_tag_1e0a {
-  width: 36px;
+  justify-content: center;
   flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--color-text-dim);
+  color: var(--color-text-mid);
 }
 
 .tap_label_2f1b {
-  flex-grow: 1;
-  min-width: 0px;
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--color-text-hi);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.hold_row_413d {
+.tile_text_7d1e {
+  min-width: 0;
+  flex-grow: 1;
   display: flex;
-  gap: var(--space-2);
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hold_row_413d {
+  width: 100%;
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+  min-width: 0;
 }
 
 .hold_tag_524e {
-  width: 36px;
   flex-shrink: 0;
   font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--color-text-dim);
+  font-size: 14px;
+  color: var(--color-text-lo);
 }
 
 .hold_label_635f {
-  flex-grow: 1;
   min-width: 0px;
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text-hi);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--color-text-lo);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -316,12 +307,9 @@
   display: none;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: var(--space-4) var(--space-5);
   background: var(--color-bg-1);
-  border-radius: var(--radius-md);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--color-line-strong);
+  border-radius: var(--radius-xl);
 }
 
 .switch_head_ab2c {
@@ -342,8 +330,7 @@
 .clear_tap_cd4e {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -359,8 +346,7 @@
 .clear_hold_de5f {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -376,8 +362,7 @@
 .forget_f182 {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -402,8 +387,7 @@
 .done_ef60 {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -450,8 +434,7 @@
 .action_tap_23a4 {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -472,8 +455,7 @@
 .action_hold_34b5 {
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--button-face);
-  box-shadow: var(--bevel-button);
+  background: var(--color-bg-3);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -491,11 +473,13 @@
 }
 
 .empty_8571 {
-  width: fit-content;
-  height: fit-content;
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-bg-1);
+  border-radius: var(--radius-xl);
   font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--color-text-dim);
+  font-size: 14px;
+  color: var(--color-text-lo);
 }
 
 .root[data-devicemenu="open"] .device_menu_7260 {

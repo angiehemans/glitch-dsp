@@ -160,6 +160,10 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l, ModelLibrary& m)
 
     songControl.onError = footswitchControl.onError = [this] (const juce::String& message) { sendError (message); };
     songControl.onChanged = footswitchControl.onChanged = [this] { sendState(); };
+    songControl.onLoadPreset = [this] (const juce::String& presetId)
+    {
+        handlePresetCommand (protocol::command::presetLoad, object ({ { "presetId", presetId } }));
+    };
     footswitchControl.onCommand = [this] (const juce::var& command) { handleCommand (command); };
     footswitchControl.connectMidi();
     engine.getDeviceManager().addChangeListener (this);
@@ -221,6 +225,8 @@ void WebUi::handleCommand (const juce::var& command)
     else if (type == protocol::command::panicToggle)
     {
         engine.setPanic (! engine.isPanic());
+        if (engine.isPanic())
+            engine.getPlayer().stop(); // the song stops (keeping its place) and stays stopped after
     }
     else if (type == protocol::command::projectCreate || type == protocol::command::projectOpen)
     {
@@ -1243,6 +1249,7 @@ void WebUi::emitState()
         { "presetModified", presetModified = store.isPresetModified() },
         { "mappings", project.isObject() ? project["mappings"] : juce::var (juce::Array<juce::var>()) },
         { "setlists", project.isObject() ? project["setlists"] : juce::var (juce::Array<juce::var>()) },
+        { "librarySetlists", songControl.getLibrarySetlists() },
         { "songs", songControl.getSongs() },
         { "transport", object ({ { "playing", engine.getPlayer().isPlaying() },
                                  { "songId", project.isObject() ? project["songId"] : juce::var() },
@@ -1328,9 +1335,12 @@ void WebUi::timerCallback()
        #endif
     }
 
-    const auto levels = object ({ { "in:1", engine.takePeakDb (Engine::in1) } });
+    const auto levels = object ({});
     for (int ch = 0; ch < Engine::maxChannels; ++ch)
+    {
+        levels.getDynamicObject()->setProperty ("in:" + juce::String (ch + 1), engine.takeInputPeakDb (ch));
         levels.getDynamicObject()->setProperty ("out:" + juce::String (ch + 1), engine.takeOutputPeakDb (ch));
+    }
 
     for (const auto& id : chainIds)
     {

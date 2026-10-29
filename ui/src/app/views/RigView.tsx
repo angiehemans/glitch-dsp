@@ -6,10 +6,9 @@ import BlockTile from "@scamp/components/BlockTile/BlockTile";
 import ChainStrip from "@scamp/components/ChainStrip/ChainStrip";
 import Rig from "@scamp/views/Rig/Rig";
 import { send } from "../../store/glitch";
-import { dbToPosition, positionToDb } from "../faderLaw";
+import { dbToPosition, formatDb, positionToDb } from "../faderLaw";
 import { renameByKey, renameWhenCreated } from "../rename";
 import { FootswitchView } from "./FootswitchView";
-import { MonitorView } from "./MonitorView";
 
 type ChainColor = "orange" | "cyan" | "pink" | "lime" | "violet";
 
@@ -61,31 +60,41 @@ function ioOptions(chain: Chain, inputNames: string[], outputNames: string[]) {
 
 const PLUGIN_IMAGE = "/assets/plugin.svg";
 
+const FINISHES = ["orange", "black", "cream", "blue", "red", "hammer", "green", "purple"] as const;
+/** A pedal finish that stays with the block: picked from its id. */
+export const finishOf = (id: string) => FINISHES[[...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % FINISHES.length];
+
+/** The small type line under a pedal's name. */
+const kindOf = (b: Block) =>
+  b.type === "nam" ? "NAM model" : b.type === "ir" ? "Cab IR" : b.type === "plugin" ? b.plugin?.manufacturer || b.plugin?.format || "Plugin" : b.type;
+
 function blockState(b: Block) {
   if (b.missing) return "error";
   return b.enabled ? "active" : "bypassed";
 }
 
 /**
- * A block in a chain, at a fixed height (half height inside an ABY path); its picture keeps its
- * aspect ratio. Its header bypasses or removes it; clicking it opens the plugin's own window
- * (native: it can't render in the WebView) for everything else.
+ * A block in a chain as a pedal (a slim one inside an ABY path), with the plugin window's snapshot
+ * on its face when there is one. Its stomp switch bypasses it; clicking its face opens the plugin's
+ * own window (native: it can't render in the WebView) for everything else.
  */
 function BlockView({ block, snapshotBase, small = false }: { block: Block; snapshotBase: string; small?: boolean }) {
   // Engine-captured picture of the plugin's window; the version busts the image cache after each capture.
-  const art = block.snapshotAt && snapshotBase ? `${snapshotBase}${block.id}.png?v=${block.snapshotAt}` : PLUGIN_IMAGE;
+  const art = block.snapshotAt && snapshotBase ? `${snapshotBase}${block.id}.png?v=${block.snapshotAt}` : "";
 
   return (
     <BlockTile
       state={blockState(block)}
       size={small ? "small" : "regular"}
+      finish={finishOf(block.id)}
       name={block.name}
+      kind={kindOf(block)}
       bypassLabel={block.enabled ? "Bypass" : "Turn on"}
       onOpen={() => send({ type: "block.openEditor", blockId: block.id })}
       onBypass={() => send({ type: "block.toggle", blockId: block.id })}
       onRemove={() => send({ type: "block.remove", blockId: block.id })}
     >
-      <img class="gl-block-art" src={art} alt="" draggable={false} />
+      {art && <img class="gl-block-art" src={art} alt="" draggable={false} />}
     </BlockTile>
   );
 }
@@ -117,6 +126,24 @@ let insertAt: { chainId: string; abyId?: string; path?: "A" | "B"; index: number
 // The real + buttons add at the end: a click on one by hand (not ours, which isn't trusted) forgets the spot.
 document.addEventListener("click", (e) => e.isTrusted && (e.target as Element).closest?.('[data-scamp-id^="add_"]') && (insertAt = null), true);
 
+/** Opens a chain's add menu under what was clicked (a + between pedals, or the one at the end), kept inside the chain. */
+function placeAddMenu(chain: HTMLElement, anchor: Element) {
+  const box = chain.getBoundingClientRect();
+  const at = anchor.getBoundingClientRect();
+  chain.style.setProperty("--menu-left", `${Math.max(8, Math.min(at.left - box.left, box.width - 288))}px`);
+  chain.style.setProperty("--menu-right", "auto");
+  chain.style.setProperty("--menu-top", `${at.bottom - box.top + 4}px`);
+}
+document.addEventListener(
+  "click",
+  (e) => {
+    const add = e.isTrusted && (e.target as Element).closest?.('[data-scamp-id="add_btn_690a"]');
+    const chain = add && add.closest<HTMLElement>("section");
+    if (chain) placeAddMenu(chain, add);
+  },
+  true,
+);
+
 /** Blocks in a chain, counting those inside ABY paths but not the ABY itself. */
 const blockCount = (c: Chain) =>
   c.blocks.reduce((n, b) => n + (b.type === "aby" ? (b as AbyBlock).pathA.blocks.length + (b as AbyBlock).pathB.blocks.length : 1), 0);
@@ -139,10 +166,10 @@ function startDrag(down: PointerEvent, blockId: string) {
   down.preventDefault(); // no text selection
   down.stopPropagation(); // an ABY's wrapper holds its paths' tiles
 
-  // A small copy of the pedal follows the pointer: the ABY's pedal, or the tile's picture.
+  // A small copy of the pedal follows the pointer: the ABY's pedal, or the block's.
   const wrapper = down.currentTarget as HTMLElement;
   const abyPedal = wrapper.querySelector('[aria-label="ABY splitter pedal"]');
-  const source = abyPedal ?? wrapper.querySelector(".gl-block-art");
+  const source = abyPedal ?? wrapper.querySelector('[data-scamp-id="root"]');
   let preview: HTMLElement | null = null;
   let lane: HTMLElement | null = null;
 
@@ -151,8 +178,8 @@ function startDrag(down: PointerEvent, blockId: string) {
       if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 4) return; // still a click
       preview = (source?.cloneNode(true) as HTMLElement) ?? document.createElement("div");
       preview.classList.add("gl-drag-preview");
-      // Inline: the pedal's own Scamp class (width: 100%, position: relative) loads after app.css.
-      Object.assign(preview.style, { position: "fixed", top: "0", left: "0", width: "64px", margin: "0" });
+      // Inline: the pedal's own Scamp class (position: relative) loads after app.css. Half size.
+      Object.assign(preview.style, { position: "fixed", top: "0", left: "0", margin: "0", scale: "0.5" });
       document.body.append(preview);
       document.body.classList.add("gl-dragging");
     }
@@ -228,6 +255,7 @@ function Lane({ chainId, abyId, path, children }: { chainId: string; abyId?: str
           insertAt = { chainId, abyId, path, index: Number(lane.dataset.gap) };
           // Open the lane's own + menu: the chain's, or the A/B box's.
           const box = path ? lane.closest(`[data-scamp-id^="lane_${path.toLowerCase()}_"]`) : lane.closest("section");
+          if (!path && box) placeAddMenu(box as HTMLElement, e.currentTarget);
           box?.querySelector<HTMLElement>(path ? `[data-scamp-id^="add_${path.toLowerCase()}_"]` : '[data-scamp-id="add_btn_690a"]')?.click();
         }}
       >
@@ -323,7 +351,7 @@ function exitOutputs(c: Chain) {
     : { exit: "single" as const };
 }
 
-/** The rig of the open project, with the monitor strip under it. */
+/** The rig of the open project, with the footswitch panel under it. */
 export function RigView({ state }: { state: GlitchState }) {
   if (!state.project) {
     return (
@@ -379,11 +407,14 @@ export function RigView({ state }: { state: GlitchState }) {
             input={`In ${c.inputs[0].hwChannel}`}
             {...ioOptions(c, inputNames, outputNames)}
             level={String(Math.round(dbToPosition(c.level) * 100))}
+            levelText={formatDb(c.level, SILENCE_DB)}
             muted={c.muted}
-            inputMeter={`chain:${c.id}:in`}
+            // One bar per input channel: the hardware inputs, before the chain.
+            inputMeter={`in:${c.inputs[0].hwChannel}`}
+            stereo={c.inputs.length > 1}
+            inputMeterR={c.inputs[1] ? `in:${c.inputs[1].hwChannel}` : ""}
             output={c.outputs.length ? outputLabel(c.outputs[0].hwChannels) + (c.outputs.length > 1 ? ` +${c.outputs.length - 1}` : "") : "No output"}
             {...exitOutputs(c)}
-            outputMeter={`chain:${c.id}:out`}
             plugins={[ABY_ROW, ...plugins]}
             menuNote={pluginNote}
             scanning={state.plugins.scanning}
@@ -413,7 +444,6 @@ export function RigView({ state }: { state: GlitchState }) {
         ))}
       />
       <FootswitchView state={state} />
-      <MonitorView state={state} />
     </>
   );
 }

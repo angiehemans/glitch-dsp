@@ -26,9 +26,9 @@
 .content_5e4f {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
   flex-grow: 1;
-  padding: var(--space-4);
+  padding: var(--space-6);
 }
 
 .live_chains_6a2f {
@@ -40,172 +40,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-}
-
-.fork_e7d8 {
-  display: flex;
-  gap: var(--space-6);
-  align-items: center;
-}
-
-.aby_slot_3e7a {
-  width: 125px;
-  aspect-ratio: 3 / 4;
-  flex-shrink: 0;
-  position: relative;
-  left: 0px;
-  top: 0px;
-}
-
-.lanes_09fa {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  background: var(--color-bg-1);
-  position: relative;
-  left: 0px;
-  top: 0px;
-}
-
-/* Hides the strip's single centre line between the ABY and the lanes — the ABY sends two signals, drawn per lane below */
-.lanes_09fa::before {
-  content: "";
-  position: absolute;
-  left: -24px;
-  width: 24px;
-  top: calc(50% - 2px);
-  height: 4px;
-  background: var(--color-bg-1);
-  pointer-events: none;
-}
-
-/* Merge wire: mirror bracket into the merge node */
-.lanes_09fa::after {
-  content: "";
-  position: absolute;
-  right: -12px;
-  width: 12px;
-  top: calc((100% - var(--space-6)) / 4 - 1px);
-  bottom: calc((100% - var(--space-6)) / 4 - 1px);
-  border: 2px solid var(--color-line-strong);
-  border-left: none;
-  background: var(--color-bg-1);
-  pointer-events: none;
-}
-
-.lane_a_1a0c {
-  display: flex;
-  gap: var(--space-6);
-  align-items: center;
-  padding: var(--space-2);
-  background: var(--color-bg-0);
-  border-radius: var(--radius-md);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--divider-dark);
-  position: relative;
-  left: 0px;
-  top: 0px;
-  box-shadow: var(--bevel-inset);
-}
-
-/* ABY output: leaves the pedal 24px off its centre, steps to this lane's centre */
-.lane_a_1a0c::before {
-  content: "";
-  position: absolute;
-  left: -25px;
-  width: 12px;
-  top: 11px;
-  bottom: calc(50% - 1px);
-  border-top: 2px solid var(--color-line-strong);
-  border-right: 2px solid var(--color-line-strong);
-  pointer-events: none;
-}
-
-.lane_a_1a0c::after {
-  content: "";
-  position: absolute;
-  left: -13px;
-  width: 13px;
-  top: calc(50% - 1px);
-  height: 2px;
-  background: var(--color-line-strong);
-  pointer-events: none;
-}
-
-.lane_a_tag_2b1d {
-  font-family: var(--font-display);
-  font-size: 14px;
-  color: var(--color-lcd-text);
-  width: 24px;
-  height: fit-content;
-  text-align: center;
-}
-.lane_b_5e40 {
-  display: flex;
-  gap: var(--space-6);
-  align-items: center;
-  padding: var(--space-2);
-  background: var(--color-bg-0);
-  border-radius: var(--radius-md);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--divider-dark);
-  position: relative;
-  left: 0px;
-  top: 0px;
-  box-shadow: var(--bevel-inset);
-}
-
-/* ABY output: leaves the pedal 24px off its centre, steps to this lane's centre */
-.lane_b_5e40::before {
-  content: "";
-  position: absolute;
-  left: -25px;
-  width: 12px;
-  top: calc(50% - 1px);
-  bottom: 11px;
-  border-bottom: 2px solid var(--color-line-strong);
-  border-right: 2px solid var(--color-line-strong);
-  pointer-events: none;
-}
-
-.lane_b_5e40::after {
-  content: "";
-  position: absolute;
-  left: -13px;
-  width: 13px;
-  top: calc(50% - 1px);
-  height: 2px;
-  background: var(--color-line-strong);
-  pointer-events: none;
-}
-
-.lane_b_tag_6f51 {
-  font-family: var(--font-display);
-  font-size: 14px;
-  color: var(--color-lcd-text);
-  width: 24px;
-  height: fit-content;
-  text-align: center;
-}
-.merge_node_9284 {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: var(--color-lcd-bg);
-  border-radius: var(--radius-full);
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--color-lcd-dim);
-  font-family: var(--font-display);
-  font-size: 16px;
-  color: var(--color-lcd-text);
-  box-shadow: var(--bevel-inset);
+  gap: var(--space-4);
 }
 
 .sheet_4d40 {
@@ -213,9 +48,7 @@
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-8) var(--space-6);
-  background: var(--panel-gradient);
-  box-shadow: var(--shadow-sheet);
-  border-top: 1px solid var(--divider-dark);
+  background: var(--color-bg-1);
 }
 .sheet_head_5e51 {
   display: flex;
@@ -416,64 +249,76 @@
 }
 
 .img_comp_b1e2 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .img_fuzz_c2f3 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .img_vamp_d304 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .img_mamp_e415 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .img_comp_93b1 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .img_chorus_f526 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .img_reverb_0637 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .img_comp_1748 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .img_delay_2859 {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .img_reverb_396a {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .img_punk_4a7b {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .img_bass_5b8c {
+  width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 .inst_9c1e.inst_9c1e {
   width: 100%;
   height: 56px;
 }
 
-.icon_guitar_b8c1 {
-  width: 20px;
-  height: 20px;
-}
 
-.icon_mic_c9d2 {
-  width: 20px;
-  height: 20px;
-}
 
-.icon_bass_dae3 {
-  width: 20px;
-  height: 20px;
-}
 
 .pedal_comp_91e3 {
   height: 480px;
@@ -530,7 +375,7 @@
 .root[data-content="live"] .live_chains_6a2f {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .root[data-content="live"] .chains_b4a5 {
