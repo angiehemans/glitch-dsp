@@ -1,10 +1,13 @@
 #include "WebUi.h"
 #include "Protocol.h"
+#include "Vars.h"
 #include "../blocks/IrBlock.h"
 #include "../blocks/NamBlock.h"
 
 namespace glitch
 {
+
+using namespace vars;
 
 namespace
 {
@@ -37,14 +40,6 @@ namespace
         return { std::vector<std::byte> (bytes, bytes + size), mimeType };
     }
 
-    juce::var object (std::initializer_list<std::pair<const char*, juce::var>> props)
-    {
-        auto* obj = new juce::DynamicObject();
-        for (const auto& [key, value] : props)
-            obj->setProperty (key, value);
-        return obj;
-    }
-
     /** Names of the channels the device actually opened. */
     juce::var activeChannelNames (const juce::StringArray& names, const juce::BigInteger& active)
     {
@@ -53,12 +48,6 @@ namespace
             if (active[i])
                 result.add (names[i]);
         return result;
-    }
-
-    /** A user-typed name: trimmed, single line, at most 60 characters. Empty means "invalid". */
-    juce::String cleanName (const juce::var& v)
-    {
-        return v.toString().replaceCharacters ("\r\n\t", "   ").trim().substring (0, 60).trim();
     }
 
     /** 44.1 kHz and up (devices also offer 8–32 kHz, which no guitar rig wants), plus the current rate. */
@@ -79,34 +68,6 @@ namespace
             if (juce::isPowerOfTwo (size) || size == d->getCurrentBufferSizeSamples())
                 result.addIfNotAlreadyThere (size);
         return result;
-    }
-
-    bool isChannel (const juce::var& v)
-    {
-        return (v.isInt() || v.isInt64()) && (int) v >= 1 && (int) v <= Engine::maxChannels;
-    }
-
-    /** Hardware outputs for a send, checked: one or two valid, distinct channels, else empty. */
-    juce::Array<juce::var> sendChannels (const juce::var& requested)
-    {
-        juce::Array<juce::var> hwChannels;
-        if (auto* list = requested.getArray())
-            for (const auto& ch : *list)
-                if (isChannel (ch) && ! hwChannels.contains ((int) ch))
-                    hwChannels.add ((int) ch);
-        return hwChannels.size() == requested.size() && hwChannels.size() <= 2 ? hwChannels : juce::Array<juce::var>();
-    }
-
-    /** An outputs list's first hwChannels, checked like sendChannels. */
-    juce::Array<juce::var> outputChannels (const juce::var& outputs)
-    {
-        return sendChannels (outputs[0]["hwChannels"]);
-    }
-
-    /** A matrix send: hardware outputs (one, or a left/right pair) with a level and mute. */
-    juce::var newSend (const juce::var& hwChannels = juce::Array<juce::var> { 1, 2 })
-    {
-        return object ({ { "hwChannels", hwChannels }, { "level", 0.0 }, { "pan", 0.0 }, { "mute", false } });
     }
 
     /** The chain's last block, when it's an ABY whose paths exit to their own outputs. */
@@ -195,59 +156,12 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l, ModelLibrary& m)
 {
     addAndMakeVisible (browser);
     syncEngine();
-    loadSong();
+    songControl.loadSong();
 
-    footswitch.onPress = [this] (Footswitch::Switch sw)
-    {
-        lastSwitch = object ({ { "channel", sw.channel }, { "cc", sw.cc } });
-        if (store.addMidiSwitch (sw.channel, sw.cc))
-            sendState(); // a switch found: it gets a tile
-        if (! learning.isObject())
-            return;
-
-        // MIDI learn: this switch, on the page being learned, gets the action for the gesture.
-        auto* mappings = store.getCurrent()["mappings"].getArray();
-        if (mappings == nullptr)
-            return;
-        const auto onPage = (int) learning["page"];
-        auto mapping = findMapping (sw, onPage);
-        if (! mapping.isObject())
-        {
-            mapping = object ({ { "switch", lastSwitch.clone() }, { "page", onPage }, { "tap", {} }, { "hold", {} } });
-            mappings->add (mapping);
-        }
-        mapping.getDynamicObject()->setProperty (learning["gesture"].toString() == "hold" ? "hold" : "tap", learning["action"]);
-        learning = juce::var();
-        learnedNow = true;
-        store.markDirty();
-    };
-    footswitch.holdMsFor = [this] (Footswitch::Switch sw)
-    {
-        const auto mapping = findMapping (sw, page);
-        if (learnedNow || ! mapping["hold"].isObject())
-            return 0.0;
-        return mapping["holdMs"].isVoid() ? 500.0 : (double) mapping["holdMs"];
-    };
-    footswitch.onGesture = [this] (Footswitch::Switch sw, bool hold)
-    {
-        if (std::exchange (learnedNow, false))
-        {
-            sendState();
-            return;
-        }
-        if (engine.isTuning())
-        {
-            // The plan: tap any switch (or hold again) to leave tune mode, whatever it's mapped to.
-            applyTuneMode (false);
-            sendState();
-            return;
-        }
-        if (const auto action = findMapping (sw, page)[hold ? "hold" : "tap"]; action.isObject())
-            runAction (action);
-        else
-            sendState(); // the press still shows on the mapping screen
-    };
-    connectMidi();
+    songControl.onError = footswitchControl.onError = [this] (const juce::String& message) { sendError (message); };
+    songControl.onChanged = footswitchControl.onChanged = [this] { sendState(); };
+    footswitchControl.onCommand = [this] (const juce::var& command) { handleCommand (command); };
+    footswitchControl.connectMidi();
     engine.getDeviceManager().addChangeListener (this);
     engine.onDeviceListChanged = [this] { sendState(); };
 
@@ -322,7 +236,7 @@ void WebUi::handleCommand (const juce::var& command)
             return;
         }
         syncEngine();
-        loadSong(); // the project's current song, routed its way
+        songControl.loadSong(); // the project's current song, routed its way
     }
     else if (type == protocol::command::projectRename)
     {
@@ -358,9 +272,9 @@ void WebUi::handleCommand (const juce::var& command)
         if (! handlePresetCommand (type, command))
             return;
     }
-    else if (type.startsWith ("song.") || type.startsWith ("transport.") || type == protocol::command::trackMixSet)
+    else if (type.startsWith ("setlist.") || type.startsWith ("song.") || type.startsWith ("transport.") || type == protocol::command::trackMixSet)
     {
-        if (! handleSongCommand (type, command))
+        if (! songControl.handleCommand (type, command))
             return;
     }
     else if (type.startsWith ("tune."))
@@ -370,7 +284,7 @@ void WebUi::handleCommand (const juce::var& command)
     }
     else if (type.startsWith ("midi.") || type.startsWith ("mapping.") || type.startsWith ("footswitch."))
     {
-        if (! handleMidiCommand (type, command))
+        if (! footswitchControl.handleCommand (type, command))
             return;
     }
     else if (type == protocol::command::deviceScan)
@@ -699,196 +613,6 @@ void WebUi::applyTuneMode (bool on)
     engine.setTuneMode (on, juce::jmax (1, (int) settings["tunerInput"]) - 1, settings["vocalChainId"].toString());
 }
 
-bool WebUi::handleMidiCommand (const juce::String& type, const juce::var& command)
-{
-    const auto sw = Footswitch::Switch { (int) command["channel"], (int) command["cc"] };
-
-    if (type == protocol::command::midiSelect)
-    {
-        store.setMidiDevice (command["name"].toString()); // "" = none
-        footswitch.close();
-        connectMidi();
-        return true;
-    }
-    if (type == protocol::command::midiForgetSwitch)
-    {
-        // Gone from the found switches, and its mappings in this project with it (every page).
-        store.removeMidiSwitch (sw.channel, sw.cc);
-        if (auto* mappings = store.getCurrent()["mappings"].getArray())
-        {
-            mappings->removeIf ([&] (const juce::var& m) { return (int) m["switch"]["channel"] == sw.channel && (int) m["switch"]["cc"] == sw.cc; });
-            store.markDirty();
-        }
-        return true;
-    }
-    if (type == protocol::command::footswitchPress)
-    {
-        // A switch pressed on screen (or by a test), as if from MIDI.
-        const auto now = juce::Time::getMillisecondCounterHiRes();
-        (bool) command["down"] ? footswitch.press (sw, now) : footswitch.release (sw, now);
-        return true;
-    }
-
-    if (! store.getCurrent().isObject())
-    {
-        sendError ("No project open");
-        return false;
-    }
-
-    if (type == protocol::command::midiLearn)
-    {
-        if (! command["action"].isObject())
-        {
-            sendError ("Nothing to learn");
-            return false;
-        }
-        learning = object ({ { "action", command["action"] }, { "gesture", command["gesture"].toString() == "hold" ? "hold" : "tap" },
-                             { "page", command["page"].isVoid() ? page : (int) command["page"] } });
-    }
-    else if (type == protocol::command::midiCancelLearn)
-    {
-        learning = juce::var();
-    }
-    else if (type == protocol::command::mappingSet)
-    {
-        if (! command["action"].isObject())
-        {
-            sendError ("No action to map");
-            return false;
-        }
-        auto* mappings = store.getCurrent()["mappings"].getArray();
-        const auto onPage = (int) command["page"];
-        auto mapping = findMapping (sw, onPage);
-        if (! mapping.isObject())
-        {
-            mapping = object ({ { "switch", object ({ { "channel", sw.channel }, { "cc", sw.cc } }) }, { "page", onPage }, { "tap", {} }, { "hold", {} } });
-            mappings->add (mapping);
-        }
-        mapping.getDynamicObject()->setProperty (command["gesture"].toString() == "hold" ? "hold" : "tap", command["action"]);
-        store.markDirty();
-    }
-    else if (type == protocol::command::mappingClear || type == protocol::command::mappingHoldMs)
-    {
-        const auto mapping = findMapping (sw, (int) command["page"]);
-        if (! mapping.isObject())
-        {
-            sendError ("No mapping for that switch");
-            return false;
-        }
-        if (type == protocol::command::mappingHoldMs)
-        {
-            mapping.getDynamicObject()->setProperty ("holdMs", juce::jlimit (100, 3000, (int) command["holdMs"]));
-        }
-        else
-        {
-            mapping.getDynamicObject()->setProperty (command["gesture"].toString() == "hold" ? "hold" : "tap", {});
-            if (! mapping["tap"].isObject() && ! mapping["hold"].isObject())
-                store.getCurrent()["mappings"].getArray()->removeAllInstancesOf (mapping);
-        }
-        store.markDirty();
-    }
-    else if (type == protocol::command::footswitchPage)
-    {
-        page = juce::jlimit (0, pageCount(), (int) command["page"]); // one past the last: a new, empty page
-    }
-    else
-    {
-        sendError ("Unknown command: " + type);
-        return false;
-    }
-    return true;
-}
-
-juce::var WebUi::findMapping (Footswitch::Switch sw, int onPage) const
-{
-    if (auto* mappings = store.getCurrent()["mappings"].getArray())
-        for (const auto& m : *mappings)
-            if ((int) m["switch"]["channel"] == sw.channel && (int) m["switch"]["cc"] == sw.cc && (int) m["page"] == onPage)
-                return m;
-    return {};
-}
-
-int WebUi::pageCount() const
-{
-    int count = 1;
-    if (auto* mappings = store.getCurrent()["mappings"].getArray())
-        for (const auto& m : *mappings)
-            count = std::max (count, (int) m["page"] + 1);
-    return count;
-}
-
-void WebUi::runAction (const juce::var& action)
-{
-    const auto type = action["type"].toString();
-    const auto toggled = [] (const juce::var& v) { return ! (bool) v; };
-
-    if (type == "page.next")
-    {
-        page = (page + 1) % pageCount();
-        sendState();
-    }
-    else if (type == "preset.next" || type == "preset.prev")
-    {
-        const auto* presets = store.getPresetSummaries().getArray();
-        if (presets == nullptr || presets->isEmpty())
-            return sendState();
-        int at = -1;
-        for (int i = 0; i < presets->size(); ++i)
-            if ((*presets)[i]["id"].toString() == store.getCurrentPresetId())
-                at = i;
-        const auto n = presets->size();
-        const auto next = type == "preset.next" ? (at + 1) % n : (at <= 0 ? n - 1 : at - 1);
-        handleCommand (object ({ { "type", protocol::command::presetLoad }, { "presetId", (*presets)[next]["id"] } }));
-    }
-    else if (type == "chain.toggleMute")
-    {
-        const auto chain = store.findChain (action["chainId"].toString());
-        handleCommand (object ({ { "type", protocol::command::chainSetMute }, { "chainId", action["chainId"] }, { "muted", toggled (chain["muted"]) } }));
-    }
-    else if (type == "aby.toggleAB" || type == "aby.toggleY")
-    {
-        // A/B picks the other path (from Y, back to AB); Y switches between Y and AB.
-        const auto aby = store.findBlock (action["blockId"].toString());
-        const auto y = aby["mode"].toString() == "Y";
-        if (type == "aby.toggleY" || y)
-            handleCommand (object ({ { "type", protocol::command::abySetMode }, { "blockId", action["blockId"] }, { "mode", y ? "AB" : "Y" } }));
-        else
-            handleCommand (object ({ { "type", protocol::command::abySelect }, { "blockId", action["blockId"] }, { "path", aby["active"].toString() == "A" ? "B" : "A" } }));
-    }
-    else if (type == protocol::command::blockToggle || type == protocol::command::presetLoad || type == protocol::command::abySelect
-             || type == protocol::command::panicToggle || type == protocol::command::tuneToggle)
-    {
-        handleCommand (action);
-    }
-    else
-    {
-        sendError ("The footswitch can't do " + type + " yet");
-    }
-}
-
-void WebUi::connectMidi()
-{
-    const auto wanted = store.getMidiDevice();
-    juce::String identifier;
-    juce::StringArray names;
-    for (const auto& d : juce::MidiInput::getAvailableDevices())
-    {
-        names.add (d.name);
-        if (d.name == wanted)
-            identifier = d.identifier;
-    }
-    const auto listChanged = names != std::exchange (midiNames, names); // plugged in or out: the menu lists it
-
-    const auto wasOpen = footswitch.getOpenIdentifier().isNotEmpty();
-    if (identifier.isEmpty())
-        footswitch.close(); // unplugged, or none chosen
-    else if (identifier != footswitch.getOpenIdentifier() && ! footswitch.open (identifier))
-        sendError ("Couldn't open the MIDI device " + wanted);
-
-    if (listChanged || wasOpen != footswitch.getOpenIdentifier().isNotEmpty())
-        sendState();
-}
-
 bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& command)
 {
     juce::Array<juce::var>* sends = nullptr;
@@ -897,7 +621,7 @@ bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& comma
     if (command["trackId"].toString().isNotEmpty())
     {
         // A backing track of the current song: its sends in the project's track mix.
-        const auto entry = trackMixEntry (command["trackId"].toString(), true);
+        const auto entry = songControl.trackMixEntry (command["trackId"].toString(), true);
         if (! entry.isObject())
         {
             sendError ("That track isn't in the current song");
@@ -958,209 +682,8 @@ bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& comma
     if (chain.isObject() && command["trackId"].toString().isEmpty())
         applyChainParams (chain); // mixer gains only: no rewiring
     else
-        applyTrackMix();
+        songControl.applyTrackMix();
     store.markDirty();
-    return true;
-}
-
-//==============================================================================
-juce::var WebUi::trackMixEntry (const juce::String& trackId, bool create)
-{
-    const auto project = store.getCurrent();
-    const auto song = songs.find (project["songId"].toString());
-    juce::var track;
-    if (auto* tracks = song["tracks"].getArray())
-        for (const auto& t : *tracks)
-            if (t["id"].toString() == trackId)
-                track = t;
-    if (! track.isObject())
-        return {};
-
-    const auto songId = song["id"].toString();
-    if (const auto existing = project["trackMix"][juce::Identifier (songId)][juce::Identifier (trackId)]; existing.isObject())
-        return existing;
-
-    // Not edited yet: the plan's default, to the project's main output at the track's own level.
-    auto entry = object ({ { "outputs", juce::Array<juce::var> { newSend (project["mainOutput"].clone()) } },
-                           { "level", track["defaultLevel"] }, { "pan", 0.0 }, { "mute", false } });
-    if (create)
-    {
-        auto* mix = project["trackMix"].getDynamicObject();
-        if (! project["trackMix"][juce::Identifier (songId)].isObject())
-            mix->setProperty (songId, juce::var (new juce::DynamicObject()));
-        project["trackMix"][juce::Identifier (songId)].getDynamicObject()->setProperty (trackId, entry);
-        store.markDirty();
-    }
-    return entry;
-}
-
-void WebUi::applyTrackMix()
-{
-    const auto song = songs.find (store.getCurrent()["songId"].toString());
-    const auto* tracks = song["tracks"].getArray();
-    for (int i = 0; i < BackingPlayer::maxTracks; ++i)
-    {
-        std::vector<Engine::Send> sends;
-        float level = 0;
-        bool muted = true; // tracks the song doesn't have: silent
-        if (tracks != nullptr && i < tracks->size())
-        {
-            const auto entry = trackMixEntry ((*tracks)[i]["id"].toString(), false);
-            if (auto* outputs = entry["outputs"].getArray())
-                for (const auto& o : *outputs)
-                {
-                    Engine::Send send { {}, (float) o["level"], (bool) o["mute"] };
-                    if (auto* hw = o["hwChannels"].getArray())
-                        for (const auto& ch : *hw)
-                            send.outputs.push_back ((int) ch - 1);
-                    sends.push_back (send);
-                }
-            level = (float) entry["level"];
-            muted = (bool) entry["mute"];
-        }
-        engine.setTrackRoutes (i, sends, level, muted);
-    }
-}
-
-void WebUi::loadSong()
-{
-    const auto song = songs.find (store.getCurrent()["songId"].toString());
-    const auto failed = engine.getPlayer().load (songs.getFiles (song));
-    if (! failed.isEmpty())
-        sendError ("Couldn't open " + failed.joinIntoString (", "));
-    applyTrackMix();
-}
-
-void WebUi::importSong()
-{
-    if (chooser != nullptr)
-        return; // already open
-    chooser = std::make_unique<juce::FileChooser> ("Choose a song's audio files (WAV or AIFF): one track each",
-                                                   juce::File::getSpecialLocation (juce::File::userMusicDirectory), "*.wav;*.aif;*.aiff");
-    const auto safe = juce::Component::SafePointer<WebUi> (this);
-    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [safe] (const juce::FileChooser& fc)
-                          {
-                              if (safe == nullptr)
-                                  return;
-                              auto& ui = *safe;
-                              const auto files = fc.getResults();
-                              ui.chooser = nullptr;
-                              if (files.isEmpty())
-                                  return;
-
-                              juce::StringArray failed;
-                              const auto song = ui.songs.import (files, failed);
-                              if (! failed.isEmpty())
-                                  ui.sendError ("Couldn't import " + failed.joinIntoString (", "));
-                              if (song.isObject() && ui.store.getCurrent().isObject())
-                              {
-                                  ui.store.getCurrent().getDynamicObject()->setProperty ("songId", song["id"]);
-                                  ui.store.markDirty();
-                                  ui.loadSong();
-                              }
-                              ui.sendState();
-                          });
-}
-
-bool WebUi::handleSongCommand (const juce::String& type, const juce::var& command)
-{
-    auto& player = engine.getPlayer();
-    const auto songId = command["songId"].toString();
-
-    if (type == protocol::command::songImport)
-    {
-        if (! store.getCurrent().isObject())
-        {
-            sendError ("Open a project first");
-            return false;
-        }
-        importSong();
-    }
-    else if (type == protocol::command::songSelect)
-    {
-        auto* project = store.getCurrent().getDynamicObject();
-        if (project == nullptr || (songId.isNotEmpty() && ! songs.find (songId).isObject()))
-        {
-            sendError (project == nullptr ? "Open a project first" : "Unknown song: " + songId);
-            return false;
-        }
-        project->setProperty ("songId", songId.isNotEmpty() ? juce::var (songId) : juce::var());
-        store.markDirty();
-        loadSong();
-    }
-    else if (type == protocol::command::songRename)
-    {
-        const auto title = cleanName (command["title"]);
-        if (title.isEmpty() || ! songs.rename (songId, title))
-        {
-            sendError (title.isEmpty() ? "A song needs a title" : "Unknown song: " + songId);
-            return false;
-        }
-    }
-    else if (type == protocol::command::songDelete)
-    {
-        const auto current = store.getCurrent()["songId"].toString() == songId;
-        if (! songs.remove (songId))
-        {
-            sendError ("Unknown song: " + songId);
-            return false;
-        }
-        if (current)
-        {
-            store.getCurrent().getDynamicObject()->removeProperty ("songId");
-            store.markDirty();
-            loadSong();
-        }
-    }
-    else if (type == protocol::command::trackMixSet)
-    {
-        const auto entry = trackMixEntry (command["trackId"].toString(), true);
-        if (! entry.isObject())
-        {
-            sendError ("That track isn't in the current song");
-            return false;
-        }
-        if (! command["outputs"].isVoid())
-        {
-            // The Songs tab's output menu, a shortcut like a chain's chip: it sets the first send.
-            const auto hwChannels = outputChannels (command["outputs"]);
-            if (hwChannels.isEmpty())
-            {
-                sendError ("Invalid output channels");
-                return false;
-            }
-            auto* sends = entry["outputs"].getArray();
-            if (sends->isEmpty())
-                sends->add (newSend (hwChannels));
-            else
-                (*sends)[0].getDynamicObject()->setProperty ("hwChannels", hwChannels);
-        }
-        if (! command["level"].isVoid())
-            entry.getDynamicObject()->setProperty ("level", juce::jlimit (Engine::silenceDb, 10.0f, (float) command["level"]));
-        if (! command["mute"].isVoid())
-            entry.getDynamicObject()->setProperty ("mute", (bool) command["mute"]);
-        store.markDirty();
-        applyTrackMix();
-    }
-    else if (type == protocol::command::transportPlay)
-    {
-        player.play();
-    }
-    else if (type == protocol::command::transportStop)
-    {
-        player.stop();
-    }
-    else if (type == protocol::command::transportRestart)
-    {
-        player.restart();
-    }
-    else
-    {
-        sendError ("Unknown command: " + type);
-        return false;
-    }
     return true;
 }
 
@@ -1637,6 +1160,11 @@ void WebUi::closeEditor (const juce::String& blockId)
 //==============================================================================
 void WebUi::sendState()
 {
+    stateDue = true; // sent on the next tick: a fader drag's dozens of commands a second make one state per tick
+}
+
+void WebUi::emitState()
+{
     auto& deviceManager = engine.getDeviceManager();
     juce::var device; // null when no device is open
 
@@ -1695,21 +1223,6 @@ void WebUi::sendState()
         project.getDynamicObject()->removeProperty ("pluginStates");
     }
 
-    juce::Array<juce::var> midiDevices;
-    for (const auto& d : juce::MidiInput::getAvailableDevices())
-        midiDevices.add (d.name);
-    const auto midiName = store.getMidiDevice();
-    const auto midi = object ({
-        { "device", midiName.isNotEmpty() ? juce::var (midiName) : juce::var() },
-        { "connected", footswitch.getOpenIdentifier().isNotEmpty() },
-        { "devices", midiDevices },
-        { "learning", learning },
-        { "page", page },
-        { "pageCount", pageCount() },
-        { "lastSwitch", lastSwitch },
-        { "switches", store.getMidiSwitches() },
-    });
-
     // Fields past midi are stubs until their milestone; see packages/protocol/src/model.ts.
     const auto state = object ({
         { "device", device },
@@ -1729,8 +1242,8 @@ void WebUi::sendState()
         { "currentPresetId", store.getCurrentPresetId().isNotEmpty() ? juce::var (store.getCurrentPresetId()) : juce::var() },
         { "presetModified", presetModified = store.isPresetModified() },
         { "mappings", project.isObject() ? project["mappings"] : juce::var (juce::Array<juce::var>()) },
-        { "setlists", juce::Array<juce::var>() },
-        { "songs", songs.getSongs() },
+        { "setlists", project.isObject() ? project["setlists"] : juce::var (juce::Array<juce::var>()) },
+        { "songs", songControl.getSongs() },
         { "transport", object ({ { "playing", engine.getPlayer().isPlaying() },
                                  { "songId", project.isObject() ? project["songId"] : juce::var() },
                                  { "position", engine.getPlayer().getPositionSeconds() } }) },
@@ -1739,7 +1252,7 @@ void WebUi::sendState()
                                 { "reference", project.isObject() ? project["tuneMode"]["reference"] : juce::var (440) },
                                 { "vocalChainId", project.isObject() ? project["tuneMode"]["vocalChainId"] : juce::var() },
                                 { "backingTracks", "pause" } }) },
-        { "midi", midi },
+        { "midi", footswitchControl.getState() },
     });
 
     emit (object ({ { "type", protocol::event::state }, { "state", state } }));
@@ -1793,9 +1306,12 @@ void WebUi::checkDevice()
 
 void WebUi::timerCallback()
 {
+    if (std::exchange (stateDue, false))
+        emitState();
+
     if (++ticks % 60 == 0)
     {
-        connectMidi(); // plugged in or out
+        footswitchControl.connectMidi(); // plugged in or out
         captureStates();
         store.saveIfDirty();
         if (store.isPresetModified() != presetModified)
@@ -1823,6 +1339,10 @@ void WebUi::timerCallback()
     }
 
     emit (object ({ { "type", protocol::event::meters }, { "levels", levels }, { "cpu", engine.getCpuUsage() } }));
+
+    // A song that played to its end moves the setlist on, when it auto-advances.
+    if (wasPlaying && songControl.advanceAtEnd())
+        sendState();
 
     // Where the song is, about 10 times a second, and once more when it stops (at its end, say).
     const auto playing = engine.getPlayer().isPlaying();

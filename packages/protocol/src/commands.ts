@@ -62,6 +62,20 @@ export type Command =
   | { type: "transport.play" }
   | { type: "transport.stop" }
   | { type: "transport.restart" }
+  /** The current setlist's next or previous song, cued (stopped, at its start). */
+  | { type: "transport.next" }
+  | { type: "transport.prev" }
+  // Setlists: the project's own. create makes one (named, or "Setlist N") and makes it current;
+  // select makes one current (null: none), which next/prev and the preload follow.
+  | { type: "setlist.create"; name?: string }
+  | { type: "setlist.select"; setlistId: string | null }
+  | { type: "setlist.rename"; setlistId: string; name: string }
+  | { type: "setlist.delete"; setlistId: string }
+  | { type: "setlist.addSong"; setlistId: string; songId: string; index?: number }
+  | { type: "setlist.removeSong"; setlistId: string; index: number }
+  | { type: "setlist.moveSong"; setlistId: string; index: number; to: number }
+  /** Play the next song when one ends. */
+  | { type: "setlist.setAutoAdvance"; setlistId: string; on: boolean }
   // ABY: splitAt inserts one at index (default: the end), moving the blocks after it into path A.
   // block.remove on an ABY keeps path A in the chain and deletes path B.
   | { type: "chain.splitAt"; chainId: string; index?: number }
@@ -80,13 +94,10 @@ export type Command =
   | { type: "preset.load"; presetId: string }
   | { type: "preset.rename"; presetId: string; name: string }
   | { type: "preset.delete"; presetId: string }
-  // Footswitch. name null = no MIDI input. set maps a switch's tap or hold on a page; learn instead
-  // waits for the next switch pressed and maps that (on page, default the current one); clear removes
+  // Footswitch. name null = no MIDI input. set maps a switch's tap or hold on a page; clear removes
   // one gesture of a switch's mapping. press acts as if
   // the switch were pressed (down) or released, for on-screen switches and tests.
   | { type: "midi.selectDevice"; name: string | null }
-  | { type: "midi.learn"; action: ActionRef; gesture: "tap" | "hold"; page?: number }
-  | { type: "midi.cancelLearn" }
   /** Drops a found switch, and its mappings in the open project. Pressing it again finds it again. */
   | { type: "midi.forgetSwitch"; channel: number; cc: number }
   | { type: "mapping.set"; channel: number; cc: number; page: number; gesture: "tap" | "hold"; action: ActionRef }
@@ -94,14 +105,7 @@ export type Command =
   | { type: "mapping.setHoldMs"; channel: number; cc: number; page: number; holdMs: number }
   | { type: "footswitch.setPage"; page: number }
   | { type: "footswitch.press"; channel: number; cc: number; down: boolean }
-  // Stubbed from the plan; not handled until their milestone.
-  | { type: "block.setParam"; blockId: string; param: string; value: number }
-  | { type: "project.setMainOutput"; outputs: number[] }
-  | { type: "setlist.create"; name: string; projectId?: string }
-  | { type: "setlist.addToProject"; setlistId: string; projectId: string }
-  | { type: "setlist.import"; path: string; projectId?: string }
-  | { type: "song.addTrack"; songId: string; file: string; name: string }
-  | { type: "transport.next" }
+  // Tune mode
   | { type: "tune.toggle" }
   | { type: "tune.setInput"; hwChannel: number }
   /** A4 in Hz, 415 to 466. */

@@ -203,7 +203,10 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
         connect (previous, out); // a split's outputs 0-1 are path A, or the merged sum
 
         // Both output stages always feed the mixer; path B's is silent unless the chain splits.
-        const auto slot = slots[c.id];
+        const auto found = slots.find (c.id);
+        if (found == slots.end())
+            continue; // more chains than mixer slots: this one isn't heard rather than sharing a slot
+        const auto slot = found->second;
         connect (out, mixerNode, slot * 4, 2);
         connect (chainOutB[c.id], mixerNode, slot * 4 + 2, 2);
     }
@@ -605,6 +608,11 @@ void Engine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     master.reset (device->getCurrentSampleRate(), 0.02);
     master.setCurrentAndTargetValue (0.0f); // fade in from silence on start
     player.audioDeviceAboutToStart (device);
+    if (tuning.load())
+    {
+        tuner.stop(); // restart at the new device's rate, or every reading is off
+        tuner.start (device->getCurrentSampleRate());
+    }
 }
 
 void Engine::audioDeviceStopped()

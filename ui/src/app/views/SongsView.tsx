@@ -3,6 +3,7 @@ import Songs from "@scamp/views/Songs/Songs";
 import { useState } from "preact/hooks";
 import { send, transport } from "../../store/glitch";
 import { dbToPosition, formatDb, positionToDb } from "../faderLaw";
+import { renameWhenCreated } from "../rename";
 import { outputChoices, outputLabel } from "./RigView";
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
@@ -13,6 +14,7 @@ const outputs = (sends: OutputRef[]) =>
 export function SongsView({ state }: { state: GlitchState }) {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [routing, setRouting] = useState<string | null>(null); // the track whose output menu is open
+  const [deletingList, setDeletingList] = useState<string | null>(null);
   if (!state.project) {
     return (
       <p class="gl-empty">
@@ -22,6 +24,11 @@ export function SongsView({ state }: { state: GlitchState }) {
   }
 
   const song = state.songs.find((s) => s.id === state.project!.songId);
+  const setlist = state.setlists.find((l) => l.id === state.project!.setlistId);
+  // Its songs that are still in the library, by place (the setlist commands' index).
+  const entries = (setlist?.songs ?? []).map((id, index) => ({ index, song: state.songs.find((s) => s.id === id) })).filter((e) => e.song);
+  const move = (id: string, by: number) =>
+    setlist && send({ type: "setlist.moveSong", setlistId: setlist.id, index: Number(id), to: Number(id) + by });
   const mix = song ? state.project.trackMix[song.id] ?? {} : {};
   const t = transport.value;
   const position = t.songId === song?.id ? t.position : 0;
@@ -43,12 +50,54 @@ export function SongsView({ state }: { state: GlitchState }) {
       }}
     >
       <Songs
+        setlist={setlist ? "some" : "none"}
         selected={song ? "song" : "none"}
+        setlists={state.setlists.map((l) => ({ id: l.id, name: l.name, current: l.id === setlist?.id ? "on" : "off", renameKey: `setlist:${l.id}` }))}
+        autoLabel={`Auto-advance: ${setlist?.autoAdvance ? "on" : "off"}`}
+        autoOn={setlist?.autoAdvance ? "on" : "off"}
+        deleteSetlistLabel={setlist && deletingList === setlist.id ? `Delete “${setlist.name}”?` : "Delete setlist…"}
+        deleteSetlistConfirm={setlist && deletingList === setlist.id ? "on" : "off"}
+        entries={entries.map((e, n) => ({
+          id: String(e.index),
+          number: String(n + 1),
+          title: e.song!.title,
+          current: e.song!.id === song?.id ? "on" : "off",
+          songLabel: `Cue ${e.song!.title}`,
+        }))}
+        setlistNote={
+          !state.setlists.length ? "No setlists yet. Make one, then add songs from the library with +." : setlist && !entries.length ? "Empty. Add songs from the library below with +." : ""
+        }
+        onNewSetlist={() => {
+          renameWhenCreated("setlist"); // name it in place
+          send({ type: "setlist.create" });
+        }}
+        onSelectSetlist={(id) => {
+          setDeletingList(null);
+          send({ type: "setlist.select", setlistId: id === setlist?.id ? null : id });
+        }}
+        onToggleAuto={() => setlist && send({ type: "setlist.setAutoAdvance", setlistId: setlist.id, on: !setlist.autoAdvance })}
+        onDeleteSetlist={() => {
+          if (!setlist) return;
+          if (deletingList !== setlist.id) return setDeletingList(setlist.id);
+          setDeletingList(null);
+          send({ type: "setlist.delete", setlistId: setlist.id });
+        }}
+        onPickEntry={(id) => {
+          const songId = setlist?.songs[Number(id)];
+          if (songId) send({ type: "song.select", songId });
+        }}
+        onEntryUp={(id) => move(id, -1)}
+        onEntryDown={(id) => move(id, 1)}
+        onEntryRemove={(id) => setlist && send({ type: "setlist.removeSong", setlistId: setlist.id, index: Number(id) })}
+        onAddToSetlist={(id) => setlist && send({ type: "setlist.addSong", setlistId: setlist.id, songId: id })}
+        onPrev={() => send({ type: "transport.prev" })}
+        onNext={() => send({ type: "transport.next" })}
         songs={state.songs.map((s) => ({
           id: s.id,
           title: s.title,
           detail: `${s.tracks.length} track${s.tracks.length === 1 ? "" : "s"} · ${clock(s.length)}`,
           current: s.id === song?.id,
+          addLabel: `Add ${s.title} to ${setlist?.name ?? "the setlist"}`,
         }))}
         noSongs={state.songs.length === 0}
         noSelection={!song && state.songs.length > 0}

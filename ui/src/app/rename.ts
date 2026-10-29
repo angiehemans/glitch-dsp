@@ -1,9 +1,11 @@
 import { effect } from "@preact/signals";
+import type { GlitchState } from "@glitch/protocol";
 import { glitch, send } from "../store/glitch";
 import { cancelPendingNavigation } from "./router";
 
 /**
- * Double-click any element with data-rename="project:<id>", "chain:<id>", "preset:<id>" or "song:<id>" to edit its text in place
+ * Double-click any element with data-rename="project:<id>", "chain:<id>", "preset:<id>", "song:<id>" or
+ * "setlist:<id>" to edit its text in place
  * (contenteditable keeps Scamp's styling). Enter or clicking away saves, Escape cancels. The engine
  * is the source of truth: on save the text waits for the state that carries the new name.
  */
@@ -12,7 +14,7 @@ type Done = (how: "enter" | "blur" | "cancel") => void;
 function startRenaming(el: HTMLElement, onDone?: Done) {
   if (el.isContentEditable) return;
   const [kind, id] = (el.dataset.rename ?? "").split(":");
-  if (!id || !["project", "chain", "preset", "song"].includes(kind)) return;
+  if (!id || !["project", "chain", "preset", "song", "setlist"].includes(kind)) return;
 
   const original = el.textContent ?? "";
   // A name inside a button (the top bar's preset): while editing, a space or a click in the text
@@ -44,6 +46,8 @@ function startRenaming(el: HTMLElement, onDone?: Done) {
       send({ type: "preset.rename", presetId: id, name });
     } else if (kind === "song") {
       send({ type: "song.rename", songId: id, title: name });
+    } else if (kind === "setlist") {
+      send({ type: "setlist.rename", setlistId: id, name });
     } else {
       send({ type: "chain.rename", chainId: id, name });
     }
@@ -79,8 +83,9 @@ export function renameByKey(key: string) {
  * Start renaming the next project or chain to appear (after project.create / chain.create), so new
  * things get a name straight away.
  */
-export function renameWhenCreated(kind: "project" | "chain" | "preset", onDone?: (id: string, how: "enter" | "blur" | "cancel") => void) {
-  const ids = (s = glitch.value) => (kind === "project" ? s?.projects : kind === "preset" ? s?.presets : s?.chains)?.map((x) => x.id) ?? [];
+export function renameWhenCreated(kind: "project" | "chain" | "preset" | "setlist", onDone?: (id: string, how: "enter" | "blur" | "cancel") => void) {
+  const lists = { project: (s: GlitchState) => s.projects, preset: (s: GlitchState) => s.presets, setlist: (s: GlitchState) => s.setlists, chain: (s: GlitchState) => s.chains };
+  const ids = (s = glitch.value) => (s ? lists[kind](s) : []).map((x) => x.id);
   const known = new Set(ids());
   const dispose = effect(() => {
     const added = ids(glitch.value).find((id) => !known.has(id));

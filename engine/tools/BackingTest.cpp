@@ -1,4 +1,5 @@
-// Checks the backing-track player: mono on both outputs, resampling, sample-lock, end, restart, stop.
+// Checks the backing-track player: mono on both outputs, resampling, sample-lock, end, restart, stop,
+// and a preloaded next song.
 // Build and run: cmake --build --preset dev --target BackingTest && <artefacts>/BackingTest
 
 #include "../src/audio/BackingPlayer.h"
@@ -107,6 +108,30 @@ int main()
         juce::Thread::sleep (2); // let the read-ahead keep up over a whole second of audio
     }
     check (! player.isPlaying(), "the song stops at its end");
+
+    // The next song, preloaded: load() swaps it in, at its start, and it plays.
+    const auto next = writeSine (dir, "next.wav", rate, 2, 330.0, 2.0);
+    player.preload ({ next });
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    check (player.load ({ next }).isEmpty(), "the preloaded song loads");
+    check (juce::Time::getMillisecondCounterHiRes() - started < 5.0, "a preloaded song loads without opening its files again");
+    check (player.getNumTracks() == 1 && std::abs (player.getLengthSeconds() - 2.0) < 0.001, "it's the preloaded song");
+    std::vector<float> nextOut;
+    player.play();
+    for (int b = 0; b < 20; ++b)
+    {
+        player.processBlock (buffer, midi);
+        juce::Thread::sleep (3);
+        for (int i = 0; i < block; ++i)
+            nextOut.push_back (buffer.getSample (0, i));
+    }
+    check (std::abs (pitchOf (nextOut, rate) - 330.0) < 0.5, "the preloaded song plays from its start");
+
+    // Preloading the song after it (a setlist edit mid-song) leaves the playing one alone.
+    const auto before = player.getPositionSeconds();
+    player.preload ({ mono, copy });
+    player.processBlock (buffer, midi);
+    check (player.isPlaying() && player.getPositionSeconds() > before, "preloading keeps the current song playing");
 
     std::printf (failures == 0 ? "backing: ok\n" : "backing: %d failures\n", failures);
     return failures == 0 ? 0 : 1;

@@ -24,8 +24,11 @@ public:
     ~BackingPlayer() override;
 
     /** Replaces the song: opens each file (a mono one plays on both outputs). Stops, at the start.
-        Returns the files that couldn't be opened. */
+        Returns the files that couldn't be opened. Instant when these files were preloaded. */
     juce::StringArray load (const juce::Array<juce::File>& files);
+    /** Opens and starts reading ahead a song that may come next (a setlist's), so load() of the
+        same files swaps it in without waiting for the disk. Replaces any earlier preload. */
+    void preload (const juce::Array<juce::File>& files);
     void play();
     void stop(); // keeps the position
     void restart(); // to the start, playing or not
@@ -64,13 +67,17 @@ private:
         juce::AudioSource& out() { return resampled != nullptr ? (juce::AudioSource&) *resampled : *buffered; }
     };
 
-    void prepareTracks(); // with the lock held
+    std::vector<Track> open (const juce::Array<juce::File>&, juce::StringArray& failed);
+    void prepare (Track&); // read-ahead at its file's rate, resampling to the device's
+    juce::int64 lengthOf (const std::vector<Track>&) const;
     void seek (juce::int64 devicePosition); // with the lock held
 
     juce::AudioFormatManager formats;
     juce::TimeSliceThread readAhead { "Backing tracks" };
     juce::CriticalSection lock; // the audio thread only tries it, and plays silence if it's taken
     std::vector<Track> tracks;
+    std::vector<Track> preloaded; // message thread only: the audio thread never sees these
+    juce::Array<juce::File> preloadedFiles;
     std::atomic<bool> playing { false };
     std::atomic<juce::int64> position { 0 }; // in device samples
     std::atomic<juce::int64> length { 0 };   // in device samples: the longest track

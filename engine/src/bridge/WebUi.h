@@ -4,11 +4,11 @@
 
 #include "../audio/Engine.h"
 #include "../blocks/ModelLibrary.h"
-#include "../midi/Footswitch.h"
 #include "../plugins/PluginLibrary.h"
 #include "../plugins/PluginWindow.h"
 #include "../project/ProjectStore.h"
-#include "../project/SongLibrary.h"
+#include "FootswitchControl.h"
+#include "SongControl.h"
 
 #include <map>
 
@@ -59,28 +59,10 @@ private:
     bool handleAbyCommand (const juce::String& type, const juce::var& command);
     bool handleRouteCommand (const juce::String& type, const juce::var& command);
     bool handlePresetCommand (const juce::String& type, const juce::var& command);
-    bool handleMidiCommand (const juce::String& type, const juce::var& command);
     bool handleTuneCommand (const juce::String& type, const juce::var& command);
-    bool handleSongCommand (const juce::String& type, const juce::var& command);
-
-    // Backing tracks: the project's current song (its songId) in the player, routed by its trackMix.
-    /** A track of the current song's mix entry: its sends, level and mute. Before it's edited it's the
-        default (the project's main output); create stores that default in the project. */
-    juce::var trackMixEntry (const juce::String& trackId, bool create);
-    void applyTrackMix();
-    void loadSong(); // the current song into the player, then its routes
-    void importSong(); // a file chooser, then the files as a new song, made current
     /** Tells the engine tune mode's state and settings (the project's), e.g. after a setting changes. */
     void applyTuneMode (bool on);
 
-    // Footswitch: mappings are the project's, per switch and page, each with a tap and a hold action.
-    juce::var findMapping (Footswitch::Switch, int onPage) const;
-    int pageCount() const;
-    /** Runs a mapped action: a command (block.toggle, preset.load, aby.select, panic.toggle) or a footswitch one
-        (chain.toggleMute, preset.next/prev, aby.toggleAB/toggleY, page.next). */
-    void runAction (const juce::var& action);
-    /** Opens the chosen MIDI input when it's there, closes it when it's gone. Polled. */
-    void connectMidi();
     /** Copies plugin states into the project, so they save. */
     void captureStates();
     void openEditor (const juce::String& blockId);
@@ -90,7 +72,10 @@ private:
     void captureSnapshot (const juce::String& blockId);
     void closeEditor (const juce::String& blockId);
 
+    /** Marks the state as changed; the timer sends it at most once a tick (30 Hz). */
     void sendState();
+    void emitState(); // builds and sends it now
+    bool stateDue = false;
     /** Errors for a device that opened without the inputs or outputs it was asked for (e.g. busy). */
     void checkDevice();
     void sendError (const juce::String& message);
@@ -111,15 +96,9 @@ private:
     int ticks = 0;
     bool presetModified = false; // as last sent, so a knob turned in a plugin window updates it
 
-    Footswitch footswitch;
-    int page = 0;
-    juce::var learning;             // { action, gesture, page } while MIDI learn waits for a press
-    juce::var lastSwitch;           // { channel, cc } of the last press, for the mapping screen
-    juce::StringArray midiNames;    // MIDI inputs as last seen, polled for hotplug
-
-    SongLibrary songs { ProjectStore::getDataDir() };
+    SongControl songControl { engine, store };
+    FootswitchControl footswitchControl { engine, store };
     bool wasPlaying = false; // the transport as last sent
-    bool learnedNow = false;        // the press that was learned doesn't also run an action
 
     const juce::String devUrl { GLITCH_UI_DEV_URL };
     const juce::File uiRoot;

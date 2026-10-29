@@ -46,8 +46,6 @@ namespace glitch::protocol
         inline constexpr auto presetRename   = "preset.rename";
         inline constexpr auto presetDelete   = "preset.delete";
         inline constexpr auto midiSelect     = "midi.selectDevice";
-        inline constexpr auto midiLearn      = "midi.learn";
-        inline constexpr auto midiCancelLearn = "midi.cancelLearn";
         inline constexpr auto midiForgetSwitch = "midi.forgetSwitch";
         inline constexpr auto mappingSet     = "mapping.set";
         inline constexpr auto mappingClear   = "mapping.clear";
@@ -62,6 +60,16 @@ namespace glitch::protocol
         inline constexpr auto transportPlay  = "transport.play";
         inline constexpr auto transportStop  = "transport.stop";
         inline constexpr auto transportRestart = "transport.restart";
+        inline constexpr auto transportNext  = "transport.next";
+        inline constexpr auto transportPrev  = "transport.prev";
+        inline constexpr auto setlistCreate  = "setlist.create";
+        inline constexpr auto setlistSelect  = "setlist.select";
+        inline constexpr auto setlistRename  = "setlist.rename";
+        inline constexpr auto setlistDelete  = "setlist.delete";
+        inline constexpr auto setlistAddSong = "setlist.addSong";
+        inline constexpr auto setlistRemoveSong = "setlist.removeSong";
+        inline constexpr auto setlistMoveSong = "setlist.moveSong";
+        inline constexpr auto setlistSetAutoAdvance = "setlist.setAutoAdvance";
         inline constexpr auto tuneToggle     = "tune.toggle";
         inline constexpr auto tuneSetInput   = "tune.setInput";
         inline constexpr auto tuneSetReference = "tune.setReference";

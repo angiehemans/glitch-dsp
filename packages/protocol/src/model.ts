@@ -124,7 +124,8 @@ export interface PresetSummary { id: string; name: string }
  * What a footswitch does. Commands: { type: "block.toggle", blockId }, { type: "preset.load", presetId },
  * { type: "aby.select", blockId, path }, { type: "panic.toggle" }, { type: "tune.toggle" }. Footswitch-only: { type: "chain.toggleMute", chainId },
  * { type: "preset.next" }, { type: "preset.prev" }, { type: "aby.toggleAB", blockId },
- * { type: "aby.toggleY", blockId }, { type: "page.next" }.
+ * { type: "aby.toggleY", blockId }, { type: "page.next" }, { type: "transport.toggle" } (play/stop).
+ * Transport commands work too: transport.next, transport.prev, transport.restart.
  */
 export interface ActionRef { type: string; [key: string]: unknown }
 
@@ -180,7 +181,9 @@ export interface Project {
   /** ms since epoch */
   openedAt: number;
   mainOutput: number[];
-  setlists: string[];
+  /** The project's own setlists (each owned by the project), and the one it's playing through. */
+  setlists: Setlist[];
+  setlistId?: string | null;
   songPresets: Record<string, string>;
   trackMix: Record<string, Record<string, TrackMixEntry>>;
   /** The song in the player. */
@@ -230,8 +233,6 @@ export interface GlitchState {
     device: string | null;
     connected: boolean;
     devices: string[];
-    /** MIDI learn: the next switch pressed gets this action. */
-    learning: { action: ActionRef; gesture: "tap" | "hold"; page: number } | null;
     page: number;
     pageCount: number;
     lastSwitch: { channel: number; cc: number } | null;

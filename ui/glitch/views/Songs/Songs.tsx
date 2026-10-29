@@ -1,8 +1,16 @@
 import styles from './Songs.module.css';
 
 type SongsProps = {
+  setlist?: "some" | "none";
   selected?: "song" | "none";
-  songs?: Array<{ id: string; title: string; detail: string; current: boolean }>;
+  setlists?: Array<{ id: string; name: string; current: string; renameKey: string }>;
+  autoLabel?: string;
+  autoOn?: string;
+  deleteSetlistLabel?: string;
+  deleteSetlistConfirm?: string;
+  entries?: Array<{ id: string; number: string; title: string; current: string; songLabel: string }>;
+  setlistNote?: string;
+  songs?: Array<{ id: string; title: string; detail: string; current: boolean; addLabel: string }>;
   noSongs?: boolean;
   noSelection?: boolean;
   title?: string;
@@ -26,11 +34,22 @@ type SongsProps = {
     label: string;
     muteLabel: string;
   }>;
+  onNewSetlist?: () => void;
+  onSelectSetlist?: (id: string) => void;
+  onToggleAuto?: () => void;
+  onDeleteSetlist?: () => void;
+  onPickEntry?: (id: string) => void;
+  onEntryUp?: (id: string) => void;
+  onEntryDown?: (id: string) => void;
+  onEntryRemove?: (id: string) => void;
   onImport?: () => void;
+  onAddToSetlist?: (id: string) => void;
   onSelectSong?: (id: string) => void;
   onDelete?: () => void;
+  onPrev?: () => void;
   onRestart?: () => void;
   onPlay?: () => void;
+  onNext?: () => void;
   onOpenRoute?: (id: string) => void;
   onPickOutput?: (id: string) => void;
   onMuteTrack?: (id: string) => void;
@@ -38,10 +57,24 @@ type SongsProps = {
 };
 
 export default function Songs({
+  setlist = "some",
   selected = "song",
+  setlists = [
+    { id: "1", name: "Friday at the Crown", current: "on", renameKey: "" },
+    { id: "2", name: "Acoustic", current: "off", renameKey: "" },
+  ],
+  autoLabel = "Auto-advance: on",
+  autoOn = "on",
+  deleteSetlistLabel = "Delete setlist…",
+  deleteSetlistConfirm = "off",
+  entries = [
+    { id: "0", number: "1", title: "Midnight City", current: "on", songLabel: "Play Midnight City" },
+    { id: "1", number: "2", title: "Dancing in the Dark", current: "off", songLabel: "Play Dancing in the Dark" },
+  ],
+  setlistNote = "",
   songs = [
-    { id: "1", title: "Midnight City", detail: "3 tracks · 4:03", current: true },
-    { id: "2", title: "Dancing in the Dark", detail: "5 tracks · 3:58", current: false },
+    { id: "1", title: "Midnight City", detail: "3 tracks · 4:03", current: true, addLabel: "Add Midnight City to the setlist" },
+    { id: "2", title: "Dancing in the Dark", detail: "5 tracks · 3:58", current: false, addLabel: "Add Dancing in the Dark to the setlist" },
   ],
   noSongs = false,
   noSelection = false,
@@ -81,19 +114,59 @@ export default function Songs({
       level: "60", db: "−6.0 dB", mute: "on", label: "Guitar 2 level", muteLabel: "Mute Guitar 2",
     },
   ],
+  onNewSetlist,
+  onSelectSetlist,
+  onToggleAuto,
+  onDeleteSetlist,
+  onPickEntry,
+  onEntryUp,
+  onEntryDown,
+  onEntryRemove,
   onImport,
+  onAddToSetlist,
   onSelectSong,
   onDelete,
+  onPrev,
   onRestart,
   onPlay,
+  onNext,
   onOpenRoute,
   onPickOutput,
   onMuteTrack,
   className,
 }: SongsProps) {
   return (
-    <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} aria-label="Songs" data-selected={selected}>
+    <section data-scamp-id="root" className={`${styles.root} ${className ?? ''}`} aria-label="Songs" data-setlist={setlist} data-selected={selected}>
       <div data-scamp-id="library_1a0b" className={styles.library_1a0b}>
+        <div data-scamp-id="setlist_1c0d" className={styles.setlist_1c0d}>
+          <div data-scamp-id="setlist_head_2d1e" className={styles.setlist_head_2d1e}>
+            <h2 data-scamp-id="setlist_title_3e2f" className={styles.setlist_title_3e2f}>SETLIST</h2>
+            <button data-scamp-id="new_setlist_4f30" className={styles.new_setlist_4f30} type="button" onClick={onNewSetlist}>+ New</button>
+          </div>
+          <ul data-scamp-id="setlist_tabs_5041" className={styles.setlist_tabs_5041}>
+            {setlists.map((list) => (
+              <li data-scamp-id="setlist_tab_row_6152" className={styles.setlist_tab_row_6152} key={list.id}>
+                <button data-scamp-id="setlist_tab_7263" className={styles.setlist_tab_7263} type="button" data-current={list.current} data-rename={list.renameKey} onClick={() => onSelectSetlist?.(list.id)}>{list.name}</button>
+              </li>
+            ))}
+          </ul>
+          <div data-scamp-id="setlist_tools_8374" className={styles.setlist_tools_8374}>
+            <button data-scamp-id="auto_9485" className={styles.auto_9485} type="button" data-on={autoOn} onClick={onToggleAuto}>{autoLabel}</button>
+            <button data-scamp-id="delete_setlist_a596" className={styles.delete_setlist_a596} type="button" data-confirm={deleteSetlistConfirm} onClick={onDeleteSetlist}>{deleteSetlistLabel}</button>
+          </div>
+          <ol data-scamp-id="entries_b6a7" className={styles.entries_b6a7}>
+            {entries.map((entry) => (
+              <li data-scamp-id="entry_c7b8" className={styles.entry_c7b8} key={entry.id} data-current={entry.current}>
+                <span data-scamp-id="entry_num_d8c9" className={styles.entry_num_d8c9}>{entry.number}</span>
+                <button data-scamp-id="entry_title_e9da" className={styles.entry_title_e9da} type="button" aria-label={entry.songLabel} onClick={() => onPickEntry?.(entry.id)}>{entry.title}</button>
+                <button data-scamp-id="entry_up_faeb" className={styles.entry_up_faeb} type="button" aria-label="Move up" onClick={() => onEntryUp?.(entry.id)}>↑</button>
+                <button data-scamp-id="entry_down_0bfc" className={styles.entry_down_0bfc} type="button" aria-label="Move down" onClick={() => onEntryDown?.(entry.id)}>↓</button>
+                <button data-scamp-id="entry_remove_1c0e" className={styles.entry_remove_1c0e} type="button" aria-label="Remove from the setlist" onClick={() => onEntryRemove?.(entry.id)}>✕</button>
+              </li>
+            ))}
+          </ol>
+          <p data-scamp-id="setlist_note_2d1f" className={styles.setlist_note_2d1f}>{setlistNote}</p>
+        </div>
         <div data-scamp-id="library_head_2b1c" className={styles.library_head_2b1c}>
           <h2 data-scamp-id="library_title_3c2d" className={styles.library_title_3c2d}>SONGS</h2>
           <button data-scamp-id="import_4d3e" className={styles.import_4d3e} type="button" onClick={onImport}>Import song…</button>
@@ -105,6 +178,7 @@ export default function Songs({
                 <span data-scamp-id="song_name_8172" className={styles.song_name_8172}>{song.title}</span>
                 <span data-scamp-id="song_detail_9283" className={styles.song_detail_9283}>{song.detail}</span>
               </button>
+              <button data-scamp-id="add_song_3e20" className={styles.add_song_3e20} type="button" aria-label={song.addLabel} onClick={() => onAddToSetlist?.(song.id)}>+</button>
             </li>
           ))}
         </ul>
@@ -118,8 +192,10 @@ export default function Songs({
           <button data-scamp-id="delete_e7d8" className={styles.delete_e7d8} type="button" data-confirm={deleteConfirm} onClick={onDelete}>{deleteLabel}</button>
         </div>
         <div data-scamp-id="transport_f8e9" className={styles.transport_f8e9}>
-          <button data-scamp-id="restart_09fa" className={styles.restart_09fa} type="button" aria-label="Back to the start" onClick={onRestart}>⏮</button>
+          <button data-scamp-id="prev_4f31" className={styles.prev_4f31} type="button" aria-label="Previous song in the setlist" onClick={onPrev}>⏮</button>
+          <button data-scamp-id="restart_09fa" className={styles.restart_09fa} type="button" aria-label="Back to the start" onClick={onRestart}>↺</button>
           <button data-scamp-id="play_1a0c" className={styles.play_1a0c} type="button" data-playing={playing} onClick={onPlay}>{playLabel}</button>
+          <button data-scamp-id="next_5042" className={styles.next_5042} type="button" aria-label="Next song in the setlist" onClick={onNext}>⏭</button>
           <span data-scamp-id="time_2b1d" className={styles.time_2b1d}>{timeLabel}</span>
           <div data-scamp-id="progress_3c2e" className={styles.progress_3c2e} aria-hidden="true" />
         </div>
@@ -162,4 +238,4 @@ export default function Songs({
   );
 }
 
-export const _scamp = { contract: 2, events: ['onImport', 'onSelectSong', 'onDelete', 'onRestart', 'onPlay', 'onOpenRoute', 'onPickOutput', 'onMuteTrack'] } as const;
+export const _scamp = { contract: 2, events: ['onNewSetlist', 'onSelectSetlist', 'onToggleAuto', 'onDeleteSetlist', 'onPickEntry', 'onEntryUp', 'onEntryDown', 'onEntryRemove', 'onImport', 'onAddToSetlist', 'onSelectSong', 'onDelete', 'onPrev', 'onRestart', 'onPlay', 'onNext', 'onOpenRoute', 'onPickOutput', 'onMuteTrack'] } as const;
