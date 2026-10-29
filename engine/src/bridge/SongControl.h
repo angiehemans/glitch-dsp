@@ -1,0 +1,54 @@
+#pragma once
+
+#include "../audio/Engine.h"
+#include "../project/ProjectStore.h"
+#include "../project/SongLibrary.h"
+
+#include <functional>
+
+namespace glitch
+{
+
+// Backing tracks and setlists: the project's current song (its songId) in the player, routed by
+// its trackMix, and the project's setlists (setlistId is the one it's on). Message thread only.
+class SongControl
+{
+public:
+    SongControl (Engine&, ProjectStore&);
+
+    std::function<void (const juce::String&)> onError;
+    std::function<void()> onChanged; // after an import finishes, so the state is sent
+
+    /** song.*, transport.*, trackMix.set and setlist.* commands. False after an error. */
+    bool handleCommand (const juce::String& type, const juce::var& command);
+
+    /** A track of the current song's mix entry: its sends, level and mute. Before it's edited it's the
+        default (the project's main output); create stores that default in the project. */
+    juce::var trackMixEntry (const juce::String& trackId, bool create);
+    void applyTrackMix();
+    void loadSong(); // the current song into the player, then its routes
+    /** After a song played to its end: the setlist's next one, playing, when it auto-advances. */
+    bool advanceAtEnd();
+
+    juce::var getSongs() const { return songs.getSongs(); }
+
+private:
+    bool handleSetlistCommand (const juce::String& type, const juce::var& command);
+    bool handleSongCommand (const juce::String& type, const juce::var& command);
+    void importSong(); // a file chooser, then the files as a new song, made current
+    void selectSong (const juce::String& songId); // made current and loaded ("" for none)
+    void preloadNext(); // the setlist's next song, read ahead; never touches the current one
+    juce::var currentSetlist() const;
+    /** The current setlist's song step places from the current one (1 next, -1 previous), or "". */
+    juce::String setlistNeighbour (int step) const;
+    void sendError (const juce::String& message) { if (onError) onError (message); }
+
+    Engine& engine;
+    ProjectStore& store;
+    SongLibrary songs { ProjectStore::getDataDir() };
+    std::unique_ptr<juce::FileChooser> chooser;
+
+    JUCE_DECLARE_NON_COPYABLE (SongControl)
+};
+
+} // namespace glitch

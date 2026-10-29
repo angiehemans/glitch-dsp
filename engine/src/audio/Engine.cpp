@@ -22,7 +22,9 @@ Engine::Engine (const juce::XmlElement* savedDeviceState)
     inputNode = graph.addNode (std::make_unique<IO> (IO::audioInputNode))->nodeID;
     outputNode = graph.addNode (std::make_unique<IO> (IO::audioOutputNode))->nodeID;
     mixerNode = graph.addNode (std::make_unique<OutputMixer>())->nodeID;
-    static_assert (OutputMixer::numSources == 2 * maxChains && OutputMixer::numOutputs == maxChannels);
+    playerNode = graph.addNode (std::make_unique<BackingPlayer>())->nodeID;
+    static_assert (OutputMixer::chainSources == 2 * maxChains && OutputMixer::numOutputs == maxChannels
+                   && OutputMixer::numSources == OutputMixer::chainSources + BackingPlayer::maxTracks);
     player.setProcessor (&graph);
 
     deviceError = deviceManager.initialise (maxChannels, maxChannels, savedDeviceState, true);
@@ -163,6 +165,8 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
     // Connections to channels the device doesn't have are refused by the graph, which leaves them silent.
     for (int ch = 0; ch < maxChannels; ++ch)
         graph.addConnection ({ { mixerNode, ch }, { outputNode, ch } }, Update::none);
+    for (int ch = 0; ch < BackingPlayer::maxTracks * 2; ++ch) // track i on the mixer's sources after the chains'
+        graph.addConnection ({ { playerNode, ch }, { mixerNode, OutputMixer::chainSources * 2 + ch } }, Update::none);
 
     for (const auto& c : chains)
     {
@@ -199,7 +203,10 @@ void Engine::applyChains (const std::vector<ChainSpec>& chains)
         connect (previous, out); // a split's outputs 0-1 are path A, or the merged sum
 
         // Both output stages always feed the mixer; path B's is silent unless the chain splits.
-        const auto slot = slots[c.id];
+        const auto found = slots.find (c.id);
+        if (found == slots.end())
+            continue; // more chains than mixer slots: this one isn't heard rather than sharing a slot
+        const auto slot = found->second;
         connect (out, mixerNode, slot * 4, 2);
         connect (chainOutB[c.id], mixerNode, slot * 4 + 2, 2);
     }
@@ -219,28 +226,45 @@ void Engine::setRoutes (const juce::String& chainId, const std::vector<Send>& ma
         return;
 
     for (int source = 0; source < 2; ++source)
-    {
-        OutputMixer::SourceGains gains {};
-        for (const auto& send : source == 0 ? main : pathB)
-        {
-            if (send.muted || send.levelDb <= silenceDb || send.outputs.empty())
-                continue;
-            const auto g = juce::Decibels::decibelsToGain (send.levelDb);
-            const auto valid = [] (int out) { return out >= 0 && out < maxChannels; };
+        mixer->setGains (it->second * 2 + source, gainsFor (source == 0 ? main : pathB, 1.0f));
+}
 
-            if (send.outputs.size() >= 2)
-            {
-                if (valid (send.outputs[0])) gains[0][(size_t) send.outputs[0]] += g;
-                if (valid (send.outputs[1])) gains[1][(size_t) send.outputs[1]] += g;
-            }
-            else if (valid (send.outputs[0]))
-            {
-                gains[0][(size_t) send.outputs[0]] += 0.5f * g;
-                gains[1][(size_t) send.outputs[0]] += 0.5f * g;
-            }
+void Engine::setTrackRoutes (int track, const std::vector<Send>& sends, float levelDb, bool isMuted)
+{
+    auto* mixer = dynamic_cast<OutputMixer*> (graph.getNodeForId (mixerNode)->getProcessor());
+    if (mixer == nullptr || track < 0 || track >= BackingPlayer::maxTracks)
+        return;
+    const auto scale = isMuted || levelDb <= silenceDb ? 0.0f : juce::Decibels::decibelsToGain (levelDb);
+    mixer->setGains (OutputMixer::chainSources + track, gainsFor (sends, scale));
+}
+
+BackingPlayer& Engine::getPlayer()
+{
+    return *dynamic_cast<BackingPlayer*> (graph.getNodeForId (playerNode)->getProcessor());
+}
+
+std::array<std::array<float, Engine::maxChannels>, 2> Engine::gainsFor (const std::vector<Send>& sends, float scale)
+{
+    OutputMixer::SourceGains gains {};
+    for (const auto& send : sends)
+    {
+        if (send.muted || send.levelDb <= silenceDb || send.outputs.empty())
+            continue;
+        const auto g = scale * juce::Decibels::decibelsToGain (send.levelDb);
+        const auto valid = [] (int out) { return out >= 0 && out < maxChannels; };
+
+        if (send.outputs.size() >= 2)
+        {
+            if (valid (send.outputs[0])) gains[0][(size_t) send.outputs[0]] += g;
+            if (valid (send.outputs[1])) gains[1][(size_t) send.outputs[1]] += g;
         }
-        mixer->setGains (it->second * 2 + source, gains);
+        else if (valid (send.outputs[0]))
+        {
+            gains[0][(size_t) send.outputs[0]] += 0.5f * g;
+            gains[1][(size_t) send.outputs[0]] += 0.5f * g;
+        }
     }
+    return gains;
 }
 
 bool Engine::duck (const juce::String& chainId)
@@ -584,6 +608,11 @@ void Engine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     master.reset (device->getCurrentSampleRate(), 0.02);
     master.setCurrentAndTargetValue (0.0f); // fade in from silence on start
     player.audioDeviceAboutToStart (device);
+    if (tuning.load())
+    {
+        tuner.stop(); // restart at the new device's rate, or every reading is off
+        tuner.start (device->getCurrentSampleRate());
+    }
 }
 
 void Engine::audioDeviceStopped()

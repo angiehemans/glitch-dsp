@@ -9,6 +9,7 @@ import {
   type GlitchState,
   type Mapping,
   type Project,
+  type TrackMixEntry,
 } from "@glitch/protocol";
 import type { EngineBridge } from "./engine";
 
@@ -32,7 +33,7 @@ export function emptyState(): GlitchState {
     songs: [],
     transport: { playing: false, songId: null, position: 0 },
     tuneMode: { active: false, tunerInput: 1, reference: 440, vocalChainId: null, backingTracks: "pause" },
-    midi: { device: null, connected: false, devices: [], learning: null, page: 0, pageCount: 1, lastSwitch: null, switches: [] },
+    midi: { device: null, connected: false, devices: [], page: 0, pageCount: 1, lastSwitch: null, switches: [] },
   };
 }
 
@@ -81,6 +82,7 @@ export function createMockEngine(): EngineBridge {
     const preset = current?.presets.find((p) => p.id === current.currentPresetId);
     state.presetModified = !!preset && rigJson(preset.chains) !== rigJson(current!.chains);
     state.mappings = current?.mappings ?? [];
+    state.setlists = current?.setlists ?? [];
     state.midi = { ...state.midi, connected: state.midi.device !== null, devices: ["Mock Chocolate"], pageCount: pageCount() };
     state.projects = [...projects]
       .sort((a, b) => b.openedAt - a.openedAt)
@@ -139,6 +141,22 @@ export function createMockEngine(): EngineBridge {
     const master = state.monitor.muted || state.panic ? SILENCE_DB : state.monitor.gainDb;
     outs.forEach((o, i) => (levels[`out:${i + 1}`] = Math.max(SILENCE_DB, o + master)));
     emit({ type: "meters", levels, cpu: 0.08 + Math.random() * 0.04 });
+    // The song plays on, and stops at its end.
+    const song = currentSong();
+    if (state.transport.playing && song) {
+      state.transport.position = Math.min(song.length, state.transport.position + 1 / 30);
+      if (state.transport.position >= song.length) {
+        state.transport.playing = false;
+        // The setlist moves on, when it auto-advances.
+        const next = currentSetlist()?.autoAdvance ? setlistNeighbour(1) : undefined;
+        if (next) {
+          selectSong(next);
+          state.transport.playing = true;
+        }
+        emitState();
+      }
+      if (Math.round(t * 30) % 3 === 0) emit({ type: "transport", ...state.transport, songId: song.id });
+    }
     // A guitar's low E drifting a few cents either side, with gaps between notes.
     if (state.tuneMode.active && Math.round(t * 30) % 2 === 0) {
       const hz = Math.sin(t * 0.8) > -0.6 ? 82.41 * 2 ** ((12 * Math.sin(t * 0.5)) / 1200) * (state.tuneMode.reference / 440) : 0;
@@ -149,7 +167,38 @@ export function createMockEngine(): EngineBridge {
     }
   }, 1000 / 30);
 
-  // Footswitch, as the engine's Footswitch and WebUi: tap/hold, MIDI learn, pages, actions.
+  // Setlists, as WebUi: the project's current one, and a song's neighbours in it.
+  const currentSetlist = () => {
+    const p = projects.find((p) => p.id === state.project?.id);
+    return p?.setlists.find((l) => l.id === p.setlistId);
+  };
+  const setlistNeighbour = (step: number) => {
+    const ids = (currentSetlist()?.songs ?? []).filter((id) => state.songs.some((s) => s.id === id));
+    const at = ids.indexOf(projects.find((p) => p.id === state.project?.id)?.songId ?? "");
+    if (at < 0) return step > 0 ? ids[0] : undefined;
+    return ids[at + step];
+  };
+  const selectSong = (songId: string | null) => {
+    const p = projects.find((p) => p.id === state.project?.id);
+    if (p) p.songId = songId;
+    state.transport = { playing: false, songId, position: 0 };
+  };
+
+  // Backing tracks, as WebUi: the project's current song, and its track mix (default: main output).
+  const currentSong = () => state.songs.find((s) => s.id === projects.find((p) => p.id === state.project?.id)?.songId);
+  const trackMixEntry = (trackId: string, create: boolean): TrackMixEntry | undefined => {
+    const p = projects.find((p) => p.id === state.project?.id);
+    const song = currentSong();
+    const track = song?.tracks.find((t) => t.id === trackId);
+    if (!p || !song || !track) return undefined;
+    const existing = p.trackMix[song.id]?.[trackId];
+    if (existing) return existing;
+    const entry = { outputs: [{ hwChannels: [...p.mainOutput], level: 0, pan: 0, mute: false }], level: track.defaultLevel, pan: 0, mute: false };
+    if (create) (p.trackMix[song.id] ??= {})[trackId] = entry;
+    return entry;
+  };
+
+  // Footswitch, as the engine's Footswitch and WebUi: tap/hold, pages, actions.
   const mappings = () => projects.find((p) => p.id === state.project?.id)?.mappings;
   const findMapping = (channel: number, cc: number, page: number) =>
     mappings()?.find((m) => m.switch.channel === channel && m.switch.cc === cc && m.page === page);
@@ -160,15 +209,6 @@ export function createMockEngine(): EngineBridge {
     if (held.has(key)) return; // a repeated press
     state.midi.lastSwitch = { channel, cc };
     if (!state.midi.switches.some((s) => s.channel === channel && s.cc === cc)) state.midi.switches.push({ channel, cc });
-    const learn = state.midi.learning;
-    if (learn) {
-      const m = findMapping(channel, cc, learn.page) ?? { switch: { channel, cc }, page: learn.page, tap: null, hold: null };
-      if (!mappings()?.includes(m)) mappings()?.push(m);
-      m[learn.gesture] = learn.action;
-      state.midi.learning = null;
-      held.set(key, { done: true }); // the learned press doesn't run anything
-      return emitState();
-    }
     if (state.tuneMode.active) {
       // Any switch leaves tune mode, whatever it's mapped to.
       state.tuneMode.active = false;
@@ -218,7 +258,9 @@ export function createMockEngine(): EngineBridge {
       if (action.type === "aby.toggleY" || aby.mode === "Y") return bridge.send({ type: "aby.setMode", blockId: aby.id, mode: aby.mode === "Y" ? "AB" : "Y" });
       return bridge.send({ type: "aby.select", blockId: aby.id, path: aby.active === "A" ? "B" : "A" });
     }
-    if (["block.toggle", "preset.load", "aby.select", "panic.toggle", "tune.toggle"].includes(action.type)) return bridge.send(action as unknown as Command);
+    if (action.type === "transport.toggle") return bridge.send({ type: state.transport.playing ? "transport.stop" : "transport.play" });
+    if (["block.toggle", "preset.load", "aby.select", "panic.toggle", "tune.toggle", "transport.next", "transport.prev", "transport.restart"].includes(action.type))
+      return bridge.send(action as unknown as Command);
     error(`The footswitch can't do ${action.type} yet`);
   };
 
@@ -302,7 +344,116 @@ export function createMockEngine(): EngineBridge {
         case "tune.toggle":
           if (!state.project) return error("No project open");
           state.tuneMode.active = !state.tuneMode.active;
+          if (state.tuneMode.active) state.transport.playing = false; // the song pauses while tuning
           break;
+        case "song.import": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("Open a project first");
+          // A browser can't open the engine's file chooser: a sample song stands in.
+          const id = newId();
+          state.songs.push({
+            id,
+            title: ["Midnight City", "Dancing in the Dark", "Seven Nation Army"][state.songs.length % 3],
+            length: 180 + 30 * state.songs.length,
+            tracks: [
+              { id: newId(), name: "Backing", file: "backing.wav", channels: 2, role: "backing", defaultLevel: 0 },
+              { id: newId(), name: "Click", file: "click.wav", channels: 1, role: "click", defaultLevel: 0 },
+              { id: newId(), name: "Guitar 2", file: "gtr2.wav", channels: 2, role: "stem", defaultLevel: 0 },
+            ],
+          });
+          p.songId = id;
+          state.transport = { playing: false, songId: id, position: 0 };
+          break;
+        }
+        case "song.select": {
+          if (!state.project) return error("Open a project first");
+          if (cmd.songId && !state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);
+          selectSong(cmd.songId);
+          break;
+        }
+        case "song.rename":
+        case "song.delete": {
+          const song = state.songs.find((s) => s.id === cmd.songId);
+          if (!song) return error(`Unknown song: ${cmd.songId}`);
+          if (cmd.type === "song.rename") song.title = cmd.title.trim() || song.title;
+          else {
+            state.songs.splice(state.songs.indexOf(song), 1);
+            for (const p of projects) if (p.songId === song.id) p.songId = null;
+            if (state.transport.songId === song.id) state.transport = { playing: false, songId: null, position: 0 };
+          }
+          break;
+        }
+        case "trackMix.set": {
+          const entry = trackMixEntry(cmd.trackId, true);
+          if (!entry) return error("That track isn't in the current song");
+          if (cmd.outputs) {
+            if (!cmd.outputs[0]?.hwChannels.length) return error("Invalid output channels");
+            if (entry.outputs.length) entry.outputs[0].hwChannels = [...cmd.outputs[0].hwChannels];
+            else entry.outputs.push({ hwChannels: [...cmd.outputs[0].hwChannels], level: 0, pan: 0, mute: false });
+          }
+          if (cmd.level !== undefined) entry.level = Math.min(10, Math.max(SILENCE_DB, cmd.level));
+          if (cmd.mute !== undefined) entry.mute = cmd.mute;
+          break;
+        }
+        case "transport.play":
+          if (!currentSong()) return error("Choose a song first");
+          if (state.transport.position >= currentSong()!.length) state.transport.position = 0;
+          state.transport.playing = true;
+          break;
+        case "transport.stop":
+          state.transport.playing = false;
+          break;
+        case "transport.restart":
+          state.transport.position = 0;
+          break;
+        case "transport.next":
+        case "transport.prev": {
+          const id = setlistNeighbour(cmd.type === "transport.next" ? 1 : -1);
+          if (!id) return error(currentSetlist() ? "That's the end of the setlist" : "Choose a setlist first");
+          selectSong(id);
+          break;
+        }
+        case "setlist.create": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("Open a project first");
+          const setlist = { id: newId(), name: cmd.name?.trim() || `Setlist ${p.setlists.length + 1}`, owner: p.id, songs: [], autoAdvance: false };
+          p.setlists.push(setlist);
+          p.setlistId = setlist.id;
+          break;
+        }
+        case "setlist.select":
+        case "setlist.rename":
+        case "setlist.delete":
+        case "setlist.addSong":
+        case "setlist.removeSong":
+        case "setlist.moveSong":
+        case "setlist.setAutoAdvance": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("Open a project first");
+          const l = p.setlists.find((x) => x.id === cmd.setlistId);
+          if (cmd.type === "setlist.select") {
+            if (cmd.setlistId && !l) return error(`Unknown setlist: ${cmd.setlistId}`);
+            p.setlistId = cmd.setlistId;
+            break;
+          }
+          if (!l) return error(`Unknown setlist: ${cmd.setlistId}`);
+          if (cmd.type === "setlist.rename") l.name = cmd.name.trim() || l.name;
+          if (cmd.type === "setlist.delete") {
+            p.setlists.splice(p.setlists.indexOf(l), 1);
+            if (p.setlistId === l.id) p.setlistId = null;
+          }
+          if (cmd.type === "setlist.addSong") {
+            if (!state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);
+            l.songs.splice(cmd.index ?? l.songs.length, 0, cmd.songId);
+          }
+          if (cmd.type === "setlist.removeSong" || cmd.type === "setlist.moveSong") {
+            if (cmd.index < 0 || cmd.index >= l.songs.length) return error("No song at that place in the setlist");
+            const [id] = l.songs.splice(cmd.index, 1);
+            if (cmd.type === "setlist.moveSong") l.songs.splice(Math.max(0, Math.min(l.songs.length, cmd.to)), 0, id);
+          }
+          if (cmd.type === "setlist.setAutoAdvance") l.autoAdvance = cmd.on;
+          break;
+        }
         case "tune.setInput":
           state.tuneMode.tunerInput = cmd.hwChannel;
           break;
@@ -317,10 +468,6 @@ export function createMockEngine(): EngineBridge {
           break;
         case "footswitch.press":
           return cmd.down ? press(cmd.channel, cmd.cc) : release(cmd.channel, cmd.cc);
-        case "midi.learn":
-          if (!state.project) return error("No project open");
-          state.midi.learning = { action: cmd.action, gesture: cmd.gesture, page: cmd.page ?? state.midi.page };
-          break;
         case "midi.forgetSwitch": {
           const same = (s: { channel: number; cc: number }) => s.channel === cmd.channel && s.cc === cmd.cc;
           state.midi.switches = state.midi.switches.filter((s) => !same(s));
@@ -328,9 +475,6 @@ export function createMockEngine(): EngineBridge {
           if (list) list.splice(0, list.length, ...list.filter((m) => !same(m.switch)));
           break;
         }
-        case "midi.cancelLearn":
-          state.midi.learning = null;
-          break;
         case "mapping.set": {
           if (!mappings()) return error("No project open");
           const m = findMapping(cmd.channel, cmd.cc, cmd.page) ?? { switch: { channel: cmd.channel, cc: cmd.cc }, page: cmd.page, tap: null, hold: null };
@@ -499,12 +643,19 @@ export function createMockEngine(): EngineBridge {
         }
         case "route.set":
         case "route.remove": {
-          const c = chain(cmd.chainId);
-          if (!c) return error(`Unknown chain: ${cmd.chainId}`);
-          const split = endsInSplit(c) ? (c.blocks[c.blocks.length - 1] as AbyBlock).splitOutputs : undefined;
-          if (!!cmd.path !== !!split)
-            return error(split ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
-          const sends = split ? split[cmd.path!] : c.outputs;
+          let sends;
+          if (cmd.trackId) {
+            const entry = trackMixEntry(cmd.trackId, true);
+            if (!entry) return error("That track isn't in the current song");
+            sends = entry.outputs;
+          } else {
+            const c = chain(cmd.chainId ?? "");
+            if (!c) return error(`Unknown chain: ${cmd.chainId}`);
+            const split = endsInSplit(c) ? (c.blocks[c.blocks.length - 1] as AbyBlock).splitOutputs : undefined;
+            if (!!cmd.path !== !!split)
+              return error(split ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
+            sends = split ? split[cmd.path!] : c.outputs;
+          }
           const n = state.device?.outputs.length ?? 0;
           if (!cmd.hwChannels.length || cmd.hwChannels.length > 2 || new Set(cmd.hwChannels).size !== cmd.hwChannels.length || cmd.hwChannels.some((ch) => ch < 1 || ch > Math.max(n, 8)))
             return error("Invalid output channels");
@@ -550,7 +701,7 @@ export function createMockEngine(): EngineBridge {
           break;
         }
         default:
-          return error(`Unknown command: ${cmd.type}`);
+          return error(`Unknown command: ${(cmd as Command).type}`);
       }
       emitState();
     },

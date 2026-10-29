@@ -37,7 +37,7 @@ public:
     std::function<double (Switch)> holdMsFor;
     /** A tap (hold false) or a hold (hold true) to act on. */
     std::function<void (Switch, bool hold)> onGesture;
-    /** Any press, before it's worked out: for MIDI learn and the activity light. */
+    /** Any press, before it's worked out: found switches get a tile from it. */
     std::function<void (Switch)> onPress;
 
     /** Opens a MIDI input by identifier; closing any other. False if it couldn't be opened. */

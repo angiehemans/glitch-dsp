@@ -1,5 +1,5 @@
 import { signal } from "@preact/signals";
-import type { Command, GlitchState, MetersEvent, TunerEvent } from "@glitch/protocol";
+import type { Command, GlitchState, MetersEvent, TransportState, TunerEvent } from "@glitch/protocol";
 import { engine } from "../bridge/engine";
 
 export const glitch = signal<GlitchState | null>(null);
@@ -8,6 +8,8 @@ export const lastError = signal<string | null>(null);
 export const cpuPercent = signal(0);
 /** The latest tuner reading, while tune mode is on (~15 Hz). Only the tuner view reads it. */
 export const tuner = signal<TunerEvent | null>(null);
+/** Where the song is (~10 Hz while playing), from transport events and every state. */
+export const transport = signal<TransportState>({ playing: false, songId: null, position: 0 });
 
 const meterSubscribers = new Set<(m: MetersEvent) => void>();
 
@@ -28,6 +30,10 @@ export function startStore() {
     switch (event.type) {
       case "state":
         glitch.value = event.state;
+        transport.value = event.state.transport;
+        break;
+      case "transport":
+        transport.value = { playing: event.playing, songId: event.songId, position: event.position };
         break;
       case "meters":
         cpuPercent.value = Math.round(event.cpu * 100);

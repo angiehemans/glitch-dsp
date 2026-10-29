@@ -56,7 +56,10 @@ juce_add_gui_app(Glitch
 target_sources(Glitch PRIVATE
     src/Main.cpp
     src/MainComponent.cpp
+    src/bridge/FootswitchControl.cpp
+    src/bridge/SongControl.cpp
     src/bridge/WebUi.cpp
+    src/audio/BackingPlayer.cpp
     src/audio/Engine.cpp
     src/audio/Tuner.cpp
     src/blocks/IrBlock.cpp
@@ -64,7 +67,8 @@ target_sources(Glitch PRIVATE
     src/blocks/NamBlock.cpp
     src/midi/Footswitch.cpp
     src/plugins/PluginLibrary.cpp
-    src/project/ProjectStore.cpp)
+    src/project/ProjectStore.cpp
+    src/project/SongLibrary.cpp)
 
 target_compile_definitions(Glitch PRIVATE
     JUCE_WEB_BROWSER=1
@@ -125,6 +129,33 @@ target_link_libraries(GlitchBench
         juce::juce_audio_processors
         juce::juce_audio_formats
         juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# ProjectStoreTest: checks project conversion, block moves, presets and settings. Not built by default:
+# cmake --build --preset dev --target ProjectStoreTest
+juce_add_console_app(ProjectStoreTest)
+set_target_properties(ProjectStoreTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(ProjectStoreTest PRIVATE tools/ProjectStoreTest.cpp src/project/ProjectStore.cpp)
+target_compile_definitions(ProjectStoreTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(ProjectStoreTest
+    PRIVATE
+        juce::juce_core
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# BackingTest: checks the backing-track player. Not built by default:
+# cmake --build --preset dev --target BackingTest
+juce_add_console_app(BackingTest)
+set_target_properties(BackingTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(BackingTest PRIVATE tools/BackingTest.cpp src/audio/BackingPlayer.cpp)
+target_compile_definitions(BackingTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(BackingTest
+    PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

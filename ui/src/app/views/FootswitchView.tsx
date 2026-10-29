@@ -4,7 +4,7 @@ import { useState } from "preact/hooks";
 import { send } from "../../store/glitch";
 
 /** Everything a switch can do in this rig, labelled, for a switch's menu: presets first. */
-function learnable(state: GlitchState): { name: string; action: ActionRef }[] {
+function assignable(state: GlitchState): { name: string; action: ActionRef }[] {
   const list: { name: string; action: ActionRef }[] = [];
   for (const p of state.presets) list.push({ name: `Preset: ${p.name}`, action: { type: "preset.load", presetId: p.id } });
   list.push({ name: "Next preset", action: { type: "preset.next" } }, { name: "Previous preset", action: { type: "preset.prev" } });
@@ -23,6 +23,10 @@ function learnable(state: GlitchState): { name: string; action: ActionRef }[] {
     list.push({ name: `Mute ${c.name}`, action: { type: "chain.toggleMute", chainId: c.id } });
   }
   list.push(
+    { name: "Play / stop the song", action: { type: "transport.toggle" } },
+    { name: "Next song (in the setlist)", action: { type: "transport.next" } },
+    { name: "Previous song", action: { type: "transport.prev" } },
+    { name: "Restart the song", action: { type: "transport.restart" } },
     { name: "Tune mode (mute all but vocals, open the tuner)", action: { type: "tune.toggle" } },
     { name: "Panic (mute all outputs)", action: { type: "panic.toggle" } },
     { name: "Next page", action: { type: "page.next" } },
@@ -63,6 +67,14 @@ function describe(state: GlitchState, action: ActionRef | null): { label: string
       return { label: "Panic", lit: state.panic };
     case "tune.toggle":
       return { label: "Tune mode", lit: state.tuneMode.active };
+    case "transport.toggle":
+      return { label: "Play / stop", lit: state.transport.playing };
+    case "transport.next":
+      return { label: "Next song", lit: false };
+    case "transport.prev":
+      return { label: "Previous song", lit: false };
+    case "transport.restart":
+      return { label: "Restart song", lit: false };
     default:
       return { label: action.type, lit: false };
   }
@@ -84,7 +96,7 @@ export function FootswitchView({ state }: { state: GlitchState }) {
   const { midi, mappings } = state;
   const [editing, setEditing] = useState<string | null>(null);
   const [forgetting, setForgetting] = useState<string | null>(null); // the switch whose Forget was clicked once
-  const actions = learnable(state);
+  const actions = assignable(state);
   // Switches found, plus any mapped in a project from elsewhere; named A, B, C… by CC.
   const ids = [...new Set([...midi.switches, ...mappings.map((m) => m.switch)].map((s) => `${s.channel}:${s.cc}`))].sort(
     (a, b) => parseSwitch(a).channel - parseSwitch(b).channel || parseSwitch(a).cc - parseSwitch(b).cc,

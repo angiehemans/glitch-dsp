@@ -9,6 +9,7 @@ import { route } from "./router";
 import { HomeView } from "./views/HomeView";
 import { RigView } from "./views/RigView";
 import { RoutingView } from "./views/RoutingView";
+import { SongsView } from "./views/SongsView";
 import { TunerView } from "./views/TunerView";
 
 // A signal rendered as text updates that text node in place: reading cpuPercent.value in App would
@@ -33,7 +34,7 @@ export function App() {
     <div class="gl-app">
       <div class="gl-topbar">
         <TopBar
-          variant={path === "/rig" || path === "/routing" ? "rig" : "home"}
+          variant={["/rig", "/routing", "/songs"].includes(path) ? "rig" : "home"}
           projectName={state?.project?.name ?? "NO PROJECT"}
           projectRenameKey={state?.project ? `project:${state.project.id}` : ""}
           presetName={preset?.name ?? "—"}
@@ -52,7 +53,7 @@ export function App() {
           }}
           onRenamePreset={() => preset && renameByKey(`preset:${preset.id}`)}
           onDeletePreset={() => preset && send({ type: "preset.delete", presetId: preset.id })}
-          songName="—"
+          songName={state?.songs.find((s) => s.id === state.project?.songId)?.title ?? "—"}
           cpuLoad={cpuText as unknown as string}
           audioDevice={device ? device.name : "NO AUDIO DEVICE"}
           devices={(state?.devices ?? []).map((d, i) => ({ id: String(i), name: d.label || d.name, kind: d.type, current: d.current }))}
@@ -94,8 +95,6 @@ export function App() {
           </button>
         </div>
       )}
-      {state?.tuneMode.active && <TunerView state={state} />}
-
       {lastError.value && (
         <div class="gl-banner gl-banner-error" role="alert">
           {lastError.value}
@@ -105,20 +104,28 @@ export function App() {
         </div>
       )}
 
-      {state?.project && (path === "/rig" || path === "/routing") && (
-        <div class="gl-tabs">
-          <ViewTabs active={path === "/routing" ? "routing" : "rig"} />
-        </div>
-      )}
-
-      {!state ? (
-        <p class="gl-loading">Connecting to engine…</p>
-      ) : path === "/rig" ? (
-        <RigView state={state} />
-      ) : path === "/routing" ? (
-        <RoutingView state={state} />
+      {state?.tuneMode.active ? (
+        <TunerView state={state} />
       ) : (
-        <HomeView state={state} />
+        <>
+          {state?.project && ["/rig", "/routing", "/songs"].includes(path) && (
+            <div class="gl-tabs">
+              <ViewTabs active={path === "/routing" ? "routing" : path === "/songs" ? "songs" : "rig"} />
+            </div>
+          )}
+
+          {!state ? (
+            <p class="gl-loading">Connecting to engine…</p>
+          ) : path === "/rig" ? (
+            <RigView state={state} />
+          ) : path === "/routing" ? (
+            <RoutingView state={state} />
+          ) : path === "/songs" ? (
+            <SongsView state={state} />
+          ) : (
+            <HomeView state={state} />
+          )}
+        </>
       )}
     </div>
   );

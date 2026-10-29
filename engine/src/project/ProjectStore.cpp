@@ -197,6 +197,10 @@ juce::var ProjectStore::normaliseProject (const juce::var& project)
 
 juce::File ProjectStore::getDataDir()
 {
+    // Tests point it at a temporary folder, so they never touch the user's projects.
+    if (const auto dir = juce::SystemStats::getEnvironmentVariable ("GLITCH_DATA_DIR", {}); dir.isNotEmpty())
+        return juce::File (dir);
+
     const auto base = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory);
    #if JUCE_MAC
     return base.getChildFile ("Application Support/Glitch");
@@ -759,9 +763,7 @@ void ProjectStore::removeMidiSwitch (int channel, int cc)
 void ProjectStore::saveSettings() const
 {
     settings.getDynamicObject()->setProperty ("lastProjectId", current["id"]);
-    const auto file = getDataDir().getChildFile ("settings.json");
-    file.getParentDirectory().createDirectory();
-    file.replaceWithText (juce::JSON::toString (settings));
+    writeJson (getDataDir().getChildFile ("settings.json"), settings); // temp file then move: a crash never leaves half a file
 }
 
 } // namespace glitch

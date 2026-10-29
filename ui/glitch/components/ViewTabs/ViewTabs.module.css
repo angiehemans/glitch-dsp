@@ -37,6 +37,20 @@
   color: var(--color-text-hi);
 }
 
+.tab_songs_7c3e {
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-lo);
+  text-decoration: none;
+}
+
+.tab_songs_7c3e:hover {
+  color: var(--color-text-hi);
+}
+
 .root[data-active="rig"] .tab_rig_5a1c {
   background: var(--button-face);
   box-shadow: var(--bevel-button);
@@ -44,6 +58,12 @@
 }
 
 .root[data-active="routing"] .tab_routing_6b2d {
+  background: var(--button-face);
+  box-shadow: var(--bevel-button);
+  color: var(--color-text-hi);
+}
+
+.root[data-active="songs"] .tab_songs_7c3e {
   background: var(--button-face);
   box-shadow: var(--bevel-button);
   color: var(--color-text-hi);
