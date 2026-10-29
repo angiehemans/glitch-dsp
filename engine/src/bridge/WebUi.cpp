@@ -195,6 +195,7 @@ WebUi::WebUi (Engine& e, ProjectStore& s, PluginLibrary& l, ModelLibrary& m)
 {
     addAndMakeVisible (browser);
     syncEngine();
+    loadSong();
 
     footswitch.onPress = [this] (Footswitch::Switch sw)
     {
@@ -321,6 +322,7 @@ void WebUi::handleCommand (const juce::var& command)
             return;
         }
         syncEngine();
+        loadSong(); // the project's current song, routed its way
     }
     else if (type == protocol::command::projectRename)
     {
@@ -354,6 +356,11 @@ void WebUi::handleCommand (const juce::var& command)
     else if (type.startsWith ("preset."))
     {
         if (! handlePresetCommand (type, command))
+            return;
+    }
+    else if (type.startsWith ("song.") || type.startsWith ("transport.") || type == protocol::command::trackMixSet)
+    {
+        if (! handleSongCommand (type, command))
             return;
     }
     else if (type.startsWith ("tune."))
@@ -686,6 +693,8 @@ bool WebUi::handleTuneCommand (const juce::String& type, const juce::var& comman
 
 void WebUi::applyTuneMode (bool on)
 {
+    if (on)
+        engine.getPlayer().stop(); // the plan's default: the song doesn't keep running while muted
     const auto settings = store.getCurrent()["tuneMode"];
     engine.setTuneMode (on, juce::jmax (1, (int) settings["tunerInput"]) - 1, settings["vocalChainId"].toString());
 }
@@ -882,22 +891,38 @@ void WebUi::connectMidi()
 
 bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& command)
 {
+    juce::Array<juce::var>* sends = nullptr;
     const auto chain = store.findChain (command["chainId"].toString());
-    if (! chain.isObject())
-    {
-        sendError ("Unknown chain: " + command["chainId"].toString());
-        return false;
-    }
 
-    // A chain whose ABY splits to separate outputs routes paths A and B; any other, its own output.
-    const auto path = command["path"].toString();
-    const auto split = splitExit (chain);
-    if (path.isNotEmpty() != split.isObject())
+    if (command["trackId"].toString().isNotEmpty())
     {
-        sendError (split.isObject() ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
-        return false;
+        // A backing track of the current song: its sends in the project's track mix.
+        const auto entry = trackMixEntry (command["trackId"].toString(), true);
+        if (! entry.isObject())
+        {
+            sendError ("That track isn't in the current song");
+            return false;
+        }
+        sends = entry["outputs"].getArray();
     }
-    auto* sends = (split.isObject() ? split["splitOutputs"][path == "B" ? "B" : "A"] : chain["outputs"]).getArray();
+    else
+    {
+        if (! chain.isObject())
+        {
+            sendError ("Unknown chain: " + command["chainId"].toString());
+            return false;
+        }
+
+        // A chain whose ABY splits to separate outputs routes paths A and B; any other, its own output.
+        const auto path = command["path"].toString();
+        const auto split = splitExit (chain);
+        if (path.isNotEmpty() != split.isObject())
+        {
+            sendError (split.isObject() ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
+            return false;
+        }
+        sends = (split.isObject() ? split["splitOutputs"][path == "B" ? "B" : "A"] : chain["outputs"]).getArray();
+    }
 
     const auto hwChannels = sendChannels (command["hwChannels"]);
     if (sends == nullptr || hwChannels.isEmpty())
@@ -930,8 +955,212 @@ bool WebUi::handleRouteCommand (const juce::String& type, const juce::var& comma
         return false;
     }
 
-    applyChainParams (chain); // mixer gains only: no rewiring
+    if (chain.isObject() && command["trackId"].toString().isEmpty())
+        applyChainParams (chain); // mixer gains only: no rewiring
+    else
+        applyTrackMix();
     store.markDirty();
+    return true;
+}
+
+//==============================================================================
+juce::var WebUi::trackMixEntry (const juce::String& trackId, bool create)
+{
+    const auto project = store.getCurrent();
+    const auto song = songs.find (project["songId"].toString());
+    juce::var track;
+    if (auto* tracks = song["tracks"].getArray())
+        for (const auto& t : *tracks)
+            if (t["id"].toString() == trackId)
+                track = t;
+    if (! track.isObject())
+        return {};
+
+    const auto songId = song["id"].toString();
+    if (const auto existing = project["trackMix"][juce::Identifier (songId)][juce::Identifier (trackId)]; existing.isObject())
+        return existing;
+
+    // Not edited yet: the plan's default, to the project's main output at the track's own level.
+    auto entry = object ({ { "outputs", juce::Array<juce::var> { newSend (project["mainOutput"].clone()) } },
+                           { "level", track["defaultLevel"] }, { "pan", 0.0 }, { "mute", false } });
+    if (create)
+    {
+        auto* mix = project["trackMix"].getDynamicObject();
+        if (! project["trackMix"][juce::Identifier (songId)].isObject())
+            mix->setProperty (songId, juce::var (new juce::DynamicObject()));
+        project["trackMix"][juce::Identifier (songId)].getDynamicObject()->setProperty (trackId, entry);
+        store.markDirty();
+    }
+    return entry;
+}
+
+void WebUi::applyTrackMix()
+{
+    const auto song = songs.find (store.getCurrent()["songId"].toString());
+    const auto* tracks = song["tracks"].getArray();
+    for (int i = 0; i < BackingPlayer::maxTracks; ++i)
+    {
+        std::vector<Engine::Send> sends;
+        float level = 0;
+        bool muted = true; // tracks the song doesn't have: silent
+        if (tracks != nullptr && i < tracks->size())
+        {
+            const auto entry = trackMixEntry ((*tracks)[i]["id"].toString(), false);
+            if (auto* outputs = entry["outputs"].getArray())
+                for (const auto& o : *outputs)
+                {
+                    Engine::Send send { {}, (float) o["level"], (bool) o["mute"] };
+                    if (auto* hw = o["hwChannels"].getArray())
+                        for (const auto& ch : *hw)
+                            send.outputs.push_back ((int) ch - 1);
+                    sends.push_back (send);
+                }
+            level = (float) entry["level"];
+            muted = (bool) entry["mute"];
+        }
+        engine.setTrackRoutes (i, sends, level, muted);
+    }
+}
+
+void WebUi::loadSong()
+{
+    const auto song = songs.find (store.getCurrent()["songId"].toString());
+    const auto failed = engine.getPlayer().load (songs.getFiles (song));
+    if (! failed.isEmpty())
+        sendError ("Couldn't open " + failed.joinIntoString (", "));
+    applyTrackMix();
+}
+
+void WebUi::importSong()
+{
+    if (chooser != nullptr)
+        return; // already open
+    chooser = std::make_unique<juce::FileChooser> ("Choose a song's audio files (WAV or AIFF): one track each",
+                                                   juce::File::getSpecialLocation (juce::File::userMusicDirectory), "*.wav;*.aif;*.aiff");
+    const auto safe = juce::Component::SafePointer<WebUi> (this);
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                              | juce::FileBrowserComponent::canSelectMultipleItems,
+                          [safe] (const juce::FileChooser& fc)
+                          {
+                              if (safe == nullptr)
+                                  return;
+                              auto& ui = *safe;
+                              const auto files = fc.getResults();
+                              ui.chooser = nullptr;
+                              if (files.isEmpty())
+                                  return;
+
+                              juce::StringArray failed;
+                              const auto song = ui.songs.import (files, failed);
+                              if (! failed.isEmpty())
+                                  ui.sendError ("Couldn't import " + failed.joinIntoString (", "));
+                              if (song.isObject() && ui.store.getCurrent().isObject())
+                              {
+                                  ui.store.getCurrent().getDynamicObject()->setProperty ("songId", song["id"]);
+                                  ui.store.markDirty();
+                                  ui.loadSong();
+                              }
+                              ui.sendState();
+                          });
+}
+
+bool WebUi::handleSongCommand (const juce::String& type, const juce::var& command)
+{
+    auto& player = engine.getPlayer();
+    const auto songId = command["songId"].toString();
+
+    if (type == protocol::command::songImport)
+    {
+        if (! store.getCurrent().isObject())
+        {
+            sendError ("Open a project first");
+            return false;
+        }
+        importSong();
+    }
+    else if (type == protocol::command::songSelect)
+    {
+        auto* project = store.getCurrent().getDynamicObject();
+        if (project == nullptr || (songId.isNotEmpty() && ! songs.find (songId).isObject()))
+        {
+            sendError (project == nullptr ? "Open a project first" : "Unknown song: " + songId);
+            return false;
+        }
+        project->setProperty ("songId", songId.isNotEmpty() ? juce::var (songId) : juce::var());
+        store.markDirty();
+        loadSong();
+    }
+    else if (type == protocol::command::songRename)
+    {
+        const auto title = cleanName (command["title"]);
+        if (title.isEmpty() || ! songs.rename (songId, title))
+        {
+            sendError (title.isEmpty() ? "A song needs a title" : "Unknown song: " + songId);
+            return false;
+        }
+    }
+    else if (type == protocol::command::songDelete)
+    {
+        const auto current = store.getCurrent()["songId"].toString() == songId;
+        if (! songs.remove (songId))
+        {
+            sendError ("Unknown song: " + songId);
+            return false;
+        }
+        if (current)
+        {
+            store.getCurrent().getDynamicObject()->removeProperty ("songId");
+            store.markDirty();
+            loadSong();
+        }
+    }
+    else if (type == protocol::command::trackMixSet)
+    {
+        const auto entry = trackMixEntry (command["trackId"].toString(), true);
+        if (! entry.isObject())
+        {
+            sendError ("That track isn't in the current song");
+            return false;
+        }
+        if (! command["outputs"].isVoid())
+        {
+            // The Songs tab's output menu, a shortcut like a chain's chip: it sets the first send.
+            const auto hwChannels = outputChannels (command["outputs"]);
+            if (hwChannels.isEmpty())
+            {
+                sendError ("Invalid output channels");
+                return false;
+            }
+            auto* sends = entry["outputs"].getArray();
+            if (sends->isEmpty())
+                sends->add (newSend (hwChannels));
+            else
+                (*sends)[0].getDynamicObject()->setProperty ("hwChannels", hwChannels);
+        }
+        if (! command["level"].isVoid())
+            entry.getDynamicObject()->setProperty ("level", juce::jlimit (Engine::silenceDb, 10.0f, (float) command["level"]));
+        if (! command["mute"].isVoid())
+            entry.getDynamicObject()->setProperty ("mute", (bool) command["mute"]);
+        store.markDirty();
+        applyTrackMix();
+    }
+    else if (type == protocol::command::transportPlay)
+    {
+        player.play();
+    }
+    else if (type == protocol::command::transportStop)
+    {
+        player.stop();
+    }
+    else if (type == protocol::command::transportRestart)
+    {
+        player.restart();
+    }
+    else
+    {
+        sendError ("Unknown command: " + type);
+        return false;
+    }
     return true;
 }
 
@@ -1501,8 +1730,10 @@ void WebUi::sendState()
         { "presetModified", presetModified = store.isPresetModified() },
         { "mappings", project.isObject() ? project["mappings"] : juce::var (juce::Array<juce::var>()) },
         { "setlists", juce::Array<juce::var>() },
-        { "songs", juce::Array<juce::var>() },
-        { "transport", object ({ { "playing", false }, { "songId", {} }, { "position", 0 } }) },
+        { "songs", songs.getSongs() },
+        { "transport", object ({ { "playing", engine.getPlayer().isPlaying() },
+                                 { "songId", project.isObject() ? project["songId"] : juce::var() },
+                                 { "position", engine.getPlayer().getPositionSeconds() } }) },
         { "tuneMode", object ({ { "active", engine.isTuning() },
                                 { "tunerInput", project.isObject() ? project["tuneMode"]["tunerInput"] : juce::var (1) },
                                 { "reference", project.isObject() ? project["tuneMode"]["reference"] : juce::var (440) },
@@ -1592,6 +1823,13 @@ void WebUi::timerCallback()
     }
 
     emit (object ({ { "type", protocol::event::meters }, { "levels", levels }, { "cpu", engine.getCpuUsage() } }));
+
+    // Where the song is, about 10 times a second, and once more when it stops (at its end, say).
+    const auto playing = engine.getPlayer().isPlaying();
+    if ((playing && ticks % 3 == 0) || playing != wasPlaying)
+        emit (object ({ { "type", protocol::event::transport }, { "playing", playing },
+                        { "songId", store.getCurrent()["songId"] }, { "position", engine.getPlayer().getPositionSeconds() } }));
+    wasPlaying = playing;
 
     // The tuner's reading, about 15 times a second: the nearest note to A4 = reference, and how far off.
     if (engine.isTuning() && ticks % 2 == 0)

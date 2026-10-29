@@ -149,7 +149,8 @@ export interface Track {
   defaultLevel: number;
 }
 
-export interface Song { id: string; title: string; bpm?: number; notes?: string; tracks: Track[] }
+/** A library song: its tracks play together, sample-locked. length is in seconds (the longest track). */
+export interface Song { id: string; title: string; length: number; bpm?: number; notes?: string; tracks: Track[] }
 
 export interface Setlist {
   id: string;
@@ -159,6 +160,8 @@ export interface Setlist {
   autoAdvance: boolean;
 }
 
+/** How a project plays a song's track: its sends (like a chain's), level and mute. A track without one
+ * plays at its defaultLevel to the project's mainOutput. */
 export interface TrackMixEntry { outputs: OutputRef[]; level: number; pan: number; mute: boolean }
 
 export interface ProjectSummary {
@@ -180,6 +183,8 @@ export interface Project {
   setlists: string[];
   songPresets: Record<string, string>;
   trackMix: Record<string, Record<string, TrackMixEntry>>;
+  /** The song in the player. */
+  songId?: string | null;
 }
 
 export interface TransportState { playing: boolean; songId: string | null; position: number }

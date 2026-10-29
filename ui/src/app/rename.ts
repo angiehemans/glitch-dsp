@@ -3,7 +3,7 @@ import { glitch, send } from "../store/glitch";
 import { cancelPendingNavigation } from "./router";
 
 /**
- * Double-click any element with data-rename="project:<id>", "chain:<id>" or "preset:<id>" to edit its text in place
+ * Double-click any element with data-rename="project:<id>", "chain:<id>", "preset:<id>" or "song:<id>" to edit its text in place
  * (contenteditable keeps Scamp's styling). Enter or clicking away saves, Escape cancels. The engine
  * is the source of truth: on save the text waits for the state that carries the new name.
  */
@@ -12,7 +12,7 @@ type Done = (how: "enter" | "blur" | "cancel") => void;
 function startRenaming(el: HTMLElement, onDone?: Done) {
   if (el.isContentEditable) return;
   const [kind, id] = (el.dataset.rename ?? "").split(":");
-  if (!id || (kind !== "project" && kind !== "chain" && kind !== "preset")) return;
+  if (!id || !["project", "chain", "preset", "song"].includes(kind)) return;
 
   const original = el.textContent ?? "";
   // A name inside a button (the top bar's preset): while editing, a space or a click in the text
@@ -42,6 +42,8 @@ function startRenaming(el: HTMLElement, onDone?: Done) {
       send({ type: "project.rename", projectId: id, name });
     } else if (kind === "preset") {
       send({ type: "preset.rename", presetId: id, name });
+    } else if (kind === "song") {
+      send({ type: "song.rename", songId: id, title: name });
     } else {
       send({ type: "chain.rename", chainId: id, name });
     }

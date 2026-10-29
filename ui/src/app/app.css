@@ -270,11 +270,15 @@ body {
   width: auto;
 }
 
-/* Tune mode (TunerView): over everything below the top bar, so Panic stays in reach */
+/* Tune mode (TunerView): in place of the page, below the top bar, so Panic stays in reach */
 .gl-tuner {
-  position: fixed;
-  inset: 64px 0 0 0;
-  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.gl-tuner > * {
+  flex-grow: 1;
 }
 
 /* The footswitch panel on the Rig, above the monitor strip (RigView) */

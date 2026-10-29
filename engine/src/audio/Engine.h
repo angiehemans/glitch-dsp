@@ -4,6 +4,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "BackingPlayer.h"
 #include "Tuner.h"
 
 #include <array>
@@ -78,6 +79,11 @@ public:
     /** Where a chain's output goes, and its ABY's path B when that splits to separate outputs.
         Only gains change: no rewiring, no fade. */
     void setRoutes (const juce::String& chainId, const std::vector<Send>& main, const std::vector<Send>& pathB);
+    /** Where a backing track (0-based, in the loaded song's order) goes: its sends, scaled by its level. */
+    void setTrackRoutes (int track, const std::vector<Send>& sends, float levelDb, bool isMuted);
+
+    /** The song's tracks; load, play and stop on it directly. Message thread. */
+    BackingPlayer& getPlayer();
 
     bool addBlock (const juce::String& blockId, std::unique_ptr<juce::AudioProcessor>);
     void removeBlock (const juce::String& blockId);
@@ -148,7 +154,8 @@ private:
 
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorPlayer player;
-    NodeID inputNode, outputNode, mixerNode;
+    NodeID inputNode, outputNode, mixerNode, playerNode;
+    static std::array<std::array<float, maxChannels>, 2> gainsFor (const std::vector<Send>&, float scale);
     std::map<juce::String, int> slots; // chain id -> its sources on the mixer: 2 * slot (main), 2 * slot + 1 (path B)
     std::map<juce::String, NodeID> chainIn, chainOut, chainOutB, blocks, mixes, splits; // chainOutB: path B of a split exit; mixes: by block id; splits: AbyMerge by ABY id
 

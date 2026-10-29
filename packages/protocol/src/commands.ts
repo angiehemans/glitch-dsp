@@ -47,8 +47,21 @@ export type Command =
   // Output matrix: a chain's send to hwChannels (one output, or a left/right pair). set adds it at
   // 0 dB if it's missing, then applies level and mute; remove drops it. A chain that splits to
   // separate outputs routes path A and B (path); any other routes the chain (no path).
-  | { type: "route.set"; chainId: string; path?: "A" | "B"; hwChannels: number[]; level?: number; mute?: boolean }
-  | { type: "route.remove"; chainId: string; path?: "A" | "B"; hwChannels: number[] }
+  // A backing track of the current song routes the same way, with trackId instead of chainId.
+  | { type: "route.set"; chainId?: string; trackId?: string; path?: "A" | "B"; hwChannels: number[]; level?: number; mute?: boolean }
+  | { type: "route.remove"; chainId?: string; trackId?: string; path?: "A" | "B"; hwChannels: number[] }
+  // Backing tracks. import opens a file chooser: the chosen WAV/AIFF files become one song (a track
+  // each), copied into the library, and the current song. select puts a song in the player (null: none).
+  | { type: "song.import" }
+  | { type: "song.select"; songId: string | null }
+  | { type: "song.rename"; songId: string; title: string }
+  | { type: "song.delete"; songId: string }
+  /** A track of the current song in this project's track mix: its level or mute, or outputs, which
+   * (like chain.setOutputs) sets its first send. */
+  | { type: "trackMix.set"; trackId: string; outputs?: Pick<OutputRef, "hwChannels">[]; level?: number; mute?: boolean }
+  | { type: "transport.play" }
+  | { type: "transport.stop" }
+  | { type: "transport.restart" }
   // ABY: splitAt inserts one at index (default: the end), moving the blocks after it into path A.
   // block.remove on an ABY keeps path A in the chain and deletes path B.
   | { type: "chain.splitAt"; chainId: string; index?: number }
@@ -87,19 +100,7 @@ export type Command =
   | { type: "setlist.create"; name: string; projectId?: string }
   | { type: "setlist.addToProject"; setlistId: string; projectId: string }
   | { type: "setlist.import"; path: string; projectId?: string }
-  | { type: "song.import"; files: string[]; title: string }
   | { type: "song.addTrack"; songId: string; file: string; name: string }
-  | {
-      type: "trackMix.set";
-      songId: string;
-      trackId: string;
-      outputs?: OutputRef[];
-      level?: number;
-      pan?: number;
-      mute?: boolean;
-    }
-  | { type: "transport.play" }
-  | { type: "transport.stop" }
   | { type: "transport.next" }
   | { type: "tune.toggle" }
   | { type: "tune.setInput"; hwChannel: number }

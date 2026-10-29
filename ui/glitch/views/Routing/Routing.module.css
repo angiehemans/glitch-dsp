@@ -148,6 +148,11 @@
   background: var(--chain-violet);
 }
 
+/* a backing track of the current song */
+.swatch_1a2a[data-color="track"] {
+  background: var(--color-text-dim);
+}
+
 .source_name_2b3c {
   flex-grow: 1;
   min-width: 0px;

@@ -8,6 +8,7 @@
 #include "../plugins/PluginLibrary.h"
 #include "../plugins/PluginWindow.h"
 #include "../project/ProjectStore.h"
+#include "../project/SongLibrary.h"
 
 #include <map>
 
@@ -60,6 +61,15 @@ private:
     bool handlePresetCommand (const juce::String& type, const juce::var& command);
     bool handleMidiCommand (const juce::String& type, const juce::var& command);
     bool handleTuneCommand (const juce::String& type, const juce::var& command);
+    bool handleSongCommand (const juce::String& type, const juce::var& command);
+
+    // Backing tracks: the project's current song (its songId) in the player, routed by its trackMix.
+    /** A track of the current song's mix entry: its sends, level and mute. Before it's edited it's the
+        default (the project's main output); create stores that default in the project. */
+    juce::var trackMixEntry (const juce::String& trackId, bool create);
+    void applyTrackMix();
+    void loadSong(); // the current song into the player, then its routes
+    void importSong(); // a file chooser, then the files as a new song, made current
     /** Tells the engine tune mode's state and settings (the project's), e.g. after a setting changes. */
     void applyTuneMode (bool on);
 
@@ -106,6 +116,9 @@ private:
     juce::var learning;             // { action, gesture, page } while MIDI learn waits for a press
     juce::var lastSwitch;           // { channel, cc } of the last press, for the mapping screen
     juce::StringArray midiNames;    // MIDI inputs as last seen, polled for hotplug
+
+    SongLibrary songs { ProjectStore::getDataDir() };
+    bool wasPlaying = false; // the transport as last sent
     bool learnedNow = false;        // the press that was learned doesn't also run an action
 
     const juce::String devUrl { GLITCH_UI_DEV_URL };

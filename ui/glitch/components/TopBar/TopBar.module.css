@@ -1,14 +1,32 @@
 .root {
   width: 100%;
-  height: 64px;
   display: flex;
-  gap: var(--space-4);
-  align-items: center;
-  padding: 0px var(--space-4);
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-4);
   background: var(--color-bg-1);
   position: relative;
   box-shadow: var(--bevel);
   border-bottom: 1px solid var(--color-line);
+}
+
+/* first row: where you are (project, preset, song) gets the width */
+.main_row_8e1f {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  min-width: 0px;
+}
+
+/* second row: the device, MIDI and the big buttons */
+.tools_row_9f20 {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.tools_spacer_a031 {
+  flex-grow: 1;
 }
 
 .back_7e21 {
@@ -372,7 +390,7 @@
 }
 
 .cpu_6a30 {
-  height: 44px;
+  height: 36px;
   display: flex;
   gap: var(--space-2);
   align-items: center;
@@ -428,7 +446,7 @@
 }
 
 .audio_status_bf85 {
-  height: 44px;
+  height: 36px;
   display: flex;
   gap: var(--space-2);
   align-items: center;
@@ -668,7 +686,7 @@
   text-overflow: ellipsis;
 }
 .midi_status_4f7a {
-  height: 44px;
+  height: 36px;
   display: flex;
   gap: var(--space-2);
   align-items: center;
@@ -697,7 +715,7 @@
 }
 
 .panic_3b9e {
-  height: 44px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -724,7 +742,7 @@
 }
 
 .tune_btn_5d0b {
-  height: 44px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -760,6 +778,16 @@
   letter-spacing: 0.1em;
   width: fit-content;
   height: fit-content;
+}
+
+/* home has no project display: one row */
+.root[data-variant="home"] {
+  flex-direction: row;
+  align-items: center;
+}
+
+.root[data-variant="home"] .tools_row_9f20 {
+  flex-grow: 1;
 }
 
 .root[data-variant="home"] .back_7e21 {

@@ -13,10 +13,10 @@ import { MonitorView } from "./MonitorView";
 
 type ChainColor = "orange" | "cyan" | "pink" | "lime" | "violet";
 
-const outputLabel = (channels: number[]) => `Out ${channels.join("/")}`;
+export const outputLabel = (channels: number[]) => `Out ${channels.join("/")}`;
 
 /** Output choices for a device with n outputs: stereo pairs first, then each output alone. */
-function outputChoices(n: number): number[][] {
+export function outputChoices(n: number): number[][] {
   const pairs = Array.from({ length: Math.floor(n / 2) }, (_, i) => [i * 2 + 1, i * 2 + 2]);
   const singles = Array.from({ length: n }, (_, i) => [i + 1]);
   return [...pairs, ...singles];

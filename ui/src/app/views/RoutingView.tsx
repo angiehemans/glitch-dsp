@@ -1,21 +1,54 @@
-import { SILENCE_DB, type AbyBlock, type Chain, type GlitchState, type OutputRef } from "@glitch/protocol";
+import { SILENCE_DB, type AbyBlock, type GlitchState, type OutputRef } from "@glitch/protocol";
 import Routing from "@scamp/views/Routing/Routing";
 import { send } from "../../store/glitch";
 import { dbToPosition, formatDb, positionToDb } from "../faderLaw";
 
 /**
- * A matrix source: a chain, or one path of a chain whose ABY splits to separate outputs. Its id is
- * the chain id, plus ":A" or ":B" for a path; a cell's id adds "~<output>".
+ * A matrix source: a chain, one path of a chain whose ABY splits to separate outputs, or a track of
+ * the current song. Its id is the chain id (":A" or ":B" added for a path) or "track:<id>"; a cell's
+ * id adds "~<output>". target is what route commands name it by.
  */
-type Source = { id: string; chain: Chain; path?: "A" | "B"; aby?: AbyBlock; sends: OutputRef[] };
+type Source = {
+  id: string;
+  name: string;
+  tag: string; // shown after the name: a path's letter, a track's role
+  color: string;
+  muted: boolean;
+  sends: OutputRef[];
+  target: { chainId?: string; path?: "A" | "B"; trackId?: string };
+  toggleMute: () => void;
+};
 
-function sources(chains: Chain[]): Source[] {
-  return chains.flatMap((chain): Source[] => {
+function sources(state: GlitchState): Source[] {
+  const chains = state.chains.flatMap((chain): Source[] => {
     const last = chain.blocks[chain.blocks.length - 1];
     const aby = last?.type === "aby" && (last as AbyBlock).exit === "split" ? (last as AbyBlock) : undefined;
-    if (!aby?.splitOutputs) return [{ id: chain.id, chain, sends: chain.outputs }];
-    return (["A", "B"] as const).map((path) => ({ id: `${chain.id}:${path}`, chain, path, aby, sends: aby.splitOutputs![path] }));
+    if (!aby?.splitOutputs)
+      return [{
+        id: chain.id, name: chain.name, tag: "", color: chain.color, muted: chain.muted, sends: chain.outputs, target: { chainId: chain.id },
+        toggleMute: () => send({ type: "chain.setMute", chainId: chain.id, muted: !chain.muted }),
+      }];
+    return (["A", "B"] as const).map((path) => {
+      const muted = (path === "B" ? aby.pathB : aby.pathA).mute;
+      return {
+        id: `${chain.id}:${path}`, name: chain.name, tag: path, color: chain.color, muted, sends: aby.splitOutputs![path], target: { chainId: chain.id, path },
+        toggleMute: () => send({ type: "aby.setMute", blockId: aby.id, path, muted: !muted }),
+      };
+    });
   });
+
+  // The current song's tracks; one not routed yet plays to the project's main output.
+  const song = state.songs.find((s) => s.id === state.project?.songId);
+  const tracks = (song?.tracks ?? []).map((track): Source => {
+    const entry = state.project?.trackMix[song!.id]?.[track.id];
+    const main = { hwChannels: state.project?.mainOutput ?? [1, 2], level: 0, pan: 0, mute: false };
+    return {
+      id: `track:${track.id}`, name: track.name, tag: track.role.toUpperCase(), color: "track", muted: !!entry?.mute,
+      sends: entry?.outputs ?? [main], target: { trackId: track.id },
+      toggleMute: () => send({ type: "trackMix.set", trackId: track.id, mute: !entry?.mute }),
+    };
+  });
+  return [...chains, ...tracks];
 }
 
 /** The send a cell shows: the one that reaches that output (a pair covers two cells). */
@@ -23,14 +56,15 @@ const sendAt = (sends: OutputRef[], output: number) => sends.find((s) => s.hwCha
 
 function findCell(state: GlitchState, cellId: string) {
   const [sourceId, output] = cellId.split("~");
-  const source = sources(state.chains).find((s) => s.id === sourceId);
+  const source = sources(state).find((s) => s.id === sourceId);
   return source && { source, output: Number(output), send: sendAt(source.sends, Number(output)) };
 }
 
 const routeSet = (source: Source, hwChannels: number[], change: { level?: number; mute?: boolean }) =>
-  send({ type: "route.set", chainId: source.chain.id, path: source.path, hwChannels, ...change });
+  send({ type: "route.set", ...source.target, hwChannels, ...change });
 
-/** The output matrix: every chain (or split path) against every hardware output the device opened. */
+/** The output matrix: every chain (or split path) and track of the current song, against every
+ * hardware output the device opened. */
 export function RoutingView({ state }: { state: GlitchState }) {
   if (!state.project) {
     return (
@@ -41,21 +75,20 @@ export function RoutingView({ state }: { state: GlitchState }) {
   }
 
   const names = state.device?.outputs ?? [];
-  const all = sources(state.chains);
+  const all = sources(state);
 
   return (
     <div class="gl-routing" onPointerDown={(e) => startLevelDrag(e, state)}>
       <Routing
         outputs={names.map((name, i) => ({ id: String(i + 1), label: `OUT ${i + 1}`, detail: name, meter: `out:${i + 1}` }))}
         rows={all.map((source) => {
-          const muted = source.path ? (source.path === "B" ? source.aby!.pathB : source.aby!.pathA).mute : source.chain.muted;
-          const name = source.path ? `${source.chain.name} path ${source.path}` : source.chain.name;
+          const name = source.target.path ? `${source.name} path ${source.tag}` : source.name;
           return {
             id: source.id,
-            name: source.chain.name,
-            path: source.path ?? "",
-            color: source.chain.color,
-            muted: muted ? "on" : "off",
+            name: source.name,
+            path: source.tag,
+            color: source.color,
+            muted: source.muted ? "on" : "off",
             muteLabel: `Mute ${name}`,
             cells: names.map((_, i) => {
               const output = i + 1;
@@ -73,13 +106,7 @@ export function RoutingView({ state }: { state: GlitchState }) {
           };
         })}
         empty={all.length === 0}
-        onRowMute={(id) => {
-          const source = all.find((s) => s.id === id);
-          if (!source) return;
-          if (source.path)
-            send({ type: "aby.setMute", blockId: source.aby!.id, path: source.path, muted: !(source.path === "B" ? source.aby!.pathB : source.aby!.pathA).mute });
-          else send({ type: "chain.setMute", chainId: source.chain.id, muted: !source.chain.muted });
-        }}
+        onRowMute={(id) => all.find((s) => s.id === id)?.toggleMute()}
         onRoute={(id) => {
           const cell = findCell(state, id);
           if (cell && !cell.send) routeSet(cell.source, [cell.output], {}); // routed cells only drag
@@ -94,7 +121,7 @@ export function RoutingView({ state }: { state: GlitchState }) {
         }}
         onRemove={(id) => {
           const cell = findCell(state, id);
-          if (cell?.send) send({ type: "route.remove", chainId: cell.source.chain.id, path: cell.source.path, hwChannels: cell.send.hwChannels });
+          if (cell?.send) send({ type: "route.remove", ...cell.source.target, hwChannels: cell.send.hwChannels });
         }}
       />
     </div>

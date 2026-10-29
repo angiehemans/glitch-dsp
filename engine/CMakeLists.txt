@@ -57,6 +57,7 @@ target_sources(Glitch PRIVATE
     src/Main.cpp
     src/MainComponent.cpp
     src/bridge/WebUi.cpp
+    src/audio/BackingPlayer.cpp
     src/audio/Engine.cpp
     src/audio/Tuner.cpp
     src/blocks/IrBlock.cpp
@@ -64,7 +65,8 @@ target_sources(Glitch PRIVATE
     src/blocks/NamBlock.cpp
     src/midi/Footswitch.cpp
     src/plugins/PluginLibrary.cpp
-    src/project/ProjectStore.cpp)
+    src/project/ProjectStore.cpp
+    src/project/SongLibrary.cpp)
 
 target_compile_definitions(Glitch PRIVATE
     JUCE_WEB_BROWSER=1
@@ -125,6 +127,20 @@ target_link_libraries(GlitchBench
         juce::juce_audio_processors
         juce::juce_audio_formats
         juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# BackingTest: checks the backing-track player. Not built by default:
+# cmake --build --preset dev --target BackingTest
+juce_add_console_app(BackingTest)
+set_target_properties(BackingTest PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_sources(BackingTest PRIVATE tools/BackingTest.cpp src/audio/BackingPlayer.cpp)
+target_compile_definitions(BackingTest PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+target_link_libraries(BackingTest
+    PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

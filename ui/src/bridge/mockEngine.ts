@@ -9,6 +9,7 @@ import {
   type GlitchState,
   type Mapping,
   type Project,
+  type TrackMixEntry,
 } from "@glitch/protocol";
 import type { EngineBridge } from "./engine";
 
@@ -139,6 +140,16 @@ export function createMockEngine(): EngineBridge {
     const master = state.monitor.muted || state.panic ? SILENCE_DB : state.monitor.gainDb;
     outs.forEach((o, i) => (levels[`out:${i + 1}`] = Math.max(SILENCE_DB, o + master)));
     emit({ type: "meters", levels, cpu: 0.08 + Math.random() * 0.04 });
+    // The song plays on, and stops at its end.
+    const song = currentSong();
+    if (state.transport.playing && song) {
+      state.transport.position = Math.min(song.length, state.transport.position + 1 / 30);
+      if (state.transport.position >= song.length) {
+        state.transport.playing = false;
+        emitState();
+      }
+      if (Math.round(t * 30) % 3 === 0) emit({ type: "transport", ...state.transport, songId: song.id });
+    }
     // A guitar's low E drifting a few cents either side, with gaps between notes.
     if (state.tuneMode.active && Math.round(t * 30) % 2 === 0) {
       const hz = Math.sin(t * 0.8) > -0.6 ? 82.41 * 2 ** ((12 * Math.sin(t * 0.5)) / 1200) * (state.tuneMode.reference / 440) : 0;
@@ -148,6 +159,20 @@ export function createMockEngine(): EngineBridge {
       emit({ type: "tuner", hz, note: hz ? names[((n % 12) + 12) % 12] : "", octave: Math.floor(n / 12) - 1, cents: hz ? (midi - n) * 100 : 0 });
     }
   }, 1000 / 30);
+
+  // Backing tracks, as WebUi: the project's current song, and its track mix (default: main output).
+  const currentSong = () => state.songs.find((s) => s.id === projects.find((p) => p.id === state.project?.id)?.songId);
+  const trackMixEntry = (trackId: string, create: boolean): TrackMixEntry | undefined => {
+    const p = projects.find((p) => p.id === state.project?.id);
+    const song = currentSong();
+    const track = song?.tracks.find((t) => t.id === trackId);
+    if (!p || !song || !track) return undefined;
+    const existing = p.trackMix[song.id]?.[trackId];
+    if (existing) return existing;
+    const entry = { outputs: [{ hwChannels: [...p.mainOutput], level: 0, pan: 0, mute: false }], level: track.defaultLevel, pan: 0, mute: false };
+    if (create) (p.trackMix[song.id] ??= {})[trackId] = entry;
+    return entry;
+  };
 
   // Footswitch, as the engine's Footswitch and WebUi: tap/hold, MIDI learn, pages, actions.
   const mappings = () => projects.find((p) => p.id === state.project?.id)?.mappings;
@@ -302,6 +327,69 @@ export function createMockEngine(): EngineBridge {
         case "tune.toggle":
           if (!state.project) return error("No project open");
           state.tuneMode.active = !state.tuneMode.active;
+          if (state.tuneMode.active) state.transport.playing = false; // the song pauses while tuning
+          break;
+        case "song.import": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("Open a project first");
+          // A browser can't open the engine's file chooser: a sample song stands in.
+          const id = newId();
+          state.songs.push({
+            id,
+            title: ["Midnight City", "Dancing in the Dark", "Seven Nation Army"][state.songs.length % 3],
+            length: 180 + 30 * state.songs.length,
+            tracks: [
+              { id: newId(), name: "Backing", file: "backing.wav", channels: 2, role: "backing", defaultLevel: 0 },
+              { id: newId(), name: "Click", file: "click.wav", channels: 1, role: "click", defaultLevel: 0 },
+              { id: newId(), name: "Guitar 2", file: "gtr2.wav", channels: 2, role: "stem", defaultLevel: 0 },
+            ],
+          });
+          p.songId = id;
+          state.transport = { playing: false, songId: id, position: 0 };
+          break;
+        }
+        case "song.select": {
+          const p = projects.find((p) => p.id === state.project?.id);
+          if (!p) return error("Open a project first");
+          if (cmd.songId && !state.songs.some((s) => s.id === cmd.songId)) return error(`Unknown song: ${cmd.songId}`);
+          p.songId = cmd.songId;
+          state.transport = { playing: false, songId: cmd.songId, position: 0 };
+          break;
+        }
+        case "song.rename":
+        case "song.delete": {
+          const song = state.songs.find((s) => s.id === cmd.songId);
+          if (!song) return error(`Unknown song: ${cmd.songId}`);
+          if (cmd.type === "song.rename") song.title = cmd.title.trim() || song.title;
+          else {
+            state.songs.splice(state.songs.indexOf(song), 1);
+            for (const p of projects) if (p.songId === song.id) p.songId = null;
+            if (state.transport.songId === song.id) state.transport = { playing: false, songId: null, position: 0 };
+          }
+          break;
+        }
+        case "trackMix.set": {
+          const entry = trackMixEntry(cmd.trackId, true);
+          if (!entry) return error("That track isn't in the current song");
+          if (cmd.outputs) {
+            if (!cmd.outputs[0]?.hwChannels.length) return error("Invalid output channels");
+            if (entry.outputs.length) entry.outputs[0].hwChannels = [...cmd.outputs[0].hwChannels];
+            else entry.outputs.push({ hwChannels: [...cmd.outputs[0].hwChannels], level: 0, pan: 0, mute: false });
+          }
+          if (cmd.level !== undefined) entry.level = Math.min(10, Math.max(SILENCE_DB, cmd.level));
+          if (cmd.mute !== undefined) entry.mute = cmd.mute;
+          break;
+        }
+        case "transport.play":
+          if (!currentSong()) return error("Choose a song first");
+          if (state.transport.position >= currentSong()!.length) state.transport.position = 0;
+          state.transport.playing = true;
+          break;
+        case "transport.stop":
+          state.transport.playing = false;
+          break;
+        case "transport.restart":
+          state.transport.position = 0;
           break;
         case "tune.setInput":
           state.tuneMode.tunerInput = cmd.hwChannel;
@@ -499,12 +587,19 @@ export function createMockEngine(): EngineBridge {
         }
         case "route.set":
         case "route.remove": {
-          const c = chain(cmd.chainId);
-          if (!c) return error(`Unknown chain: ${cmd.chainId}`);
-          const split = endsInSplit(c) ? (c.blocks[c.blocks.length - 1] as AbyBlock).splitOutputs : undefined;
-          if (!!cmd.path !== !!split)
-            return error(split ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
-          const sends = split ? split[cmd.path!] : c.outputs;
+          let sends;
+          if (cmd.trackId) {
+            const entry = trackMixEntry(cmd.trackId, true);
+            if (!entry) return error("That track isn't in the current song");
+            sends = entry.outputs;
+          } else {
+            const c = chain(cmd.chainId ?? "");
+            if (!c) return error(`Unknown chain: ${cmd.chainId}`);
+            const split = endsInSplit(c) ? (c.blocks[c.blocks.length - 1] as AbyBlock).splitOutputs : undefined;
+            if (!!cmd.path !== !!split)
+              return error(split ? "This chain splits to separate outputs: route path A or B" : "This chain doesn't split to separate outputs");
+            sends = split ? split[cmd.path!] : c.outputs;
+          }
           const n = state.device?.outputs.length ?? 0;
           if (!cmd.hwChannels.length || cmd.hwChannels.length > 2 || new Set(cmd.hwChannels).size !== cmd.hwChannels.length || cmd.hwChannels.some((ch) => ch < 1 || ch > Math.max(n, 8)))
             return error("Invalid output channels");

@@ -54,6 +54,14 @@ namespace glitch::protocol
         inline constexpr auto mappingHoldMs  = "mapping.setHoldMs";
         inline constexpr auto footswitchPage = "footswitch.setPage";
         inline constexpr auto footswitchPress = "footswitch.press";
+        inline constexpr auto songImport     = "song.import";
+        inline constexpr auto songSelect     = "song.select";
+        inline constexpr auto songRename     = "song.rename";
+        inline constexpr auto songDelete     = "song.delete";
+        inline constexpr auto trackMixSet    = "trackMix.set";
+        inline constexpr auto transportPlay  = "transport.play";
+        inline constexpr auto transportStop  = "transport.stop";
+        inline constexpr auto transportRestart = "transport.restart";
         inline constexpr auto tuneToggle     = "tune.toggle";
         inline constexpr auto tuneSetInput   = "tune.setInput";
         inline constexpr auto tuneSetReference = "tune.setReference";

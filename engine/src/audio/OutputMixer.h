@@ -8,14 +8,15 @@
 namespace glitch
 {
 
-// The output matrix: every source (a chain's output, or the B path of a chain whose ABY splits to
-// separate outputs) on a fixed pair of inputs, summed into the hardware outputs. Each source channel
+// The output matrix: every source (a chain's output, the B path of a chain whose ABY splits to
+// separate outputs, or a backing track) on a fixed pair of inputs, summed into the hardware outputs. Each source channel
 // has a gain into each output; the engine sets them from the routes (setGains, message thread) and
 // they're smoothed here, so routing and level changes never click and never need rewiring.
 class OutputMixer final : public juce::AudioProcessor
 {
 public:
-    static constexpr int numSources = 16;  // Engine::maxChains, two sources each
+    static constexpr int chainSources = 16; // Engine::maxChains, two sources each
+    static constexpr int numSources = chainSources + 16; // then BackingPlayer::maxTracks
     static constexpr int numOutputs = 8;   // Engine::maxChannels
     static constexpr double fadeSeconds = 0.02;
 
