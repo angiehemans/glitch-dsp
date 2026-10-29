@@ -114,10 +114,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  background-image: var(--chain-floor);
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
   position: relative;
   left: 0px;
   top: 0px;
@@ -130,10 +126,6 @@
   width: 24px;
   top: calc(50% - 2px);
   height: 4px;
-  background-image: var(--chain-floor);
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
   pointer-events: none;
 }
 
@@ -146,10 +138,6 @@
   bottom: calc((100% - var(--space-6)) / 4 - 1px);
   border: 2px solid var(--color-line-strong);
   border-left: none;
-  background-image: var(--chain-floor);
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
   pointer-events: none;
 }
 
@@ -500,7 +488,7 @@
   box-shadow: var(--bevel-inset);
 }
 
-/* split exit: one line out of each lane to the end of the chain, over the chain's centre line */
+/* split exit: one line out of each lane to the end of the chain */
 .exit_lines_c4d5 {
   display: none;
   flex-direction: column;
@@ -508,10 +496,6 @@
   align-self: stretch;
   flex-grow: 1;
   margin-left: calc(-1 * var(--space-6));
-  background-image: var(--chain-floor);
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
 }
 
 .exit_b_d5e6 {

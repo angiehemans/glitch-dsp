@@ -69,9 +69,6 @@
   --color-bg-2: #26282c;
   --color-bg-3: #34363b;
 
-  /* The image under a chain's pedals (ChainStrip's body). The ABY hides the chain's centre line with
-     patches of the same image, fixed to the window like the body's so they match: change both together. */
-  --chain-floor: url("/assets/carpet3.webp");
 
   /* Semantic */
   --color-line: #2e3035;

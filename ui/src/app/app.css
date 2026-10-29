@@ -299,8 +299,48 @@ body {
   position: relative;
 }
 
+/* The chain's centre line, in pieces: across the gap before each block, and from the last block to
+   the end of the chain (a flex item that takes the rest). Not one line behind everything, which the
+   ABY would have to paint over. Paths draw none; a split ABY draws its own lines to the end. */
+.gl-lane:not([data-aby]) > .gl-drag {
+  position: relative;
+}
+
+.gl-lane:not([data-aby]) > .gl-drag::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: calc(50% - 1px);
+  width: var(--space-6);
+  height: 2px;
+  background: var(--color-line-strong);
+  pointer-events: none;
+}
+
+.gl-lane:not([data-aby])::after {
+  content: "";
+  flex-grow: 1;
+  height: 2px;
+  margin-left: calc(-1 * var(--space-6));
+  background: var(--color-line-strong);
+}
+
+.gl-lane:not([data-aby]) > .gl-drag:first-child::before {
+  display: none;
+}
+
+/* a split ABY ends the chain with its own two lines */
+.gl-lane:has(> .gl-drag > [data-exit="split"])::after {
+  display: none;
+}
+
+/* an empty chain: no gap before the line to take back */
+.gl-lane:not([data-aby]):not(:has(> .gl-drag))::after {
+  margin-left: 0;
+}
+
 /* where the dragged block will land (RigView's dropSpot sets --drop-x) */
-.gl-lane[data-over]::after {
+.gl-lane[data-over]::before {
   content: "";
   position: absolute;
   top: 0;
