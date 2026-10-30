@@ -48,11 +48,15 @@ const newId = () => Math.random().toString(16).slice(2, 10);
  */
 export function createMockEngine(): EngineBridge {
   const listeners = new Set<(e: EngineEvent) => void>();
-  type MockPreset = { id: string; name: string; chains: Chain[] };
+  type Bypass = { chains: Record<string, boolean>; blocks: Record<string, boolean> };
+  type MockPreset = { id: string; name: string; bypass: Bypass };
   const projects: (Project & { chains: Chain[]; openedAt: number; presets: MockPreset[]; currentPresetId: string | null; mappings: Mapping[] })[] = [];
-  // The rig as saved: without what the engine fills in as it runs (as ProjectStore's rigJson).
-  const rigJson = (chains: Chain[]) =>
-    JSON.stringify(chains, (key, value) => (["missing", "note", "snapshotAt", "snapshotWidth", "snapshotHeight"].includes(key) ? undefined : value));
+  // What a preset keeps of the rig: chain mutes and block bypasses (as ProjectStore's bypassOf).
+  const blocksOf = (c: Chain) => c.blocks.flatMap((b) => (b.type === "aby" ? [...(b as AbyBlock).pathA.blocks, ...(b as AbyBlock).pathB.blocks] : [b]));
+  const bypassOf = (chains: Chain[]): Bypass => ({
+    chains: Object.fromEntries(chains.map((c) => [c.id, c.muted])),
+    blocks: Object.fromEntries(chains.flatMap(blocksOf).map((b) => [b.id, b.enabled])),
+  });
   const state: GlitchState = {
     ...emptyState(),
     device: {
@@ -81,7 +85,11 @@ export function createMockEngine(): EngineBridge {
     state.presets = current?.presets.map(({ id, name }) => ({ id, name })) ?? [];
     state.currentPresetId = current?.currentPresetId ?? null;
     const preset = current?.presets.find((p) => p.id === current.currentPresetId);
-    state.presetModified = !!preset && rigJson(preset.chains) !== rigJson(current!.chains);
+    const rig = bypassOf(current?.chains ?? []);
+    state.presetModified =
+      !!preset &&
+      (Object.entries(rig.chains).some(([id, muted]) => preset.bypass.chains[id] !== muted) ||
+        Object.entries(rig.blocks).some(([id, on]) => preset.bypass.blocks[id] !== on));
     state.mappings = current?.mappings ?? [];
     state.setlists = current?.setlists ?? [];
     state.midi = { ...state.midi, connected: state.midi.device !== null, devices: ["Mock Chocolate"], pageCount: pageCount() };
@@ -334,9 +342,9 @@ export function createMockEngine(): EngineBridge {
           const clean = (name?: string) => (name ?? "").replace(/\s+/g, " ").trim().slice(0, 60).trim();
           if (cmd.type === "preset.save" || cmd.type === "preset.saveAs") {
             const existing = cmd.type === "preset.save" ? p.presets.find((x) => x.id === p.currentPresetId) : undefined;
-            const preset = existing ?? { id: newId(), name: clean(cmd.name) || `Preset ${p.presets.length + 1}`, chains: [] };
+            const preset = existing ?? { id: newId(), name: clean(cmd.name) || `Preset ${p.presets.length + 1}`, bypass: bypassOf([]) };
             if (existing && clean(cmd.name)) existing.name = clean(cmd.name);
-            preset.chains = structuredClone(p.chains);
+            preset.bypass = bypassOf(p.chains);
             if (!existing) p.presets.push(preset);
             p.currentPresetId = preset.id;
             break;
@@ -344,7 +352,10 @@ export function createMockEngine(): EngineBridge {
           const preset = p.presets.find((x) => x.id === cmd.presetId);
           if (!preset) return error(`Unknown preset: ${cmd.presetId}`);
           if (cmd.type === "preset.load") {
-            p.chains = structuredClone(preset.chains);
+            for (const c of p.chains) {
+              c.muted = preset.bypass.chains[c.id] ?? c.muted;
+              for (const b of blocksOf(c)) b.enabled = preset.bypass.blocks[b.id] ?? b.enabled;
+            }
             p.currentPresetId = preset.id;
           }
           if (cmd.type === "preset.rename") {

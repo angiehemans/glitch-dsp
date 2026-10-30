@@ -7,7 +7,7 @@ type FootswitchPanelProps = {
   deviceName?: string;
   devices?: Array<{ id: string; name: string; current: boolean }>;
   pageLabel?: string;
-  switches?: Array<{ id: string; name: string; label: string; lit: string; editing: string; tap: string; hold: string }>;
+  switches?: Array<{ id: string; name: string; label: string; editLabel: string; lit: string; editing: string; tap: string; hold: string }>;
   editTitle?: string;
   canClearTap?: boolean;
   canClearHold?: boolean;
@@ -40,10 +40,10 @@ export default function FootswitchPanel({
   ],
   pageLabel = "PAGE 1 / 1",
   switches = [
-    { id: "1:20", name: "A", label: "Switch A: tap Fuzz, hold Panic", lit: "on", editing: "on", tap: "Fuzz", hold: "Panic" },
-    { id: "1:21", name: "B", label: "Switch B: tap Delay, hold nothing", lit: "off", editing: "off", tap: "Delay", hold: "—" },
-    { id: "1:22", name: "C", label: "Switch C: tap Next preset, hold Previous preset", lit: "off", editing: "off", tap: "Next preset", hold: "Previous preset" },
-    { id: "1:23", name: "D", label: "Switch D: tap Mute Vocals, hold nothing", lit: "off", editing: "off", tap: "Mute Vocals", hold: "—" },
+    { id: "1:20", name: "A", label: "Press switch A: tap Fuzz, hold Panic", editLabel: "Choose what switch A does", lit: "on", editing: "on", tap: "Fuzz", hold: "Panic" },
+    { id: "1:21", name: "B", label: "Press switch B: tap Delay, hold nothing", editLabel: "Choose what switch B does", lit: "off", editing: "off", tap: "Delay", hold: "—" },
+    { id: "1:22", name: "C", label: "Press switch C: tap Next preset, hold Previous preset", editLabel: "Choose what switch C does", lit: "off", editing: "off", tap: "Next preset", hold: "Previous preset" },
+    { id: "1:23", name: "D", label: "Press switch D: tap Mute Vocals, hold nothing", editLabel: "Choose what switch D does", lit: "off", editing: "off", tap: "Mute Vocals", hold: "—" },
   ],
   editTitle = "SWITCH A · PAGE 1",
   canClearTap = true,
@@ -100,7 +100,7 @@ export default function FootswitchPanel({
       <ul data-scamp-id="tiles_d9c6" className={styles.tiles_d9c6}>
         {switches.map((sw) => (
           <li data-scamp-id="tile_row_45c6" className={styles.tile_row_45c6} key={sw.id}>
-            <button data-scamp-id="tile_ead7" className={styles.tile_ead7} type="button" data-lit={sw.lit} data-editing={sw.editing} aria-label={sw.label} onClick={() => onEditSwitch?.(sw.id)}>
+            <button data-scamp-id="tile_ead7" className={styles.tile_ead7} type="button" data-lit={sw.lit} data-editing={sw.editing} data-switch={sw.id} aria-label={sw.label}>
               <span data-scamp-id="tile_name_fbe8" className={styles.tile_name_fbe8}>{sw.name}</span>
               <span data-scamp-id="tile_text_7d1e" className={styles.tile_text_7d1e}>
                 <span data-scamp-id="tap_label_2f1b" className={styles.tap_label_2f1b}>{sw.tap}</span>
@@ -110,11 +110,12 @@ export default function FootswitchPanel({
                 </span>
               </span>
             </button>
+            <button data-scamp-id="tile_edit_7c2a" className={styles.tile_edit_7c2a} type="button" data-editing={sw.editing} aria-label={sw.editLabel} onClick={() => onEditSwitch?.(sw.id)}>Edit</button>
           </li>
         ))}
       </ul>
       {noSwitches && (
-        <p data-scamp-id="empty_8571" className={styles.empty_8571}>Press each footswitch once so Glitch can find it. Then click a switch here to choose what its tap and hold do.</p>
+        <p data-scamp-id="empty_8571" className={styles.empty_8571}>Press each footswitch once so Glitch can find it. Then click a switch's Edit to choose what its tap and hold do, or click the switch to press it.</p>
       )}
       <div data-scamp-id="switch_menu_9a1b" className={styles.switch_menu_9a1b} role="group" aria-label={editTitle}>
         <div data-scamp-id="switch_head_ab2c" className={styles.switch_head_ab2c}>

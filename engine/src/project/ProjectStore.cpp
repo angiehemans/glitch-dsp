@@ -336,31 +336,22 @@ bool ProjectStore::writeJson (const juce::File& file, const juce::var& value)
 //==============================================================================
 namespace
 {
-    /** Ids of every block in these chains, ABY paths included. */
-    juce::StringArray rigBlockIds (const juce::var& chains)
+    /** What a preset keeps of these chains: { chains: { id: muted }, blocks: { id: enabled } }. */
+    juce::var bypassOf (const juce::var& chains)
     {
-        juce::StringArray ids;
+        auto muted = object(), enabled = object();
         if (auto* list = chains.getArray())
+        {
             for (const auto& c : *list)
+            {
+                muted.getDynamicObject()->setProperty (c["id"].toString(), (bool) c["muted"]);
                 for (auto* blocks : ProjectStore::getBlockLists (c))
                     for (const auto& b : *blocks)
-                        ids.add (b["id"].toString());
-        return ids;
-    }
-
-    /** The chains as JSON without what the engine fills in as it runs (load errors, notes, snapshots),
-        for comparing a rig with its preset. */
-    juce::String rigJson (const juce::var& chains)
-    {
-        const auto copy = chains.clone();
-        if (auto* list = copy.getArray())
-            for (const auto& c : *list)
-                for (auto* blocks : ProjectStore::getBlockLists (c))
-                    for (const auto& b : *blocks)
-                        if (auto* o = b.getDynamicObject())
-                            for (const auto* key : { "missing", "note", "snapshotAt", "snapshotWidth", "snapshotHeight" })
-                                o->removeProperty (key);
-        return juce::JSON::toString (copy, true);
+                        if (b["type"].toString() != "aby")
+                            enabled.getDynamicObject()->setProperty (b["id"].toString(), (bool) b["enabled"]);
+            }
+        }
+        return object ({ { "chains", muted }, { "blocks", enabled } });
     }
 }
 
@@ -377,14 +368,10 @@ void ProjectStore::loadPresets()
         const auto preset = juce::JSON::parse (file);
         if (auto* obj = preset.getDynamicObject(); obj != nullptr && preset["id"].toString() == file.getFileNameWithoutExtension())
         {
-            juce::Array<juce::var> chains;
-            if (auto* loaded = preset["chains"].getArray())
-                for (const auto& c : *loaded)
-                    if (auto chain = normaliseChain (c); ! chain.isVoid())
-                        chains.add (chain);
-            obj->setProperty ("chains", chains);
-            if (! preset["pluginStates"].isObject())
-                obj->setProperty ("pluginStates", object());
+            if (! preset["bypass"]["blocks"].isObject()) // an old preset, a whole rig: keep only its bypasses
+                obj->setProperty ("bypass", bypassOf (preset["chains"]));
+            obj->removeProperty ("chains");
+            obj->removeProperty ("pluginStates");
             presets.add (preset);
         }
     }
@@ -418,13 +405,7 @@ juce::String ProjectStore::savePreset (const juce::String& presetId, const juce:
 
     auto* obj = preset.getDynamicObject();
     obj->setProperty ("name", name.isNotEmpty() ? name : preset["name"].toString());
-    obj->setProperty ("chains", current["chains"].clone());
-
-    auto states = object();
-    for (const auto& id : rigBlockIds (current["chains"]))
-        if (const auto state = current["pluginStates"][juce::Identifier (id)]; ! state.isVoid())
-            states.getDynamicObject()->setProperty (id, state);
-    obj->setProperty ("pluginStates", states);
+    obj->setProperty ("bypass", bypassOf (current["chains"]));
 
     writeJson (getPresetsDir().getChildFile (preset["id"].toString() + ".json"), preset);
     current.getDynamicObject()->setProperty ("currentPresetId", preset["id"]);
@@ -438,11 +419,20 @@ bool ProjectStore::loadPreset (const juce::String& presetId)
     if (! preset.isObject())
         return false;
 
-    // The rig's plugin states become the preset's; blocks that aren't in it are gone.
-    auto* obj = current.getDynamicObject();
-    obj->setProperty ("chains", preset["chains"].clone());
-    obj->setProperty ("pluginStates", preset["pluginStates"].clone());
-    obj->setProperty ("currentPresetId", presetId);
+    // The rig stays; only its mutes and bypasses change. Chains and blocks added since it was saved keep theirs.
+    if (auto* list = current["chains"].getArray())
+    {
+        for (const auto& c : *list)
+        {
+            if (const auto muted = preset["bypass"]["chains"][juce::Identifier (c["id"].toString())]; muted.isBool())
+                c.getDynamicObject()->setProperty ("muted", muted);
+            for (auto* blocks : getBlockLists (c))
+                for (const auto& b : *blocks)
+                    if (const auto enabled = preset["bypass"]["blocks"][juce::Identifier (b["id"].toString())]; enabled.isBool() && b["type"].toString() != "aby")
+                        b.getDynamicObject()->setProperty ("enabled", enabled);
+        }
+    }
+    current.getDynamicObject()->setProperty ("currentPresetId", presetId);
     markDirty();
     return true;
 }
@@ -486,11 +476,12 @@ bool ProjectStore::isPresetModified() const
     const auto preset = findPreset (getCurrentPresetId());
     if (! preset.isObject())
         return false;
-    if (rigJson (current["chains"]) != rigJson (preset["chains"]))
-        return true;
-    for (const auto& id : rigBlockIds (current["chains"]))
-        if (current["pluginStates"][juce::Identifier (id)] != preset["pluginStates"][juce::Identifier (id)])
-            return true;
+    // A chain or block the preset doesn't know counts as different: saving would add it.
+    const auto rig = bypassOf (current["chains"]);
+    for (const auto* kind : { "chains", "blocks" })
+        for (const auto& [id, state] : rig[kind].getDynamicObject()->getProperties())
+            if (preset["bypass"][kind][id] != state)
+                return true;
     return false;
 }
 

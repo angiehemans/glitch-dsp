@@ -47,9 +47,8 @@ private:
     bool handleBlockCommand (const juce::String& type, const juce::var& command);
 
     /** Open project -> engine: creates and removes plugin nodes, rewires chains, sets parameters. */
-    /** Loads, unloads and rewires blocks to match the project. After a preset load, blocks that keep
-        running get their state from the store, while their chains are faded out. */
-    void syncEngine (bool presetLoaded = false);
+    /** Loads, unloads and rewires blocks to match the project. */
+    void syncEngine();
     /** The audio processor for a block (plugin, NAM model or IR), or null with an error. */
     std::unique_ptr<juce::AudioProcessor> createBlock (const juce::var& block, juce::String& error);
     /** Opens a chooser for plugins, folders, .nam models and IRs. */
@@ -67,6 +66,7 @@ private:
     void captureStates();
     void openEditor (const juce::String& blockId);
     void toggleBlock (const juce::String& blockId);
+    void setBypass (const juce::String& blockId, bool enabled); // the engine's fade and the open window's badge
     void removeBlock (const juce::String& blockId);
     /** Saves a PNG of the block's open plugin window, shown as its tile artwork. */
     void captureSnapshot (const juce::String& blockId);

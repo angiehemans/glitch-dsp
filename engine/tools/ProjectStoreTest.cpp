@@ -37,7 +37,7 @@ int main()
         "id": "c1", "name": "Guitar",
         "outputs": [ { "hwChannels": [1, 2], "level": -6 } ],
         "blocks": [
-          { "id": "b1", "type": "nam", "name": "Amp", "file": "nam/amp.nam" },
+          { "id": "b1", "type": "nam", "name": "Amp", "file": "nam/amp.nam", "enabled": true },
           { "id": "aby", "type": "aby", "exit": "split",
             "splitOutputs": { "A": [ { "hwChannels": [1, 2] } ], "B": [ { "hwChannels": [3] } ] },
             "pathA": { "blocks": [] }, "pathB": { "blocks": [] } }
@@ -60,13 +60,19 @@ int main()
         check (store.moveBlock ("b1", chain, 0, "aby", "A").isEmpty(), "a block moves into the split's path A");
         check (chain["blocks"].size() == 1 && chain["blocks"][0]["pathA"]["blocks"][0]["id"].toString() == "b1", "and it's there");
 
-        // Presets: modified once the rig changes, and not after loading the preset back.
+        // Presets keep only mutes and bypasses: other changes don't modify them, and loading keeps the rig.
         const auto presetId = store.savePreset ({}, "Clean");
         check (! store.isPresetModified(), "a just-saved preset isn't modified");
         chain.getDynamicObject()->setProperty ("level", -12.0);
-        check (store.isPresetModified(), "changing the fader modifies it");
+        check (! store.isPresetModified(), "the fader isn't part of it");
+        const auto amp = store.findBlock ("b1");
+        amp.getDynamicObject()->setProperty ("enabled", false);
+        chain.getDynamicObject()->setProperty ("muted", true);
+        check (store.isPresetModified(), "bypassing a block modifies it");
         check (store.loadPreset (presetId) && ! store.isPresetModified(), "loading it back undoes that");
-        check (std::abs ((double) store.findChain ("c1")["level"] + 6.0) < 1.0e-9, "with the saved fader level");
+        check ((bool) amp["enabled"] && ! (bool) chain["muted"], "with the saved bypass and mute");
+        check (std::abs ((double) chain["level"] + 12.0) < 1.0e-9 && store.findBlock ("b1") == amp, "and the same blocks, fader as it was");
+        chain.getDynamicObject()->setProperty ("level", -6.0);
 
         // A song linked to a deleted preset recalls nothing; other links stay.
         const auto other = store.savePreset ({}, "Lead");

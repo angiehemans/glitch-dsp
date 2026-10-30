@@ -206,6 +206,31 @@
   min-width: 0;
   flex: 1 1 200px;
   display: flex;
+  position: relative;
+}
+
+/* opens the switch's menu; the tile itself presses the switch */
+.tile_edit_7c2a {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-3);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-mid);
+  cursor: pointer;
+}
+
+.tile_edit_7c2a:hover {
+  color: var(--color-text-hi);
+}
+
+.tile_edit_7c2a[data-editing="on"] {
+  background: var(--color-text-hi);
+  color: var(--color-bg-0);
 }
 
 .tile_ead7 {
@@ -214,7 +239,7 @@
   display: flex;
   gap: var(--space-4);
   align-items: center;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-4) 64px var(--space-4) var(--space-5);
   background: var(--color-bg-1);
   border-radius: var(--radius-xl);
   text-align: left;

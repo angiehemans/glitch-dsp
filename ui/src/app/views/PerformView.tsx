@@ -1,8 +1,7 @@
 import type { AbyBlock, Block, Chain, GlitchState } from "@glitch/protocol";
 import Perform from "@scamp/views/Perform/Perform";
-import { useRef } from "preact/hooks";
 import { send, transport } from "../../store/glitch";
-import { describe, listSwitches, parseSwitch } from "./FootswitchView";
+import { describe, listSwitches, useSwitchPress } from "./FootswitchView";
 import { finishOf } from "./RigView";
 import { clock } from "./SongsView";
 
@@ -44,34 +43,13 @@ export function PerformView({ state }: { state: GlitchState }) {
   const left = song ? Math.max(0, song.length - position) : 0;
   const preset = state.presets.find((p) => p.id === state.currentPresetId);
   const { ids, name, mappingOf, pages } = listSwitches(state);
-  // A tile pressed with the mouse (or Enter/Space) is the switch pressed: down, then up, so holds work too.
-  const pressed = useRef<string | null>(null);
-  const press = (id: string | null | undefined, down: boolean) => {
-    if (!id || (down ? pressed.current : pressed.current !== id)) return;
-    pressed.current = down ? id : null;
-    send({ type: "footswitch.press", ...parseSwitch(id), down });
-  };
-  const tileOf = (e: Event) => (e.target as Element).closest<HTMLElement>("[data-switch]");
+  const pressing = useSwitchPress();
 
   return (
     <div
       class="gl-perform"
       style={{ "--progress": song?.length ? (position / song.length).toFixed(4) : "0" }}
-      onPointerDown={(e) => {
-        const tile = tileOf(e);
-        if (!tile || e.button !== 0) return;
-        tile.setPointerCapture(e.pointerId); // its release comes here even off the tile
-        press(tile.dataset.switch, true);
-      }}
-      onPointerUp={() => press(pressed.current, false)}
-      onPointerCancel={() => press(pressed.current, false)}
-      onKeyDown={(e) => {
-        const tile = tileOf(e);
-        if (!tile || (e.key !== "Enter" && e.key !== " ")) return;
-        e.preventDefault(); // Space would scroll
-        if (!e.repeat) press(tile.dataset.switch, true);
-      }}
-      onKeyUp={(e) => (e.key === "Enter" || e.key === " ") && press(tileOf(e)?.dataset.switch, false)}
+      {...pressing}
     >
       <Perform
         panic={state.panic ? "on" : "off"}

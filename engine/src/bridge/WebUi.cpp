@@ -524,7 +524,6 @@ bool WebUi::handlePresetCommand (const juce::String& type, const juce::var& comm
 
     if (type == protocol::command::presetSave || type == protocol::command::presetSaveAs)
     {
-        captureStates(); // plugin knobs turned since the last capture
         const auto overwrite = type == protocol::command::presetSave ? store.getCurrentPresetId() : juce::String();
         const auto name = cleanName (command["name"]);
         store.savePreset (overwrite, name.isNotEmpty() ? name : overwrite.isEmpty() ? newName() : juce::String());
@@ -536,7 +535,18 @@ bool WebUi::handlePresetCommand (const juce::String& type, const juce::var& comm
             sendError ("Unknown preset: " + presetId);
             return false;
         }
-        syncEngine (true);
+        // Only mutes and bypasses change: both fade, with no rewiring, so the sound never drops.
+        if (const auto* chains = store.getCurrentChains())
+        {
+            for (const auto& c : *chains)
+            {
+                applyChainParams (c);
+                for (auto* blocks : ProjectStore::getBlockLists (c))
+                    for (const auto& b : *blocks)
+                        if (b["type"].toString() != "aby")
+                            setBypass (b["id"].toString(), (bool) b["enabled"]);
+            }
+        }
     }
     else if (type == protocol::command::presetRename)
     {
@@ -801,10 +811,9 @@ bool WebUi::handleBlockCommand (const juce::String& type, const juce::var& comma
 }
 
 //==============================================================================
-void WebUi::syncEngine (bool presetLoaded)
+void WebUi::syncEngine()
 {
     const auto* chains = store.getCurrentChains();
-    const auto running = engine.getBlockIds(); // before this sync loads or unloads any
 
     juce::StringArray wantedBlocks, wantedSplits;
     if (chains != nullptr)
@@ -906,26 +915,7 @@ void WebUi::syncEngine (bool presetLoaded)
         }
     }
 
-    // Blocks the preset shares with the rig before it keep running, with the preset's state.
-    std::function<void()> atSwap;
-    if (presetLoaded)
-    {
-        // Copied now: a capture before the swap would overwrite the store's with the old states.
-        std::vector<std::pair<juce::String, juce::String>> states;
-        for (const auto& id : running)
-            states.emplace_back (id, store.getPluginState (id));
-        atSwap = [this, states]
-        {
-            for (const auto& [id, base64] : states)
-            {
-                juce::MemoryBlock state;
-                auto* processor = engine.getBlockProcessor (id);
-                if (processor != nullptr && state.fromBase64Encoding (base64) && state.getSize() > 0)
-                    processor->setStateInformation (state.getData(), (int) state.getSize());
-            }
-        };
-    }
-    engine.setChains (specs, std::move (atSwap));
+    engine.setChains (specs);
 
     if (chains != nullptr)
         for (const auto& c : *chains)
@@ -1099,11 +1089,16 @@ void WebUi::toggleBlock (const juce::String& blockId)
     {
         const auto enabled = ! (bool) block["enabled"];
         obj->setProperty ("enabled", enabled);
-        engine.setBlockEnabled (blockId, enabled);
-        if (const auto it = editors.find (blockId); it != editors.end())
-            it->second->setBypassed (! enabled);
+        setBypass (blockId, enabled);
         store.markDirty();
     }
+}
+
+void WebUi::setBypass (const juce::String& blockId, bool enabled)
+{
+    engine.setBlockEnabled (blockId, enabled);
+    if (const auto it = editors.find (blockId); it != editors.end())
+        it->second->setBypassed (! enabled);
 }
 
 void WebUi::removeBlock (const juce::String& blockId)

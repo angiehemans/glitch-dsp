@@ -1,6 +1,6 @@
 import type { AbyBlock, ActionRef, Block, GlitchState } from "@glitch/protocol";
 import FootswitchPanel from "@scamp/components/FootswitchPanel/FootswitchPanel";
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import { send } from "../../store/glitch";
 
 /** Everything a switch can do in this rig, labelled, for a switch's menu: presets first. */
@@ -96,12 +96,43 @@ export function listSwitches({ midi, mappings }: GlitchState) {
   return { ids, name, mappingOf, pages: Math.max(midi.pageCount, midi.page + 1) };
 }
 
+/**
+ * Handlers for a wrapper around switch tiles (elements with data-switch): a tile pressed with the mouse
+ * (or Enter/Space) is the switch pressed, down then up, so holds work too.
+ */
+export function useSwitchPress() {
+  const pressed = useRef<string | null>(null);
+  const press = (id: string | null | undefined, down: boolean) => {
+    if (!id || (down ? pressed.current : pressed.current !== id)) return;
+    pressed.current = down ? id : null;
+    send({ type: "footswitch.press", ...parseSwitch(id), down });
+  };
+  const tileOf = (e: Event) => (e.target as Element).closest<HTMLElement>("[data-switch]");
+  return {
+    onPointerDown: (e: PointerEvent) => {
+      const tile = tileOf(e);
+      if (!tile || e.button !== 0) return;
+      tile.setPointerCapture(e.pointerId); // its release comes here even off the tile
+      press(tile.dataset.switch, true);
+    },
+    onPointerUp: () => press(pressed.current, false),
+    onPointerCancel: () => press(pressed.current, false),
+    onKeyDown: (e: KeyboardEvent) => {
+      const tile = tileOf(e);
+      if (!tile || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault(); // Space would scroll
+      if (!e.repeat) press(tile.dataset.switch, true);
+    },
+    onKeyUp: (e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && press(tileOf(e)?.dataset.switch, false),
+  };
+}
+
 /** It sends Program Change (cc past 127, see Footswitch.h): a press with no release, so it can't hold. */
 const tapOnly = (id: string) => parseSwitch(id).cc >= 128;
 
 /**
  * The footswitch: MIDI input and pages, and a tile per switch found on the device (pressed at least
- * once, since MIDI doesn't list them). Clicking a tile opens its menu: what its tap and hold do.
+ * once, since MIDI doesn't list them). Clicking a tile presses the switch; its Edit opens its menu: what its tap and hold do.
  */
 export function FootswitchView({ state }: { state: GlitchState }) {
   const { midi } = state;
@@ -110,6 +141,7 @@ export function FootswitchView({ state }: { state: GlitchState }) {
   const actions = assignable(state);
   const { ids, name, mappingOf, pages } = listSwitches(state);
   const open = editing && ids.includes(editing) ? editing : null;
+  const pressing = useSwitchPress();
   const current = open ? mappingOf(open) : undefined;
   const set = (gesture: "tap" | "hold") => (id: string) => {
     const action = actions[Number(id)]?.action;
@@ -121,7 +153,14 @@ export function FootswitchView({ state }: { state: GlitchState }) {
   const clear = (gesture: "tap" | "hold") => () => open && send({ type: "mapping.clear", ...parseSwitch(open), page: midi.page, gesture });
 
   return (
-    <div class="gl-footswitch" onKeyDown={(e) => e.key === "Escape" && setEditing(null)}>
+    <div
+      class="gl-footswitch"
+      {...pressing}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setEditing(null);
+        pressing.onKeyDown(e);
+      }}
+    >
       <FootswitchPanel
         editing={open ? "open" : "closed"}
         connected={midi.connected ? "on" : "off"}
@@ -135,7 +174,8 @@ export function FootswitchView({ state }: { state: GlitchState }) {
           return {
             id,
             name: name(id),
-            label: `Switch ${name(id)}: tap ${tap.label}, hold ${hold.label}. Choose what it does`,
+            label: `Press switch ${name(id)}: tap ${tap.label}, hold ${hold.label}`,
+            editLabel: `Choose what switch ${name(id)} does`,
             lit: tap.lit ? "on" : "off",
             editing: id === open ? "on" : "off",
             tap: tap.label,

@@ -66,9 +66,8 @@ public:
     bool isPanic() const    { return panic.load(); }
 
     /** Rewires the graph to match. Creates and removes chain stages; blocks are added separately.
-        Chains that change are faded out first, so the rewiring itself lands a moment later.
-        With atSwap (a preset load), every chain fades out, and atSwap runs just before the rewiring. */
-    void setChains (const std::vector<ChainSpec>&, std::function<void()> atSwap = {});
+        Chains that change are faded out first, so the rewiring itself lands a moment later. */
+    void setChains (const std::vector<ChainSpec>&);
     void setChainParams (const juce::String& chainId, float levelDb, bool isMuted);
 
     /** A crosspoint of the output matrix: 0-based hardware outputs (a pair takes left and right, a
@@ -162,7 +161,6 @@ private:
     Phase phase = Phase::idle;
     double phaseEnd = 0, bypassEnd = 0; // Time::getMillisecondCounterHiRes
     std::vector<ChainSpec> pendingChains;
-    std::function<void()> pendingSwap;
     std::map<juce::String, ChainSpec> appliedChains;
     std::vector<NodeID> nodesToRemove; // removed blocks, kept playing until their chain has faded
 

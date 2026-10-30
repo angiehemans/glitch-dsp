@@ -97,9 +97,9 @@ export type Command =
   // chain's last block can split. It starts with both paths on the chain's outputs.
   | { type: "aby.setExit"; blockId: string; exit: "merge" | "split" }
   | { type: "aby.setOutputs"; blockId: string; path: "A" | "B"; outputs: Pick<OutputRef, "hwChannels">[] }
-  // Presets: a project's whole rig (chains, blocks, plugin states, routing). save overwrites the
-  // current preset (or makes one when there's none); saveAs always makes one. load swaps the rig
-  // in while every chain is faded out; blocks the presets share keep running.
+  // Presets: which chains are muted and which blocks bypassed; every preset shares the same blocks.
+  // save overwrites the current preset (or makes one when there's none); saveAs always makes one.
+  // load fades those mutes and bypasses in, with no rewiring.
   | { type: "preset.save"; name?: string }
   | { type: "preset.saveAs"; name?: string }
   | { type: "preset.load"; presetId: string }

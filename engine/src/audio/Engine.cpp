@@ -45,7 +45,7 @@ Engine::~Engine()
 }
 
 //==============================================================================
-void Engine::setChains (const std::vector<ChainSpec>& requested, std::function<void()> atSwap)
+void Engine::setChains (const std::vector<ChainSpec>& requested)
 {
     const auto dropMissing = [this] (std::vector<juce::String>& ids)
     {
@@ -91,14 +91,8 @@ void Engine::setChains (const std::vector<ChainSpec>& requested, std::function<v
     for (const auto& c : chains)
     {
         ids.insert (c.id);
-        if (const auto it = appliedChains.find (c.id); it != appliedChains.end() && (atSwap || ! (it->second == c)))
+        if (const auto it = appliedChains.find (c.id); it != appliedChains.end() && ! (it->second == c))
             changed = duck (c.id) || changed;
-    }
-    if (atSwap)
-    {
-        // A swap queued earlier still runs, then this one: both set state on blocks that may stay.
-        pendingSwap = [first = std::move (pendingSwap), then = std::move (atSwap)] { if (first) first(); then(); };
-        changed = true;
     }
     for (const auto& [id, spec] : appliedChains)
         if (ids.count (id) == 0)
@@ -404,8 +398,6 @@ void Engine::timerCallback()
 
     if (phase == Phase::fadingOut && now >= phaseEnd)
     {
-        if (auto swap = std::exchange (pendingSwap, {}))
-            swap();
         applyChains (pendingChains);
         // The new wiring swaps in on the audio thread's next buffer: fade in only after that.
         phase = Phase::fadingIn;

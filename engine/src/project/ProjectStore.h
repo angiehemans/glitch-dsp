@@ -55,14 +55,14 @@ public:
     /** The open project's presets as summaries ({ id, name }), oldest first, and the one it's on. */
     juce::var getPresetSummaries() const;
     juce::String getCurrentPresetId() const { return current["currentPresetId"].toString(); }
-    /** Saves the rig (chains, and their blocks' plugin states: capture them first) as a preset,
-        replacing presetId, or a new one when it's empty, and makes it current. Returns its id. */
+    /** Saves which chains are muted and which blocks bypassed as a preset, replacing presetId, or a
+        new one when it's empty, and makes it current. Returns its id. */
     juce::String savePreset (const juce::String& presetId, const juce::String& name);
-    /** Replaces the rig with the preset's and makes it current. False for an unknown preset. */
+    /** Sets the rig's mutes and bypasses to the preset's and makes it current. False for an unknown preset. */
     bool loadPreset (const juce::String& presetId);
     bool renamePreset (const juce::String& presetId, const juce::String& name);
     bool deletePreset (const juce::String& presetId);
-    /** The rig differs from its preset's: chains, blocks, routing, levels or plugin states. */
+    /** The rig's mutes or bypasses differ from its preset's. */
     bool isPresetModified() const;
 
     /** The footswitch's MIDI input, by name (identifiers change between sessions), in settings.json. */
@@ -98,7 +98,7 @@ private:
 
     juce::Array<juce::var> projects;
     juce::var current;
-    juce::Array<juce::var> presets; // the open project's, whole (with plugin states)
+    juce::Array<juce::var> presets; // the open project's
     juce::var settings;
     bool dirty = false;
 

@@ -222,7 +222,7 @@ export interface GlitchState {
   /** The open project's presets, oldest first, and the one the rig was last loaded from or saved to. */
   presets: PresetSummary[];
   currentPresetId: string | null;
-  /** The rig differs from that preset: chains, blocks, routing, levels or plugin settings. */
+  /** The rig's mutes or bypasses differ from that preset's (a chain or block it doesn't know counts). */
   presetModified: boolean;
   mappings: Mapping[];
   setlists: Setlist[];
